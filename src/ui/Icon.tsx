@@ -1,7 +1,8 @@
 import { spriteUrl } from '../render/assets';
+import { GOOD_INFO, type GoodId } from '../data/goods';
 
 export function GoodIcon({ good, size = 26 }: { good: string; size?: number }) {
-  return <img className="good-icon" src={spriteUrl(`goods/${good}`)} width={size} height={size} alt="" />;
+  return <img className="good-icon" src={spriteUrl(GOOD_INFO[good as GoodId]?.icon ?? `goods/${good}`)} width={size} height={size} alt="" />;
 }
 
 export function ShipIcon({ type, size = 44 }: { type: string; size?: number }) {

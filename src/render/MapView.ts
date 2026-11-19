@@ -11,6 +11,7 @@ import {
 import { CROWN, NATIVE } from './palette';
 import { RESOURCES, RESOURCE_IDS } from '../data/city';
 import { UNIT_INFO } from '../data/court';
+import { colonyKind } from './colonyKind';
 
 export interface RoutePreview { path: number[]; turns: number; risk: number; turnEnds: number[]; cross: boolean }
 
@@ -120,6 +121,9 @@ class Scene {
   rumourLayer = new Container();
   parties = new Container();
   landingG = new Graphics();
+  colonyLayer = new Container();
+  territoryG = new Graphics();
+  lastColonies = '';
   partySprites = new Map<number, { root: Container; ring: Graphics; fig: Sprite; target: string }>();
   lastFinds = '';
   fleetSprites = new Map<number, FleetSprite>();
@@ -187,8 +191,8 @@ class Scene {
     this.root.addChild(this.grid);
     this.root.addChild(this.portalBand());
     this.buildMonsters();
-    this.root.addChild(this.monsters, this.windG, this.labels, this.resLayer, this.rumourLayer, this.routes, this.landingG, this.turnMarks, this.highlight,
-      this.ports, this.parties, this.fleets, this.plateLayer, this.hover, this.previewLabel);
+    this.root.addChild(this.monsters, this.windG, this.territoryG, this.labels, this.resLayer, this.rumourLayer, this.routes, this.landingG, this.turnMarks, this.highlight,
+      this.ports, this.colonyLayer, this.parties, this.fleets, this.plateLayer, this.hover, this.previewLabel);
     this.buildLabels();
     this.buildPorts();
   }
@@ -402,6 +406,7 @@ class Scene {
     for (let i = 0; i < surveyed.length; i++) sk += surveyed[i];
     const findsKey = `${sk}|${state.rumoursDone[g.id].length}|${fogKey}`;
     if (findsKey !== this.lastFinds) { this.lastFinds = findsKey; this.drawFinds(state); }
+    this.syncColonies(state);
     this.syncFleets(state, ui, animate);
     this.syncParties(state, ui);
     this.landingG.clear();
@@ -473,6 +478,32 @@ class Scene {
         .stroke({ width: sel ? 2.4 : 1.4, color: CROWN.spain.secondary });
       ps.root.position.set(g.cx(p.hex), g.cy(p.hex) + HEX_R * 0.3);
     }
+  }
+
+  private syncColonies(state: GameState) {
+    const { g } = this;
+    const mine = state.colonies.filter((c) => c.map === g.id);
+    const key = mine.map((c) => `${c.id}:${c.level}:${c.pop}:${colonyKind(state, c)}`).join('|');
+    if (key === this.lastColonies) return;
+    this.lastColonies = key;
+    this.colonyLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
+    this.territoryG.clear();
+    for (const c of mine) {
+      for (const h of g.within(c.hex, c.level === 'outpost' ? 1 : 2)) this.territoryG.poly(g.corners(h)).fill({ color: CROWN.spain.primary, alpha: 0.09 });
+      const node = new Container();
+      const icon = new Sprite(this.assets.tex(`colonies/${colonyKind(state, c)}-${c.level}`));
+      icon.anchor.set(0.5, 0.72);
+      icon.width = HEX_W * (c.level === 'outpost' ? 1.1 : c.level === 'town' ? 1.5 : 1.9);
+      icon.scale.y = icon.scale.x;
+      node.addChild(icon);
+      node.position.set(g.cx(c.hex), g.cy(c.hex));
+      this.colonyLayer.addChild(node);
+      const plate = this.plate(`${c.name} · ${c.pop}`, CROWN.spain.primary);
+      plate.position.set(g.cx(c.hex), g.cy(c.hex) + HEX_R * 0.75);
+      this.plates.push(plate);
+      this.colonyLayer.addChild(plate);
+    }
+    this.territoryG.stroke({ width: 1, color: CROWN.spain.secondary, alpha: 0.18 });
   }
 
   partyAt(mx: number, my: number): number | null {
@@ -656,6 +687,7 @@ class Scene {
       if (t >= 1) fs.anim = null;
     }
     const s = Math.min(1.9, Math.max(0.85, 1 / scale));
+    this.plates = this.plates.filter((p) => !p.destroyed);
     for (const p of this.plates) p.scale.set(s);
     for (const d of this.decorLabels) d.node.scale.set(s);
     for (const d of this.islandLabels) d.node.scale.set(s);

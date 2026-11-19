@@ -82,32 +82,32 @@ export const EUROPEAN_PORTS: EuropeanPort[] = [
   {
     id: 'seville', name: 'Sevilla', lat: 37.2, lon: -6.3, kind: 'home', nation: 'Castile', port: 2,
     blurb: 'Capital of your trade and seat of the royal shipyard. Cacao and gold fetch the best price here.',
-    market: { sugar: [70, 30, 10, 0], spices: [110, 30, 10, 1], furs: [55, 30, 8, 1], tobacco: [65, 30, 10, 0], cacao: [100, 30, 12, 0], dyes: [65, 30, 8, 1], gold: [175, 40, 14, 0], tools: [20, 120, 30, 40] },
+    market: { silver: [130, 40, 12, 0], timber: [14, 80, 20, 24], stone: [9, 80, 15, 18], food: [6, 150, 40, 48], cloth: [24, 80, 20, 22], wine: [17, 80, 20, 26], sugar: [70, 30, 10, 0], spices: [110, 30, 10, 1], furs: [55, 30, 8, 1], tobacco: [65, 30, 10, 0], cacao: [100, 30, 12, 0], dyes: [65, 30, 8, 1], gold: [175, 40, 14, 0], tools: [20, 120, 30, 40] },
   },
   {
     id: 'cadiz', name: 'Cádiz', lat: 36.5, lon: -6.3, kind: 'home', nation: 'Castile', port: 1,
     blurb: 'A small Atlantic harbour of the Crown, closer to the open sea.',
-    market: { sugar: [66, 15, 5, 0], spices: [105, 15, 4, 0], furs: [52, 15, 4, 0], tobacco: [62, 15, 5, 0], cacao: [92, 15, 5, 0], dyes: [62, 15, 4, 0], gold: [165, 20, 6, 0], tools: [22, 60, 15, 18] },
+    market: { silver: [125, 20, 6, 0], timber: [15, 40, 10, 11], stone: [10, 40, 8, 9], food: [7, 80, 20, 22], cloth: [26, 40, 10, 10], wine: [16, 40, 10, 13], sugar: [66, 15, 5, 0], spices: [105, 15, 4, 0], furs: [52, 15, 4, 0], tobacco: [62, 15, 5, 0], cacao: [92, 15, 5, 0], dyes: [62, 15, 4, 0], gold: [165, 20, 6, 0], tools: [22, 60, 15, 18] },
   },
   {
     id: 'lisbon', name: 'Lisboa', lat: 38.7, lon: -9.2, kind: 'foreign', nation: 'Portugal',
     blurb: 'Portugal’s great harbour, rich from the African trade. A steady buyer of gold and dyes.',
-    market: { sugar: [64, 25, 8, 1], spices: [100, 25, 9, 2], furs: [50, 20, 6, 0], tobacco: [60, 20, 7, 0], cacao: [70, 20, 6, 0], dyes: [78, 25, 9, 1], gold: [165, 30, 10, 0], tools: [21, 90, 22, 30] },
+    market: { silver: [120, 30, 8, 0], timber: [14, 60, 15, 18], stone: [10, 60, 12, 14], food: [7, 100, 30, 32], cloth: [24, 60, 15, 16], wine: [14, 70, 15, 22], sugar: [64, 25, 8, 1], spices: [100, 25, 9, 2], furs: [50, 20, 6, 0], tobacco: [60, 20, 7, 0], cacao: [70, 20, 6, 0], dyes: [78, 25, 9, 1], gold: [165, 30, 10, 0], tools: [21, 90, 22, 30] },
   },
   {
     id: 'antwerp', name: 'Antwerpen', lat: 51.3, lon: 4.1, kind: 'foreign', nation: 'Flanders',
     blurb: 'The great market of the north. Its cloth workshops pay well for dyes and furs.',
-    market: { sugar: [75, 30, 12, 0], spices: [125, 30, 10, 1], furs: [80, 40, 14, 3], tobacco: [70, 30, 10, 0], cacao: [55, 25, 5, 0], dyes: [95, 40, 14, 2], gold: [150, 40, 10, 0], tools: [16, 140, 30, 50] },
+    market: { silver: [115, 40, 12, 0], timber: [11, 100, 25, 32], stone: [9, 80, 15, 18], food: [7, 120, 35, 38], cloth: [15, 120, 25, 40], wine: [22, 60, 18, 15], sugar: [75, 30, 12, 0], spices: [125, 30, 10, 1], furs: [80, 40, 14, 3], tobacco: [70, 30, 10, 0], cacao: [55, 25, 5, 0], dyes: [95, 40, 14, 2], gold: [150, 40, 10, 0], tools: [16, 140, 30, 50] },
   },
   {
     id: 'london', name: 'London', lat: 51.5, lon: 0.6, kind: 'foreign', nation: 'England',
     blurb: 'A growing port on the Thames. Takes to tobacco faster than anyone.',
-    market: { sugar: [72, 25, 9, 0], spices: [115, 25, 8, 0], furs: [72, 30, 10, 2], tobacco: [80, 30, 12, 0], cacao: [50, 20, 4, 0], dyes: [80, 30, 9, 1], gold: [150, 30, 8, 0], tools: [18, 110, 25, 40] },
+    market: { silver: [118, 30, 10, 0], timber: [12, 90, 20, 26], stone: [10, 60, 12, 14], food: [7, 110, 30, 34], cloth: [17, 100, 22, 32], wine: [24, 50, 15, 10], sugar: [72, 25, 9, 0], spices: [115, 25, 8, 0], furs: [72, 30, 10, 2], tobacco: [80, 30, 12, 0], cacao: [50, 20, 4, 0], dyes: [80, 30, 9, 1], gold: [150, 30, 8, 0], tools: [18, 110, 25, 40] },
   },
   {
     id: 'genoa', name: 'Genova', lat: 44.3, lon: 8.9, kind: 'foreign', nation: 'Genoa',
     blurb: 'Bankers and merchants of the Mediterranean. Steady buyers of everything.',
-    market: { sugar: [68, 25, 8, 0], spices: [95, 35, 10, 3], furs: [65, 30, 9, 2], tobacco: [62, 30, 9, 0], cacao: [72, 25, 7, 0], dyes: [82, 35, 10, 1], gold: [160, 40, 12, 0], tools: [18, 120, 25, 40] },
+    market: { silver: [125, 40, 12, 0], timber: [16, 60, 15, 15], stone: [8, 100, 15, 22], food: [8, 100, 30, 30], cloth: [20, 80, 20, 24], wine: [13, 90, 20, 30], sugar: [68, 25, 8, 0], spices: [95, 35, 10, 3], furs: [65, 30, 9, 2], tobacco: [62, 30, 9, 0], cacao: [72, 25, 7, 0], dyes: [82, 35, 10, 1], gold: [160, 40, 12, 0], tools: [18, 120, 25, 40] },
   },
 ];
 

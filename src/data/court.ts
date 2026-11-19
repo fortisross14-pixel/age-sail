@@ -28,7 +28,7 @@ export const RANK_INFO: Record<Rank, { name: string; cost: number; ready: number
 };
 
 export const UNIT_INFO: Record<UnitType, { name: string; sprite: string; blurb: string }> = {
-  colonist: { name: 'Colonist', sprite: 'units/colonist', blurb: 'Settlers who will found towns (with materials, in a later version).' },
+  colonist: { name: 'Colonist', sprite: 'units/colonist', blurb: 'Settlers: they found colonies (with timber and tools) and work the land there.' },
   infantry: { name: 'Infantry', sprite: 'units/pikeman', blurb: 'Soldiers to protect an expedition ashore, or to conquer.' },
   missionary: { name: 'Missionary', sprite: 'units/friar', blurb: 'Friars who will found missions among native peoples.' },
 };

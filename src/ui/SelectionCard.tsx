@@ -6,6 +6,8 @@ import { isWater } from '../data/terrain';
 import { UNIT_INFO } from '../data/court';
 import { partyMaxMoves, partyUnits } from '../sim/land';
 import { personById } from '../sim/court';
+import { canFound, foundingNeeds } from '../sim/colony';
+import { GOOD_INFO, type GoodId } from '../data/goods';
 import { ShipIcon } from './Icon';
 
 /** A compact card for the selected fleet: what it has, and what it can do next. */
@@ -28,7 +30,7 @@ export function SelectionCard() {
   const shoreNear = [fleet.hex, ...g.neighbors(fleet.hex)].some((h) => !isWater(world[fleet.map].terrain[h]) && game.fog[fleet.map][h] > 0);
   const aboard = game.units.filter((u) => u.fleet === fleet.id).length;
   const leader = leaderOf(game, fleet);
-  const port = fleet.at ? portById(world, fleet.at) : undefined;
+  const port = fleet.at ? portById(world, fleet.at, game) : undefined;
   const lowFood = fleet.supplies <= 2;
   return (
     <div className="selection" role="region" aria-label={`Selected fleet ${fleet.name}`}>
@@ -75,7 +77,7 @@ export function SelectionCard() {
             {fleet.map === 'old' ? 'Cross ⟵' : 'To Europe ⟶'}
           </button>
         )}
-        {port && !preview && <button onClick={() => set({ drawer: 'markets', selectedPort: port.id })}>Trade</button>}
+        {port && !preview && <button onClick={() => set(port.kind === 'colony' ? { drawer: 'cities', selectedColony: port.id } : { drawer: 'markets', selectedPort: port.id })}>{port.kind === 'colony' ? 'Colony' : 'Trade'}</button>}
         {port && !preview && provisionCost(world, fleet, game) > 0 && (
           <button onClick={() => void run({ kind: 'provision', fleet: fleet.id })}>Provision · {fmt(provisionCost(world, fleet, game))}</button>
         )}
@@ -98,6 +100,7 @@ function PartyCard({ partyId }: { partyId: number }) {
   const run = useStore((s) => s.run);
   const confirm = useStore((s) => s.confirmPreview);
   const set = useStore((s) => s.set);
+  const world = useStore((s) => s.world)!;
   const p = game.parties.find((x) => x.id === partyId)!;
   const g = GRIDS[p.map];
   const leader = personById(game, p.leader);
@@ -120,7 +123,10 @@ function PartyCard({ partyId }: { partyId: number }) {
         ) : p.order ? (
           <div className="sel-plan muted">Marching: {p.order.length - 1} hexes to go.</div>
         ) : (
-          <div className="sel-plan muted">Click land to march · Space to confirm · they survey the country as they go, and follow rumours (?)</div>
+          <div className="sel-plan muted">
+            {units.some((u) => u.type === 'colonist') && !canFound(world, game, p).ok ? `To found a colony: ${canFound(world, game, p).why} ` : ''}
+            Click land to march · they survey as they go, and follow rumours (?)
+          </div>
         )}
       </div>
       <div className="sel-actions">
@@ -131,6 +137,16 @@ function PartyCard({ partyId }: { partyId: number }) {
           </>
         )}
         {!preview && p.order && <button onClick={() => void run({ kind: 'stopParty', party: p.id })}>Halt</button>}
+        {!preview && units.some((u) => u.type === 'colonist') && (() => {
+          const chk = canFound(world, game, p);
+          const needs = Object.entries(foundingNeeds(game, p)).map(([g, n]) => `${n} ${GOOD_INFO[g as GoodId].name.toLowerCase()}`).join(', ');
+          return (
+            <button className="primary" disabled={!chk.ok} title={chk.ok ? `Uses ${needs} from the fleet beside you` : chk.why}
+              onClick={async () => { if (await run({ kind: 'found', party: p.id })) { const st = useStore.getState(); const c = st.game?.colonies.at(-1); st.set({ drawer: 'cities', selectedColony: c?.id ?? null }); } }}>
+              Found colony
+            </button>
+          );
+        })()}
         {!preview && ships.map((f) => (
           <button key={f.id} onClick={async () => {
             if (await run({ kind: 'boardParty', party: p.id, fleet: f.id })) useStore.getState().selectFleet(f.id);

@@ -32,6 +32,10 @@ export type Command =
   | { kind: 'moveParty'; party: number; hex: number }
   | { kind: 'boardParty'; party: number; fleet: number }
   | { kind: 'stopParty'; party: number }
+  | { kind: 'found'; party: number }
+  | { kind: 'upgradeColony'; colony: string }
+  | { kind: 'colonyTransfer'; fleet: number; good: GoodId; qty: number }
+  | { kind: 'settle'; fleet: number }
   | { kind: 'dismissEvent' };
 
 let world: World | null = null;
@@ -91,6 +95,10 @@ const api = {
       case 'moveParty': result = G.moveParty(world, state, c.party, c.hex); break;
       case 'boardParty': result = G.boardParty(state, c.party, c.fleet); break;
       case 'stopParty': result = G.stopParty(state, c.party); break;
+      case 'found': result = G.foundColony(world, state, c.party); break;
+      case 'upgradeColony': result = G.upgradeColony(state, c.colony); break;
+      case 'colonyTransfer': result = G.colonyTransfer(state, c.fleet, c.good, c.qty); break;
+      case 'settle': result = G.settleColonists(state, c.fleet); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
     return { result, state };

@@ -59,14 +59,15 @@ export function MapCanvas() {
             if (s.selectedFleet !== fleetId) s.selectFleet(fleetId);
             return;
           }
-          const port = world[map].ports.find((p) => p.hex === hex && (p.kind !== 'native' || g.discovered.includes(p.id)));
+          const colony = g.colonies.find((c) => c.map === map && c.hex === hex);
+          const port = colony ? { id: colony.id, kind: 'colony' as const } : world[map].ports.find((p) => p.hex === hex && (p.kind !== 'native' || g.discovered.includes(p.id)));
           const fleet = g.fleets.find((f) => f.id === s.selectedFleet && f.map === map);
           const again = s.preview?.dest === hex && s.preview.map === map;
           if (port) {
             if (fleet && fleet.hex !== hex) {
               if (again) void s.confirmPreview();
               else { s.set({ selectedPort: port.id }); void s.planTo(hex); }
-            } else s.set({ selectedPort: port.id, preview: null, drawer: port.kind === 'home' && !fleet ? 'cities' : 'markets' });
+            } else s.set({ selectedPort: port.id, preview: null, drawer: (port.kind === 'home' || port.kind === 'colony') && !fleet ? 'cities' : 'markets', ...(port.kind === 'colony' ? { selectedColony: port.id } : {}) });
             return;
           }
           const known = g.fog[map][hex] >= Fog.Charted;

@@ -4,11 +4,13 @@ import {
   newGame, endTurn, buy, sell, moveFleet, previewMove, crossOcean, startProject, portById, cargoUsed, maxMoves,
   provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
   slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost, landParty, moveParty, boardParty, citySlots, slotsUsedIn,
+  foundColony, upgradeColony, colonyTransfer,
 } from './game';
 import { makeMarket, unitPrice, buyCost, sellValue } from './market';
 import { planRoute } from './sailing';
 import { OLD, NEW } from './hex';
 import { FIXED_SOUTH } from '../data/europe';
+import { canFound, score } from './colony';
 import { Fog } from './types';
 
 const SEEDS = [1492, 7, 42, 2024, 31337];
@@ -423,5 +425,95 @@ describe('M4: cities and parties ashore', () => {
       for (let i = 0; i < OLD.N; i++) if (OLD.lat(i) >= FIXED_SOUTH) expect(w.old.resource[i]).toBe(0);
     }
     expect(Buffer.from(a.new.resource).equals(Buffer.from(b.new.resource))).toBe(false);
+  });
+});
+
+describe('M5: colonies', () => {
+  /** Put a ready expedition with colonists and materials beside an empty stretch of African coast. */
+  function beachhead(seed = 1492) {
+    const game = newGame(seed);
+    const { world, state } = game;
+    const f = expedition(game);
+    state.units.push({ id: 900, type: 'colonist', fleet: f.id, city: null, party: null });
+    f.cargo = { timber: 40, tools: 30, cloth: 20, wine: 20 };
+    const m = world.old;
+    const ports = m.ports.map((p) => p.hex);
+    const shore = [...Array(OLD.N).keys()].find((h) => OLD.lat(h) < 20 && OLD.lat(h) > 8 && m.terrain[h] > 1 && m.mainland[h]
+      && OLD.neighbors(h).some((j) => m.terrain[j] <= 1) && ports.every((p) => OLD.distance(p, h) > 3))!;
+    const sea = OLD.neighbors(shore).find((j) => m.terrain[j] <= 1)!;
+    f.hex = sea; f.at = null;
+    for (const h of OLD.within(shore, 3)) state.fog.old[h] = Fog.Explored;
+    expect(landParty(world, state, f.id, shore, true).ok).toBe(true);
+    return { ...game, f, p: state.parties[0], shore };
+  }
+
+  it('a party with colonists, beside a fleet with timber and tools, founds a colony', () => {
+    const { world, state, f, p, shore } = beachhead();
+    expect(canFound(world, state, p).ok).toBe(true);
+    expect(foundColony(world, state, p.id).ok).toBe(true);
+    expect(state.colonies.length).toBe(1);
+    const c = state.colonies[0];
+    expect(c.hex).toBe(shore);
+    expect(c.pop).toBe(1); // one colonist landed with the party... plus the explorer's unit was infantry
+    expect(f.cargo.timber).toBeUndefined(); // materials used, the rest carried ashore
+    expect(c.stock.cloth).toBe(20);
+    expect(state.parties.length).toBe(0);
+    expect(state.units.some((u) => u.colony === c.id)).toBe(true); // the infantry stays as a garrison
+  });
+
+  it('a colony fed, clothed and given wine grows; one without cloth and wine stalls', () => {
+    const { world, state, p } = beachhead();
+    foundColony(world, state, p.id);
+    const c = state.colonies[0];
+    c.pop = 3;
+    c.stock = { food: 10, cloth: 20, wine: 20, sugar: 10 };
+    for (let k = 0; k < 6; k++) endTurn(world, state);
+    expect(c.pop).toBeGreaterThan(3);
+    const before = c.pop;
+    c.stock = { food: 10 };
+    for (let k = 0; k < 6; k++) endTurn(world, state);
+    expect(c.last.discontent).toBe(true);
+    expect(c.pop).toBeLessThanOrEqual(before);
+  });
+
+  it('colonists work the land around the colony and fill its warehouse', () => {
+    const { world, state, p } = beachhead();
+    foundColony(world, state, p.id);
+    const c = state.colonies[0];
+    c.pop = 3;
+    c.stock = { cloth: 30, wine: 30 };
+    endTurn(world, state);
+    expect(c.last.worked.length).toBeGreaterThanOrEqual(2); // a desert coast has few hexes worth working
+    expect(c.last.worked.length).toBeLessThanOrEqual(3);
+    expect(Object.keys(c.last.produced).length).toBeGreaterThan(0);
+  });
+
+  it('an outpost with materials and colonists becomes a town; the score counts it all', () => {
+    const { world, state, p } = beachhead();
+    foundColony(world, state, p.id);
+    const c = state.colonies[0];
+    expect(upgradeColony(state, c.id).ok).toBe(false);
+    c.pop = 4;
+    c.stock = { timber: 60, tools: 30, stone: 20 };
+    const s0 = score(state);
+    expect(upgradeColony(state, c.id).ok).toBe(true);
+    expect(c.level).toBe('town');
+    expect(score(state).territory).toBeGreaterThan(s0.territory);
+    expect(score(state).total).toBeGreaterThan(0);
+  });
+
+  it('fleets dock at colonies and move goods in and out', () => {
+    const { world, state, f, p } = beachhead();
+    foundColony(world, state, p.id);
+    const c = state.colonies[0];
+    expect(moveFleet(world, state, f.id, c.hex).ok).toBe(true);
+    for (let k = 0; k < 3 && f.at !== c.id; k++) endTurn(world, state);
+    expect(f.at).toBe(c.id);
+    c.stock.food = 10;
+    expect(colonyTransfer(state, f.id, 'food', 5).ok).toBe(true);
+    expect(f.cargo.food).toBe(5);
+    expect(c.stock.food).toBe(5);
+    expect(colonyTransfer(state, f.id, 'food', -5).ok).toBe(true);
+    expect(f.cargo.food).toBeUndefined();
   });
 });

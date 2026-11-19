@@ -22,7 +22,7 @@ export interface PortDef {
   name: string;
   map: MapId;
   hex: number;
-  kind: 'home' | 'foreign' | 'native';
+  kind: 'home' | 'foreign' | 'native' | 'colony';
   nation?: string;
   /** for native trading sites: the people who trade there */
   people?: string;
@@ -108,10 +108,11 @@ export interface Person {
 export interface Unit {
   id: number;
   type: UnitType;
-  /** aboard this fleet, ashore in this party, or waiting in this home city */
+  /** aboard this fleet, ashore in this party, waiting in this home city, or stationed in this colony */
   fleet: number | null;
   city: string | null;
   party: number | null;
+  colony?: string | null;
 }
 
 /** People and units ashore, exploring on foot. */
@@ -124,6 +125,32 @@ export interface Party {
   moves: number;
   order: number[] | null;
   trail: number[];
+}
+
+export type ColonyLevel = 'outpost' | 'town' | 'city';
+
+/** A settlement of your own across the sea. */
+export interface Colony {
+  id: string;
+  name: string;
+  map: MapId;
+  hex: number;
+  founded: number;
+  /** colonists living and working here */
+  pop: number;
+  level: ColonyLevel;
+  /** goods in the colony's warehouse */
+  stock: Partial<Record<GoodId, number>>;
+  /** progress toward the next colonist */
+  growth: number;
+  /** last season's account, for the player */
+  last: {
+    produced: Partial<Record<GoodId, number>>;
+    worked: { hex: number; good: GoodId; amount: number }[];
+    hungry: boolean;
+    discontent: boolean;
+    luxuries: boolean;
+  };
 }
 
 /** A rumour of ruins or a lost city, somewhere inland. */
@@ -217,6 +244,9 @@ export interface GameState {
   surveyed: Record<MapId, number[]>;
   /** rumours already followed up */
   rumoursDone: Record<MapId, number[]>;
+  colonies: Colony[];
+  /** ducats earned from all sales, ever: part of the score */
+  revenue: number;
   /** resources found, for the record */
   finds: { map: MapId; hex: number; resource: ResourceId; turn: number; by: string }[];
   cities: Record<string, City>;

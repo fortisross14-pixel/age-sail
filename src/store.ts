@@ -5,7 +5,7 @@ import type { SimApi, Command } from './sim/worker';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import type { MovePreview } from './sim/game';
 
-const SAVE_KEY = 'age-sail:save:v5';
+const SAVE_KEY = 'age-sail:save:v6';
 
 const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' }));
 
@@ -27,6 +27,7 @@ interface Store {
   /** choosing where the selected fleet puts its people ashore */
   landing: { leader: boolean } | null;
   selectedPort: string | null;
+  selectedColony: string | null;
   preview: Preview | null;
   hover: { map: MapId; hex: number } | null;
   showWind: boolean;
@@ -72,7 +73,7 @@ export const useStore = create<Store>((set, get) => {
     if (f && f.map !== get().map) set({ map: f.map, preview: null, selectedPort: null });
   };
   return {
-    phase: 'menu', hasSave: false, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, selectedPort: null, preview: null,
+    phase: 'menu', hasSave: false, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, selectedPort: null, selectedColony: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false,
     drawer: null, courtTab: 'people', dismissed: [], toast: null, busy: false,
 

@@ -2,6 +2,7 @@ import { GOODS, GOOD_INFO, type GoodId } from '../data/goods';
 import { SHIPS, SHIP_NAMES, type ShipType } from '../data/ships';
 import { BUILDINGS, BUILDING_ORDER, CITY_SPACE, UNIT_SPECS, type BuildingId } from '../data/city';
 import * as Land from './land';
+import * as Col from './colony';
 import { EUROPEAN_PORTS, KNOWN_SOUTH, ATLANTIC_ISLANDS } from '../data/europe';
 import { TECHS, techById, type TechId } from '../data/tech';
 import { T, isWater } from '../data/terrain';
@@ -75,8 +76,15 @@ export const GOAL = { treasury: 20000, turn: 4 * 10 } as const;
 
 export const mapData = (w: World, id: MapId): MapData => w[id];
 export const allPorts = (w: World): PortDef[] => [...w.old.ports, ...w.new.ports];
-export const portById = (w: World, id: string) => allPorts(w).find((p) => p.id === id);
-export const portAt = (w: World, map: MapId, hex: number) => w[map].ports.find((p) => p.hex === hex);
+/** A port by id: European, native, or (given the game state) one of your colonies. */
+export function portById(w: World, id: string, s?: GameState): PortDef | undefined {
+  if (id.startsWith('col-')) { const c = s ? Col.colonyById(s, id) : undefined; return c ? Col.colonyPort(c) : undefined; }
+  return allPorts(w).find((p) => p.id === id);
+}
+export function portAt(w: World, map: MapId, hex: number, s?: GameState): PortDef | undefined {
+  const c = s ? Col.colonyAt(s, map, hex) : undefined;
+  return c ? Col.colonyPort(c) : w[map].ports.find((p) => p.hex === hex);
+}
 export const fleetById = (s: GameState, id: number) => s.fleets.find((f) => f.id === id);
 
 export function cargoUsed(f: Fleet): number {
@@ -92,7 +100,7 @@ export function provisionsMax(f: Fleet, s?: GameState): number {
 export const provisionsAbroad = (f: Fleet, s?: GameState) => Math.floor(provisionsMax(f, s) / 2);
 /** How full the stores can be filled where the fleet is docked. */
 export function provisionCap(world: World, f: Fleet, s?: GameState): number {
-  const port = f.at ? portById(world, f.at) : undefined;
+  const port = f.at ? portById(world, f.at, s) : undefined;
   return port?.kind === 'home' ? provisionsMax(f, s) : provisionsAbroad(f, s);
 }
 export function fleetSight(f: Fleet, s?: GameState): number {
@@ -115,7 +123,7 @@ export function canCross(s: GameState, f: Fleet) {
 
 /** Cost to fill supplies (and, in a home port, sign on missing crew). */
 export function provisionCost(world: World, f: Fleet, s?: GameState): number {
-  const port = f.at ? portById(world, f.at) : undefined;
+  const port = f.at ? portById(world, f.at, s) : undefined;
   if (!port) return 0;
   const perSeason = Math.max(4, f.crew / 2) * (port.kind === 'native' ? 1.6 : 1);
   let cost = Math.ceil(Math.max(0, provisionCap(world, f, s) - f.supplies) * perSeason);
@@ -123,9 +131,9 @@ export function provisionCost(world: World, f: Fleet, s?: GameState): number {
   return cost;
 }
 
-export function repairCost(world: World, f: Fleet): number {
-  const port = f.at ? portById(world, f.at) : undefined;
-  if (!port || port.kind === 'native') return 0;
+export function repairCost(world: World, f: Fleet, s?: GameState): number {
+  const port = f.at ? portById(world, f.at, s) : undefined;
+  if (!port || (port.kind !== 'home' && port.kind !== 'foreign')) return 0;
   return f.ships.reduce((t, s) => t + Math.ceil((100 - s.hull) * SHIPS[s.type].cost * 0.004), 0);
 }
 
@@ -141,7 +149,7 @@ function event(s: GameState, e: GameEvent) {
 function nativeMarket(world: World, port: PortDef, rng: Rng): MarketBook {
   const g = GRIDS[port.map];
   const lat = g.lat(port.hex);
-  const book: MarketBook = { tools: makeMarket(55, 20, 6, 0, int(rng, 2, 8)) };
+  const book: MarketBook = { tools: makeMarket(55, 20, 6, 0, int(rng, 2, 8)), cloth: makeMarket(45, 20, 5, 0, int(rng, 2, 8)) };
   const add = (good: GoodId, base: number, prod: number) => {
     book[good] = makeMarket(base, prod * 2.5, prod * 0.6, prod, prod * 2.5);
   };
@@ -211,7 +219,10 @@ export function newGame(seed: number): { world: World; state: GameState } {
       if (!spec) continue;
       const [base, ref, cons, prod] = spec;
       // New World goods are almost unknown in Europe: tiny stocks, high prices
-      const stock = g === 'tools' ? ref : g === 'furs' || g === 'dyes' || g === 'gold' ? ref * 0.6 : 1;
+      // goods Europe makes itself are well stocked; known imports less so; New World novelties hardly at all
+      const novelty = g === 'tobacco' || g === 'cacao';
+      const imported = g === 'furs' || g === 'dyes' || g === 'gold' || g === 'silver' || g === 'sugar' || g === 'spices';
+      const stock = novelty ? 1 : imported ? ref * 0.6 : ref;
       book[g] = makeMarket(base, ref, cons, prod, stock);
     }
     markets[p.id] = book;
@@ -230,8 +241,8 @@ export function newGame(seed: number): { world: World; state: GameState } {
     fog: { old: initialOldFog(world), new: new Array(GRIDS.new.N).fill(Fog.Unknown) },
     fleets: [], people: [], petitioners: [], units: [], parties: [], cities, markets, discovered: [],
     surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
-    rumoursDone: { old: [], new: [] }, finds: [],
-    adoption: { furs: 1, dyes: 1, gold: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1 },
+    rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0,
+    adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
     chronicle: [], events: [], nextId: 1, newWorldFound: false,
     research: { known: [], current: 'portolan', progress: 0, pending: 0 },
   };
@@ -256,8 +267,9 @@ const fail = (error: string): CommandResult => ({ ok: false, error });
 
 function dockedMarket(world: World, s: GameState, f: Fleet, g: GoodId) {
   if (!f.at) return { error: 'The fleet must be in port to trade.' };
+  if (f.at.startsWith('col-')) return { error: 'Colonies have no market: load and unload goods in the colony’s panel.' };
   const m = s.markets[f.at]?.[g];
-  if (!m) return { error: `${portById(world, f.at)?.name} does not trade in ${GOOD_INFO[g].name.toLowerCase()}.` };
+  if (!m) return { error: `${portById(world, f.at, s)?.name} does not trade in ${GOOD_INFO[g].name.toLowerCase()}.` };
   return { m };
 }
 
@@ -268,7 +280,7 @@ export function buy(world: World, s: GameState, fleetId: number, g: GoodId, qty:
   if ('error' in r) return fail(r.error!);
   const m = r.m!;
   qty = Math.min(qty, Math.floor(m.stock), cargoCapacity(f) - cargoUsed(f));
-  const sp = spreadFor(s, f, portById(world, f.at!)?.kind === 'native');
+  const sp = spreadFor(s, f, portById(world, f.at!, s)?.kind === 'native');
   while (qty > 0 && buyCost(m, qty, sp) > s.treasury) qty--;
   if (qty <= 0) return fail('Nothing to buy: no stock, no hold space, or no money.');
   const cost = buyCost(m, qty, sp);
@@ -286,8 +298,9 @@ export function sell(world: World, s: GameState, fleetId: number, g: GoodId, qty
   const m = r.m!;
   qty = Math.min(qty, f.cargo[g] ?? 0);
   if (qty <= 0) return fail('Nothing to sell.');
-  const value = sellValue(m, qty, spreadFor(s, f, portById(world, f.at!)?.kind === 'native'));
+  const value = sellValue(m, qty, spreadFor(s, f, portById(world, f.at!, s)?.kind === 'native'));
   s.treasury += value;
+  s.revenue += value;
   m.stock += qty;
   f.cargo[g] = (f.cargo[g] ?? 0) - qty;
   if (!f.cargo[g]) delete f.cargo[g];
@@ -307,14 +320,14 @@ export function provision(world: World, s: GameState, fleetId: number): CommandR
   if (cost > s.treasury) return fail(`Provisions cost ${cost} ducats. The treasury cannot pay.`);
   s.treasury -= cost;
   f.supplies = Math.max(f.supplies, provisionCap(world, f, s));
-  if (portById(world, f.at)!.kind === 'home') f.crew = Math.max(f.crew, crewNeeded(f));
+  if (portById(world, f.at, s)!.kind === 'home') f.crew = Math.max(f.crew, crewNeeded(f));
   return { ok: true, message: `Provisioned for ${cost} ducats.` };
 }
 
 export function repair(world: World, s: GameState, fleetId: number): CommandResult {
   const f = fleetById(s, fleetId);
   if (!f) return fail('No such fleet.');
-  const cost = repairCost(world, f);
+  const cost = repairCost(world, f, s);
   if (cost <= 0) return fail('Repairs need a European port.');
   if (cost > s.treasury) return fail(`Repairs cost ${cost} ducats. The treasury cannot pay.`);
   s.treasury -= cost;
@@ -447,7 +460,7 @@ const portByIdName = (id: string) => EUROPEAN_PORTS.find((p) => p.id === id)?.na
 export function recall(world: World, s: GameState, fleetId: number): CommandResult {
   const f = fleetById(s, fleetId);
   if (!f || f.leader == null) return fail('No leader to bring ashore.');
-  const port = f.at ? portById(world, f.at) : undefined;
+  const port = f.at ? portById(world, f.at, s) : undefined;
   if (!port || port.kind !== 'home') return fail('Leaders come ashore only in your own ports.');
   const p = personById(s, f.leader)!;
   p.fleet = null;
@@ -475,7 +488,7 @@ export function disembark(world: World, s: GameState, unitId: number): CommandRe
   const u = s.units.find((x) => x.id === unitId);
   const f = u?.fleet != null ? fleetById(s, u.fleet) : undefined;
   if (!u || !f) return fail('No such unit aboard.');
-  const port = f.at ? portById(world, f.at) : undefined;
+  const port = f.at ? portById(world, f.at, s) : undefined;
   if (!port || port.kind !== 'home') return fail('For now units go ashore only in your own ports. Landing elsewhere comes later.');
   u.fleet = null;
   u.city = port.id;
@@ -535,6 +548,46 @@ export function stopParty(s: GameState, partyId: number): CommandResult {
   return { ok: true };
 }
 
+// ---------- colonies ----------
+
+const colLog = (s: GameState) => (text: string, kind: 'trade' | 'peril' | 'court' = 'court') => log(s, kind, text);
+
+export function foundColony(world: World, s: GameState, partyId: number): CommandResult {
+  const p = Land.partyById(s, partyId);
+  if (!p) return fail('No such party.');
+  const r = Col.foundColony(world, s, p);
+  if (!r.ok) return r;
+  const c = r.colony!;
+  log(s, 'discovery', `${c.name} is founded on the coast with ${c.pop} colonist${c.pop > 1 ? 's' : ''}. The Crown has a new outpost beyond the sea.`);
+  if (s.colonies.length === 1) {
+    event(s, { kind: 'people', title: c.name, map: c.map, hex: c.hex,
+      text: `Your first colony stands on a far coast: a palisade, a few huts, fields cleared from the forest. ${c.name} must be fed, clothed and given wine until it can stand on its own.` });
+  }
+  return { ok: true, message: r.message };
+}
+
+export function upgradeColony(s: GameState, colonyId: string): CommandResult {
+  const c = Col.colonyById(s, colonyId);
+  if (!c) return fail('No such colony.');
+  const r = Col.upgradeColony(s, c);
+  if (r.ok) log(s, 'court', r.message!);
+  return r;
+}
+
+export function colonyTransfer(s: GameState, fleetId: number, good: GoodId, qty: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  const c = f?.at ? Col.colonyById(s, f.at) : undefined;
+  if (!f || !c) return fail('The fleet must be docked at one of your colonies.');
+  return Col.transfer(s, f, c, good, qty, cargoCapacity(f), cargoUsed(f));
+}
+
+export function settleColonists(s: GameState, fleetId: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  const c = f?.at ? Col.colonyById(s, f.at) : undefined;
+  if (!f || !c) return fail('The fleet must be docked at one of your colonies.');
+  return Col.settle(s, f, c);
+}
+
 // ---------- trade routes ----------
 
 export function setTradeRoute(world: World, s: GameState, fleetId: number, route: TradeRoute | null): CommandResult {
@@ -544,7 +597,7 @@ export function setTradeRoute(world: World, s: GameState, fleetId: number, route
     if (leaderOf(s, f)?.rank !== 'merchant') return fail('Only a fleet led by a merchant can run a trade route.');
     if (route.stops.length < 2) return fail('A route needs at least two ports.');
     for (const st of route.stops) {
-      const p = portById(world, st.port);
+      const p = portById(world, st.port, s);
       if (!p || p.map !== f.map) return fail('All stops must be on the same map as the fleet.');
       if (p.kind === 'native' && !s.discovered.includes(p.id)) return fail(`${p.name} is not yet known.`);
     }
@@ -558,6 +611,20 @@ export function setTradeRoute(world: World, s: GameState, fleetId: number, route
 /** At a stop: sell what the route says to sell, buy what it says to buy. Returns a one-line account. */
 function tradeAtStop(world: World, s: GameState, f: Fleet, st: TradeRoute['stops'][number]): string {
   const parts: string[] = [];
+  const col = Col.colonyById(s, st.port);
+  if (col) {
+    for (const g of st.sell) {
+      const n = f.cargo[g] ?? 0;
+      if (n && Col.transfer(s, f, col, g, -n, cargoCapacity(f), cargoUsed(f)).ok) parts.push(`unloaded ${n} ${GOOD_INFO[g].name.toLowerCase()}`);
+    }
+    for (const b of st.buy) {
+      const before = f.cargo[b.good] ?? 0;
+      const want = Math.max(0, b.qty - before);
+      if (want && Col.transfer(s, f, col, b.good, want, cargoCapacity(f), cargoUsed(f)).ok) parts.push(`loaded ${(f.cargo[b.good] ?? 0) - before} ${GOOD_INFO[b.good].name.toLowerCase()}`);
+    }
+    if (provisionCost(world, f, s) > 0 && provisionCost(world, f, s) < s.treasury) provision(world, s, f.id);
+    return parts.length ? `${f.name} at ${col.name}: ${parts.join(', ')}.` : `${f.name} at ${col.name}: nothing to move.`;
+  }
   let earned = 0, spent = 0;
   for (const g of st.sell) {
     const have = f.cargo[g] ?? 0;
@@ -575,7 +642,7 @@ function tradeAtStop(world: World, s: GameState, f: Fleet, st: TradeRoute['stops
     if (buy(world, s, f.id, b.good, want).ok) { spent += before - s.treasury; parts.push(`bought ${(f.cargo[b.good] ?? 0) - had} ${GOOD_INFO[b.good].name.toLowerCase()}`); }
   }
   if (provisionCost(world, f, s) > 0 && provisionCost(world, f, s) < s.treasury) provision(world, s, f.id);
-  const port = portById(world, st.port)!;
+  const port = portById(world, st.port, s)!;
   return parts.length ? `${f.name} at ${port.name}: ${parts.join(', ')} (+${earned}, −${spent} ducats).` : `${f.name} at ${port.name}: nothing to trade.`;
 }
 
@@ -588,10 +655,10 @@ function runRoute(world: World, s: GameState, f: Fleet, notes: string[]) {
     if (f.at === target.port) {
       notes.push(tradeAtStop(world, s, f, target));
       r.next = (r.next + 1) % r.stops.length;
-      const dest = portById(world, r.stops[r.next].port)!;
+      const dest = portById(world, r.stops[r.next].port, s)!;
       if (!moveFleet(world, s, f.id, dest.hex).ok) { r.active = false; notes.push(`${f.name} cannot find a way to ${dest.name}. The route is paused.`); return; }
     } else if (!f.order) {
-      const dest = portById(world, target.port)!;
+      const dest = portById(world, target.port, s)!;
       if (!moveFleet(world, s, f.id, dest.hex).ok) { r.active = false; notes.push(`${f.name} cannot find a way to ${dest.name}. The route is paused.`); return; }
     }
     if (f.moves <= 0 || f.order) return;
@@ -640,7 +707,7 @@ function planFor(world: World, s: GameState, f: Fleet, dest: number) {
   const g = GRIDS[f.map];
   const m = world[f.map];
   return planRoute(g, m, seasonOf(s.turn), f.hex, dest, {
-    explorer: canExplore(s, f), ports: new Set(m.ports.map((p) => p.hex)), fog: s.fog[f.map],
+    explorer: canExplore(s, f), ports: new Set([...m.ports.map((p) => p.hex), ...s.colonies.filter((c) => c.map === f.map).map((c) => c.hex)]), fog: s.fog[f.map],
     movesLeft: f.moves, movesMax: maxMoves(f, s), windward: windwardOf(f, s), scale: (h) => waterScale(world, f.map, h),
   });
 }
@@ -825,7 +892,7 @@ function advance(world: World, s: GameState, f: Fleet) {
   while (o.path.length > 1 && s.fleets.includes(f)) {
     const next = o.path[1];
     const isDest = o.path.length === 2;
-    const port = portAt(world, f.map, next);
+    const port = portAt(world, f.map, next, s);
     if (!isWater(m.terrain[next]) && !(isDest && port)) {
       // newly sighted land in the way: steer around it if the charts allow
       const dest = o.path[o.path.length - 1];
@@ -920,7 +987,7 @@ export function endTurn(world: World, s: GameState): void {
     p.turnsLeft--;
     if (p.turnsLeft > 0) continue;
     city.project = null;
-    const port = portById(world, city.id)!;
+    const port = portById(world, city.id, s)!;
     if (p.kind === 'ship') {
       const ship = newShip(s, p.ship, rng);
       const n = s.fleets.length + 1;
@@ -937,8 +1004,10 @@ export function endTurn(world: World, s: GameState): void {
     }
   }
 
+  // the colonies: work, eat, grow; they pay a little tax
+  for (const c of s.colonies) Col.colonySeason(world, s, c, colLog(s));
   // taxes and market dues; universities feed the scholars
-  let taxes = 0;
+  let taxes = s.colonies.reduce((t, c) => t + c.pop * 5, 0);
   for (const c of Object.values(s.cities)) {
     taxes += (CITY_SPACE[c.id]?.taxes ?? 30) + c.buildings.market * 60;
     addResearch(s, c.buildings.university * 2);
@@ -953,7 +1022,7 @@ export function endTurn(world: World, s: GameState): void {
     if (p.rank === 'explorer' && p.unitType) {
       const at = p.city ?? 'seville';
       s.units.push({ id: s.nextId++, type: p.unitType, fleet: null, city: at, party: null });
-      log(s, 'court', `${p.name} is ready to lead an expedition. ${UNIT_INFO[p.unitType].name} wait with them in ${portById(world, at)?.name}.`);
+      log(s, 'court', `${p.name} is ready to lead an expedition. ${UNIT_INFO[p.unitType].name} wait with them in ${portById(world, at, s)?.name}.`);
     } else {
       log(s, 'court', `${p.name} is ready to serve as ${RANK_INFO[p.rank].name.toLowerCase()}.`);
     }
@@ -963,7 +1032,7 @@ export function endTurn(world: World, s: GameState): void {
 
   // markets
   for (const [id, book] of Object.entries(s.markets)) {
-    const port = portById(world, id);
+    const port = portById(world, id, s);
     const european = port?.kind !== 'native';
     const boost = !european && has(s, 'factors') && s.discovered.includes(id) ? 1.5 : 1;
     for (const g of GOODS) {
@@ -989,7 +1058,7 @@ export function endTurn(world: World, s: GameState): void {
       r.current = TECHS.find((x) => techAvailable(s, x.id))?.id ?? null;
       log(s, 'court', `The court’s scholars master ${t.name.toLowerCase()}. ${t.effect}`);
       if (t.id === 'volta') {
-        event(s, { kind: 'tech', title: 'Volta do mar', map: 'old', hex: portById(world, 'seville')!.hex,
+        event(s, { kind: 'tech', title: 'Volta do mar', map: 'old', hex: portById(world, 'seville', s)!.hex,
           text: 'Pilots have learned to sail wide into the open ocean and find the winds that bring them home. The Mar Océano is still dangerous, but it can be crossed.' });
       }
     }

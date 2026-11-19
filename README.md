@@ -5,11 +5,12 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.2
+## Now playing: v0.5, the first playable version
 
-On top of the v0.1 slice below: a clean map-first HUD with four drawers, research at court, and a
-procedural African coast. Crossing the Mar Océano is near-hopeless until the court masters
-*Volta do mar* (long-distance navigation). See [docs/ROADMAP.md](docs/ROADMAP.md).
+A court of people with skills who age and die; cities with buildings that train units; landing parties
+that explore on foot and find hidden resources and ruins; colonies that must be fed, clothed and given
+wine, grow, and ship their goods home; a score of colonists, territory and commerce. Crossing the
+Mar Océano is near-hopeless until the court masters *Volta do mar*. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## v0.1: the discovery slice
 

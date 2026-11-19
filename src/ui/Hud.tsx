@@ -2,6 +2,7 @@ import { useStore, newWorldOpen } from '../store';
 import { dateLabel, seasonOf, SEASONS } from '../sim/types';
 import { GOAL, basePoints } from '../sim/game';
 import { techById } from '../data/tech';
+import { score } from '../sim/colony';
 import { fmt } from './format';
 import { spriteUrl } from '../render/assets';
 
@@ -31,6 +32,10 @@ export function Hud() {
       <div className="stat" title="Prestige: from discoveries and the Crown’s favour">
         <span className="prestige-mark" aria-hidden>✦</span>
         <div><div className="stat-value">{fmt(game.prestige)}</div><div className="stat-label">prestige</div></div>
+      </div>
+      <div className="stat" title={(() => { const sc = score(game); return `Score: ${sc.pop} colonists ×10, ${sc.territory} hexes of territory ×2, ${sc.commerce} from ${fmt(game.revenue)} ducats of sales`; })()}>
+        <span className="prestige-mark" aria-hidden>♛</span>
+        <div><div className="stat-value">{fmt(score(game).total)}</div><div className="stat-label">score</div></div>
       </div>
       <div className="goal" title={`The Crown asks for ${fmt(GOAL.treasury)} ducats by ${dateLabel(GOAL.turn)}`}>
         <div className="goal-text">{turnsLeft > 0 ? <>Crown’s charge: {fmt(GOAL.treasury)} by {dateLabel(GOAL.turn)}</> : <>The Crown’s deadline has passed</>}</div>

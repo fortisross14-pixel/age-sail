@@ -33,7 +33,7 @@ export function Fleets() {
           {fleets.length ? (
             <ul className="fleet-list">
               {fleets.map((f) => {
-                const where = f.at ? portById(world, f.at)?.name : f.order ? 'under sail' : f.map === 'new' ? 'Mar Océano' : 'at sea';
+                const where = f.at ? portById(world, f.at, game)?.name : f.order ? 'under sail' : f.map === 'new' ? 'Mar Océano' : 'at sea';
                 const l = leaderOf(game, f);
                 return (
                   <li key={f.id}>
@@ -78,7 +78,7 @@ function FleetDetail({ fleet }: { fleet: Fleet }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const leader = leaderOf(game, fleet);
   const others = game.fleets.filter((f) => f !== fleet && f.map === fleet.map && f.hex === fleet.hex);
-  const port = fleet.at ? portById(world, fleet.at) : undefined;
+  const port = fleet.at ? portById(world, fleet.at, game) : undefined;
   const home = port?.kind === 'home';
   const waitingUnits = home ? game.units.filter((u) => u.city === port!.id && u.fleet == null && u.party == null) : [];
   const ready = home && !leader ? game.people.filter((p) => p.alive && p.fleet == null && p.city === port!.id && p.ready === 0 && (p.rank === 'explorer' || p.rank === 'merchant')) : [];
@@ -183,7 +183,8 @@ function RouteEditor({ fleet }: { fleet: Fleet }) {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const run = useStore((s) => s.run);
-  const known = allPorts(world).filter((p) => p.map === fleet.map && (p.kind !== 'native' || game.discovered.includes(p.id)));
+  const known = [...allPorts(world).filter((p) => p.map === fleet.map && (p.kind !== 'native' || game.discovered.includes(p.id))),
+    ...game.colonies.filter((c) => c.map === fleet.map).map((c) => ({ id: c.id, name: `${c.name} (colony)` }))];
   const [draft, setDraft] = useState<TradeRoute>(() => fleet.route ?? { stops: [emptyStop(fleet.at ?? 'seville'), emptyStop(known.find((p) => p.id !== (fleet.at ?? 'seville'))?.id ?? 'antwerp')], next: 0, active: false });
   const update = (k: number, st: TradeStop) => setDraft({ ...draft, stops: draft.stops.map((x, i) => (i === k ? st : x)) });
   const save = (active: boolean) => void run({ kind: 'tradeRoute', fleet: fleet.id, route: { ...draft, active } });
@@ -192,8 +193,9 @@ function RouteEditor({ fleet }: { fleet: Fleet }) {
       <h3>Trade route</h3>
       <p className="muted small">The fleet sails the stops in order, again and again: it sells what you tick, then buys up to the amount you set, never above the price limit. It provisions in every port.</p>
       {draft.stops.map((st, k) => {
+        const colony = game.colonies.find((c) => c.id === st.port);
         const book = game.markets[st.port] ?? {};
-        const goods = GOODS.filter((g) => book[g]);
+        const goods = colony ? GOODS : GOODS.filter((g) => book[g]);
         return (
           <div key={k} className={`stop ${fleet.route?.active && fleet.route.next === k ? 'next' : ''}`}>
             <div className="row between">
@@ -209,9 +211,9 @@ function RouteEditor({ fleet }: { fleet: Fleet }) {
                 return (
                   <div key={g} className="stop-good">
                     <GoodIcon good={g} size={20} /><span>{GOOD_INFO[g].name}</span>
-                    <span className="muted small num">{fmt(unitPrice(book[g]!))}</span>
-                    <label className="small"><input type="checkbox" checked={sells} onChange={() => update(k, { ...st, sell: sells ? st.sell.filter((x) => x !== g) : [...st.sell, g] })} /> sell</label>
-                    <label className="small">buy
+                    <span className="muted small num">{colony ? Math.floor(colony.stock[g] ?? 0) : fmt(unitPrice(book[g]!))}</span>
+                    <label className="small"><input type="checkbox" checked={sells} onChange={() => update(k, { ...st, sell: sells ? st.sell.filter((x) => x !== g) : [...st.sell, g] })} /> {colony ? 'unload' : 'sell'}</label>
+                    <label className="small">{colony ? 'load' : 'buy'}
                       <input className="num-in" type="number" min={0} step={10} value={b?.qty ?? 0}
                         onChange={(e) => {
                           const qty = Math.max(0, Number(e.target.value) || 0);

@@ -60,6 +60,9 @@ other. Later: wars with rival crowns for space, and independence wars against in
 - M3: European home waters (charted, not open ocean, north of Cape Bojador) cost half movement, so Sevilla to
   Antwerpen is about two seasons each way. Patrician-style routes work, but seasonal turns make them slow.
 
+- M5: a colony started with 2 colonists and a season of cloth and wine reaches 4 colonists (a full outpost) in about
+  3 years and stores 20–40 sugar. Growth and output are deliberately modest; tune once natives and rivals add pressure.
+
 ## Milestones
 
 | # | Milestone | Status |
@@ -69,7 +72,7 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | M2 | Near shore and research: procedural African coast and islands south of 30.5°N with coastal peoples (gold, pepper, dyes), sugar and pepper as goods, a deadly open ocean (stores spoil twice as fast, storms three times as likely, starving crews vanish), a first research tree of 7 subjects where *Volta do mar* opens the crossing | done |
 | M3 | The court: 9 courtiers with ages, traits and five skills; petitioners each spring; ranks (explorer with a free colonist, infantry or missionary; merchant; governor) that take seasons to prepare; leaders command fleets; unit places on ships; aging and death; salaries; skill effects (navigation: moves, rationing, open-ocean storms; commerce and diplomacy: prices; construction: city projects); merchant trade routes; fleets grouped as expeditions, trade, idle; known European waters cost half movement | done |
 | M4 | City buildings with limited room (Sevilla 7 places, Cádiz 5): docks (ship types), barracks (infantry), church (missionaries), university (research), market (dues, better prices); base taxes; cities train colonists, infantry and missionaries; landing parties go ashore from a fleet, march overland at terrain cost, survey for hidden resources (gold, silver, fertile land, timber, furs, dyes, pepper; one rich region per board), follow rumours of ruins, lost cities and shrines, and board again | done |
-| M5 | Colonies (first playable): building materials, colonists' needs, founding and growth on surveyed land, production shipped home | next |
-| M6 | Native peoples: trading posts, missions, alliances, numbers-based combat, diplomacy | |
+| M5 | Colonies (first playable): new goods (timber, stone, food, cloth, wine, silver); found a colony with a party's colonists on surveyed coast and timber and tools from a fleet beside it; colonists work hexes (food first, then the most valuable crop or resource); needs each season (food; cloth and wine or work slows and growth stops; luxuries speed growth); outpost → town → city with materials; fleets dock, load and unload; merchant routes can serve colonies; score = colonists ×10 + territory ×2 + sales/200 | done |
+| M6 | Native peoples: trading posts, missions, alliances, numbers-based combat, diplomacy | next |
 | M7 | Rival crowns: AI rivals racing for land, wars, later independence | |
 | later | Old World depth (buildings, full research), events and characters' stories, eras, score and victory, Chronicle, iPad performance, an illustrator's cohesive art set | |

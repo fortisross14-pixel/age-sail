@@ -7,6 +7,11 @@ import { portById, projectCost, citySlots, slotsUsedIn } from '../sim/game';
 import { personById } from '../sim/court';
 import type { ProjectKind, UnitType } from '../sim/types';
 import { fmt } from './format';
+import { GoodIcon } from './Icon';
+import { GOODS, GOOD_INFO, NEEDS, LUXURIES, LUXURY_NEED, type GoodId } from '../data/goods';
+import { LEVELS, GROWTH_STEP, territoryOf } from '../sim/colony';
+import { cargoUsed, cargoCapacity } from '../sim/game';
+import { getView } from './MapCanvas';
 import { ShipIcon } from './Icon';
 
 export function Cities() {
@@ -18,6 +23,10 @@ export function Cities() {
         Cities pay taxes every season; a governor with construction skill makes their projects faster and cheaper. One project at a time per city.
       </p>
       {Object.keys(game.cities).map((id) => <CityCard key={id} cityId={id} />)}
+      <h3 className="section">Colonies <span className="muted small">{game.colonies.length || ''}</span></h3>
+      {game.colonies.length ? game.colonies.map((c) => <ColonyCard key={c.id} colonyId={c.id} />) : (
+        <p className="muted small">None yet. Land a party with colonists on surveyed coast, with a fleet beside it carrying timber and tools, and choose <b>Found colony</b>.</p>
+      )}
     </>
   );
 }
@@ -120,6 +129,107 @@ function CityCard({ cityId }: { cityId: string }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ColonyCard({ colonyId }: { colonyId: string }) {
+  const game = useStore((s) => s.game)!;
+  const selected = useStore((s) => s.selectedColony);
+  const run = useStore((s) => s.run);
+  const set = useStore((s) => s.set);
+  const c = game.colonies.find((x) => x.id === colonyId)!;
+  const open = selected === c.id || game.colonies.length === 1;
+  const L = LEVELS[c.level];
+  const next = L.next ? LEVELS[L.next] : null;
+  const docked = game.fleets.filter((f) => f.at === c.id);
+  const garrison = game.units.filter((u) => u.colony === c.id);
+  const lux = LUXURIES.reduce((t, g) => t + (c.stock[g] ?? 0), 0);
+  const need = (g: GoodId, per: number) => ({ have: Math.floor(c.stock[g] ?? 0), want: Math.ceil(c.pop * per * 10) / 10 });
+  const needs: [string, { have: number; want: number }, string][] = [
+    ['Food', need('food', NEEDS.food), 'Without it, colonists starve.'],
+    ['Cloth', need('cloth', NEEDS.cloth), 'Without it, work slows and the colony stops growing.'],
+    ['Wine', need('wine', NEEDS.wine), 'Without it, work slows and the colony stops growing.'],
+  ];
+  const stock = GOODS.filter((g) => (c.stock[g] ?? 0) >= 1);
+  const produced = GOODS.filter((g) => (c.last.produced[g] ?? 0) > 0);
+  return (
+    <section className={`city-card colony ${open ? 'open' : ''}`}>
+      <button className="city-head" onClick={() => { set({ selectedColony: open ? null : c.id }); if (!open) setTimeout(() => getView()?.focusHex(c.map, c.hex), 0); }} aria-expanded={open}>
+        <span className="city-name">{c.name}</span>
+        <span className="muted small">{L.name} · {c.pop}/{L.cap} colonists · {territoryOf(c).length} hexes{c.last.hungry ? ' · hungry' : c.last.discontent ? ' · discontent' : ''}</span>
+        <span aria-hidden>{open ? '▾' : '▸'}</span>
+      </button>
+      {open && (
+        <div className="city-body">
+          <div className="small">Growth {Math.floor(c.growth)}/{GROWTH_STEP}{c.last.luxuries ? ' · luxuries: growing faster' : ''}{c.pop >= L.cap ? ' · full: raise it to grow further' : ''}</div>
+          <div className="bar"><div style={{ width: `${Math.min(100, (c.growth / GROWTH_STEP) * 100)}%` }} /></div>
+
+          <h4>Needs each season</h4>
+          <div className="needs">
+            {needs.map(([n, v, why]) => (
+              <span key={n} className={`need ${v.have >= v.want ? 'ok' : 'short'}`} title={why}>{v.have >= v.want ? '✓' : '✗'} {n} {v.have}/{v.want}</span>
+            ))}
+            <span className={`need ${lux >= c.pop * LUXURY_NEED ? 'ok' : 'opt'}`} title="Sugar, tobacco or cacao: the colony grows half as fast again">{lux >= c.pop * LUXURY_NEED ? '✓' : '○'} Luxuries {Math.floor(lux)}</span>
+          </div>
+
+          <h4>Last season</h4>
+          <div className="small">
+            {c.last.worked.length} of {c.pop} colonists worked the land{c.pop > c.last.worked.length ? ` (${c.pop - c.last.worked.length} idle, foraging)` : ''}.
+          </div>
+          <div className="cargo">
+            {produced.map((g) => <span key={g} className="chip" title={GOOD_INFO[g].name}><GoodIcon good={g} size={20} />+{Math.round((c.last.produced[g] ?? 0) * 10) / 10}</span>)}
+            {!produced.length && <span className="muted small">Nothing yet: the first harvest comes next season.</span>}
+          </div>
+
+          <h4>Warehouse</h4>
+          <div className="cargo">
+            {stock.map((g) => <span key={g} className="chip" title={GOOD_INFO[g].name}><GoodIcon good={g} size={20} />{Math.floor(c.stock[g] ?? 0)}</span>)}
+            {!stock.length && <span className="muted small">Empty.</span>}
+          </div>
+
+          {garrison.length > 0 && <div className="small">Stationed here: {garrison.map((u) => UNIT_INFO[u.type].name).join(', ')}.</div>}
+
+          {next && (
+            <>
+              <h4>Raise to a {next.name.toLowerCase()}</h4>
+              <div className="small">
+                Needs {L.pop} colonists ({c.pop}) and {Object.entries(L.needs).map(([g, n]) => `${n} ${GOOD_INFO[g as GoodId].name.toLowerCase()} (${Math.floor(c.stock[g as GoodId] ?? 0)})`).join(', ')} in the warehouse.
+                A {next.name.toLowerCase()} holds {next.cap} colonists{next.radius > L.radius ? ' and works land further out' : ''}.
+              </div>
+              <button disabled={c.pop < L.pop || Object.entries(L.needs).some(([g, n]) => (c.stock[g as GoodId] ?? 0) < n!)} onClick={() => void run({ kind: 'upgradeColony', colony: c.id })}>Raise to {next.name.toLowerCase()}</button>
+            </>
+          )}
+
+          {docked.map((f) => {
+            const free = cargoCapacity(f) - cargoUsed(f);
+            const goods = GOODS.filter((g) => (f.cargo[g] ?? 0) > 0 || (c.stock[g] ?? 0) >= 1);
+            const colonists = game.units.filter((u) => u.fleet === f.id && u.type === 'colonist').length;
+            return (
+              <div key={f.id} className="dock">
+                <h4>{f.name} in port <span className="muted small">· hold {cargoUsed(f)}/{cargoCapacity(f)}</span></h4>
+                {colonists > 0 && <button className="primary" onClick={() => void run({ kind: 'settle', fleet: f.id })}>Settle {colonists} colonist{colonists > 1 ? 's' : ''} here</button>}
+                <table className="market">
+                  <thead><tr><th>Good</th><th>Colony</th><th>Ship</th><th /></tr></thead>
+                  <tbody>
+                    {goods.map((g) => (
+                      <tr key={g}>
+                        <td className="good"><GoodIcon good={g} />{GOOD_INFO[g].name}</td>
+                        <td className="num">{Math.floor(c.stock[g] ?? 0)}</td>
+                        <td className="num">{f.cargo[g] ?? '–'}</td>
+                        <td className="trade">
+                          <button disabled={!f.cargo[g]} onClick={() => void run({ kind: 'colonyTransfer', fleet: f.id, good: g, qty: -(f.cargo[g] ?? 0) })}>Unload all</button>
+                          <button disabled={free <= 0 || (c.stock[g] ?? 0) < 1} onClick={() => void run({ kind: 'colonyTransfer', fleet: f.id, good: g, qty: Math.floor(c.stock[g] ?? 0) })}>Load all</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
         </div>
       )}
     </section>

@@ -414,3 +414,14 @@ button.on { background: linear-gradient(#e9c45c, #cf9f2c); border-color: #8a6516
 .building.built { background: rgba(217, 165, 33, 0.1); }
 .building button, .offer button { min-height: 28px; padding: 3px 9px; font-size: 13px; }
 .b-icon { font-size: 22px; text-align: center; color: var(--ink-2); }
+
+/* colonies */
+h3.section { margin-top: 14px; }
+.city-card.colony { border-color: rgba(217, 165, 33, 0.7); }
+.needs { display: flex; flex-wrap: wrap; gap: 6px; }
+.need { font-size: 13px; padding: 2px 8px; border-radius: 12px; border: 1px solid var(--line); }
+.need.ok { background: rgba(61, 107, 56, 0.12); border-color: rgba(61, 107, 56, 0.45); }
+.need.short { background: rgba(163, 35, 26, 0.12); border-color: rgba(163, 35, 26, 0.5); color: var(--bad); }
+.need.opt { color: var(--ink-3); }
+.dock { border-top: 1px dashed var(--line); margin-top: 10px; }
+.city-body > button { margin-top: 6px; }
