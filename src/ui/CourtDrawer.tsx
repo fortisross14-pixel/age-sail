@@ -10,7 +10,7 @@ import { KIND_MARK } from './NewsFeed';
 import { Tabs, Pips } from './Drawers';
 import { getView } from './MapCanvas';
 import { allNations, moodOf, envoy } from '../sim/natives';
-import { RIVALS } from '../data/rivals';
+import { rivalsOf, crownSpec } from '../data/rivals';
 import { rivalScore } from '../sim/rivals';
 import { score } from '../sim/colony';
 import { SKILL_INFO as SK } from '../data/court';
@@ -321,8 +321,8 @@ function Crowns() {
   const run = useStore((s) => s.run);
   const me = score(game, world);
   const rows = [
-    { id: 'castile', name: 'Castile (you)', ...me, colonies: game.colonies.length, posts: Object.values(game.natives).filter((n) => n.post).length },
-    ...RIVALS.map((r) => ({ id: r.id, name: r.name, ...rivalScore(game, r.id), posts: game.rivals[r.id].posts.length })),
+    { id: game.crown, name: `${crownSpec(game.crown).name} (you)`, mine: true, ...me, colonies: game.colonies.length, posts: Object.values(game.natives).filter((n) => n.post).length },
+    ...rivalsOf(game.crown).map((r) => ({ id: r.id, name: r.name, mine: false, ...rivalScore(game, r.id), posts: game.rivals[r.id].posts.length })),
   ].sort((a, b) => b.total - a.total);
   return (
     <>
@@ -331,14 +331,14 @@ function Crowns() {
         <thead><tr><th>Crown</th><th>Score</th><th>Colonies</th><th>Colonists</th><th>Territory</th><th>Posts</th></tr></thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={r.id} className={r.id === 'castile' ? 'me' : ''}>
+            <tr key={r.id} className={r.mine ? 'me' : ''}>
               <td>{i + 1}. {r.name}</td><td className="num"><b>{fmt(r.total)}</b></td><td className="num">{r.colonies}</td><td className="num">{r.pop}</td><td className="num">{r.territory}</td><td className="num">{r.posts}</td>
             </tr>
           ))}
         </tbody>
       </table>
       <ul className="people">
-        {RIVALS.map((r) => {
+        {rivalsOf(game.crown).map((r) => {
           const st = game.rivals[r.id];
           const war = st.relation === 'war';
           const cost = 1000 + Math.max(0, -st.attitude) * 10;
@@ -354,7 +354,7 @@ function Crowns() {
               <div className="person-actions">
                 <div className="muted small">
                   {war ? 'Their privateers hunt your ships and they raid colonies near theirs. A party beside one of their colonies can storm it.' : 'Settling close to their colonies sours relations; below −50 they may declare war.'}
-                  {r.id === 'portugal' && game.turn > 6 ? ' Under the Treaty of Tordesillas, they resent Castilian colonies on the African coast.' : ''}
+                  {r.id === 'portugal' && game.turn > 6 ? ' Under the Treaty of Tordesillas, they resent colonies on the African coast.' : ''}
                 </div>
                 <div className="row">
                   {war

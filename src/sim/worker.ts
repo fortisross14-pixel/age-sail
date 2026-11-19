@@ -65,14 +65,14 @@ function need() {
 }
 
 const api = {
-  newGame(seed: number, until: number = DEFAULT_UNTIL) {
-    const g = G.newGame(seed, until);
+  newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain') {
+    const g = G.newGame(seed, until, crown);
     world = g.world;
     state = g.state;
     return g;
   },
   load(saved: GameState) {
-    world = generateWorld(saved.seed);
+    world = generateWorld(saved.seed, saved.crown);
     state = saved;
     return { world, state };
   },

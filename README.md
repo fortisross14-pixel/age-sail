@@ -5,10 +5,12 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.8
+## Now playing: v0.9
 
-The long game: eras, colonial loyalty and independence, stories with choices, and an end date (1550,
-1650 or 1750) with final standings. From v0.7: rival crowns (Portugal, England, the Netherlands) race you for coasts, trade and score; wars bring
+M9, your realm: play Castile, Portugal, England, France or the Netherlands, in an Old World of 53 cities and 15 realms.
+
+From v0.8: the long game: eras, colonial loyalty and independence, stories with choices, and an end date (1550,
+1650 or 1750) with final standings. From v0.7: rival crowns race you for coasts, trade and score; wars bring
 privateers and raids, and their colonies can be stormed. From v0.6: native peoples with villages, rivals and moods: trade with them, build trading posts, send missions,
 make alliances, set rivals against each other, or conquer. And from v0.5: a court of people with skills who age and die; cities with buildings that train units; landing parties
 that explore on foot and find hidden resources and ruins; colonies that must be fed, clothed and given

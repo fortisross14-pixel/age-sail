@@ -1,10 +1,11 @@
 import { useStore, newWorldOpen } from '../store';
 import { dateLabel, seasonOf, SEASONS } from '../sim/types';
-import { GOAL, basePoints } from '../sim/game';
+import { basePoints } from '../sim/game';
 import { techById } from '../data/tech';
 import { score } from '../sim/colony';
 import { rivalScore } from '../sim/rivals';
-import { RIVALS } from '../data/rivals';
+import { rivalsOf, crownSpec } from '../data/rivals';
+import { CROWN } from '../render/palette';
 import { eraAt } from '../data/eras';
 import { yearOf } from '../sim/types';
 import { fmt } from './format';
@@ -22,10 +23,9 @@ export function Hud() {
   const open = newWorldOpen(game);
   const world = useStore((s) => s.world)!;
   const mine = score(game, world).total;
-  const rank = 1 + RIVALS.filter((r) => rivalScore(game, r.id).total > mine).length;
+  const rank = 1 + rivalsOf(game.crown).filter((r) => rivalScore(game, r.id).total > mine).length;
   const idle = game.fleets.filter((f) => f.moves > 0 && !f.order && !f.at).length;
-  const goalPct = Math.max(0, Math.min(100, (game.treasury / GOAL.treasury) * 100));
-  const turnsLeft = GOAL.turn - game.turn;
+  const crown = crownSpec(game.crown);
   return (
     <header className="hud">
       <div className="cartouche" title={`${eraAt(yearOf(game.turn)).name}. The age ends in ${1492 + Math.floor(game.endTurn / 4)}${game.ended ? ' (passed: playing on)' : ''}.`} style={{ backgroundImage: `url(${spriteUrl('ornaments/cartouche')})` }}>
@@ -36,18 +36,18 @@ export function Hud() {
         <img src={spriteUrl('goods/gold')} alt="" width={28} height={28} />
         <div><div className="stat-value">{fmt(game.treasury)}</div><div className="stat-label">ducats</div></div>
       </div>
-      <div className="stat" title="Prestige: from discoveries and the Crown’s favour">
+      <div className="stat" title="Prestige: from discoveries, victories and great deeds">
         <span className="prestige-mark" aria-hidden>✦</span>
         <div><div className="stat-value">{fmt(game.prestige)}</div><div className="stat-label">prestige</div></div>
       </div>
       <div className="stat clickable" onClick={() => set({ drawer: 'court', courtTab: 'crowns' })} title={(() => { const sc = score(game, world); return `Score: ${sc.pop} colonists ×10, ${sc.territory} hexes of territory ×2, ${sc.commerce} from ${fmt(game.revenue)} ducats of sales`; })()}>
         <span className="prestige-mark" aria-hidden>♛</span>
-        <div><div className="stat-value">{fmt(mine)}</div><div className="stat-label">score · {['1st', '2nd', '3rd', '4th'][rank - 1]} of 4</div></div>
+        <div><div className="stat-value">{fmt(mine)}</div><div className="stat-label">score · {['1st', '2nd', '3rd', '4th', '5th'][rank - 1]} of 5</div></div>
       </div>
       <div className="era-label" title={eraAt(yearOf(game.turn)).blurb}>{eraAt(yearOf(game.turn)).name}<span className="muted small"> · to {1492 + Math.floor(game.endTurn / 4)}</span></div>
-      <div className="goal" title={`The Crown asks for ${fmt(GOAL.treasury)} ducats by ${dateLabel(GOAL.turn)}`}>
-        <div className="goal-text">{turnsLeft > 0 ? <>Crown’s charge: {fmt(GOAL.treasury)} by {dateLabel(GOAL.turn)}</> : <>The Crown’s deadline has passed</>}</div>
-        <div className="goal-bar"><div style={{ width: `${goalPct}%` }} /></div>
+      <div className="crown-badge" title={crown.edge.label}>
+        <span className="crown-flag" style={{ background: CROWN[game.crown].css, borderColor: CROWN[game.crown].css2 }} aria-hidden />
+        <span>{crown.name}</span>
       </div>
       <button className="research-chip" onClick={() => set({ drawer: 'court', courtTab: 'research' })} title="Research (opens the court)">
         <span aria-hidden>📜</span>

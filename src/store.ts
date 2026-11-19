@@ -4,6 +4,7 @@ import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { DEFAULT_UNTIL } from './data/eras';
 import { SAVE_KEY, LEGACY_KEY, STALE_KEYS, wrap, fromLegacy, readSave, type LoadResult } from './save';
 import type { SimApi, Command } from './sim/worker';
+import type { CrownId } from './data/rivals';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import type { MovePreview } from './sim/game';
 
@@ -44,7 +45,7 @@ interface Store {
   busy: boolean;
 
   checkSave: () => Promise<void>;
-  newGame: (seed: number, until?: number) => Promise<void>;
+  newGame: (seed: number, until?: number, crown?: CrownId) => Promise<void>;
   continueGame: () => Promise<void>;
   quitToMenu: () => void;
   run: (c: Command) => Promise<boolean>;
@@ -119,10 +120,10 @@ export const useStore = create<Store>((set, get) => {
       } catch { set({ hasSave: false, saveProblem: null }); }
     },
 
-    async newGame(seed, until = DEFAULT_UNTIL) {
+    async newGame(seed, until = DEFAULT_UNTIL, crown = 'spain') {
       set({ phase: 'loading', saveProblem: null });
       let r;
-      try { r = await sim.newGame(seed, until); } catch (e) { startFailed(e); return; }
+      try { r = await sim.newGame(seed, until, crown); } catch (e) { startFailed(e); return; }
       const { world, state } = r;
       await save(state);
       set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: [], showHelp: true });

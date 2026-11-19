@@ -1,6 +1,10 @@
 import { createNoise2D } from 'simplex-noise';
 import { T, isWater } from '../data/terrain';
-import { OLD_WORLD, ATLANTIC_ISLANDS, STRAITS, EUROPEAN_PORTS, DECOR_CITIES, AFRICA_OUTLINE, FIXED_SOUTH } from '../data/europe';
+import { OLD_WORLD, ATLANTIC_ISLANDS, STRAITS, CITIES, AFRICA_OUTLINE, FIXED_SOUTH } from '../data/europe';
+import { realmIndex, realmSpec, type RealmId } from '../data/realms';
+
+const realmName = (r: RealmId) => realmSpec(r).name;
+import type { CrownId } from '../data/rivals';
 import { OLD, NEW, type Grid } from './hex';
 import { mulberry32, hashSeed, range, int, shuffle, type Rng } from './rng';
 import type { World, MapData, PortDef, WindField, Rumour, NationDef } from './types';
@@ -247,18 +251,67 @@ function placeSites(g: Grid, terrain: Uint8Array, rng: Rng, map: 'old' | 'new', 
   });
 }
 
+function nearestLand(g: Grid, terrain: Uint8Array, target: number): number {
+  if (!isWater(terrain[target])) return target;
+  for (let r = 1; r < 6; r++) for (const h of g.within(target, r)) if (!isWater(terrain[h])) return h;
+  return -1;
+}
+
 function coastal(g: Grid, terrain: Uint8Array, i: number) {
   return !isWater(terrain[i]) && g.neighbors(i).some((j) => isWater(terrain[j]));
 }
 
-function nearestCoastal(g: Grid, terrain: Uint8Array, target: number, taken: Set<number>) {
+/**
+ * The land hex nearest a real position that keeps at least one empty hex to every city already
+ * placed: coastal for ports, any land for inland cities.
+ */
+function placeCity(g: Grid, terrain: Uint8Array, lat: number, lon: number, port: boolean, blocked: Set<number>): number {
+  const cos = Math.cos((lat * Math.PI) / 180);
   let best = -1, bd = 1e9;
   for (let i = 0; i < g.N; i++) {
-    if (taken.has(i) || !coastal(g, terrain, i)) continue;
-    const d = g.distance(i, target);
+    if (blocked.has(i) || isWater(terrain[i]) || (port && !coastal(g, terrain, i))) continue;
+    const d = (g.lat(i) - lat) ** 2 + ((g.lon(i) - lon) * cos) ** 2;
     if (d < bd) { bd = d; best = i; }
   }
   return best;
+}
+
+/** Land with no city that still belongs to a realm in 1492: [lat, lon, realm]. */
+const REALM_SEEDS: [number, number, RealmId][] = [
+  [40.0, 9.0, 'spain'], [39.6, 2.9, 'spain'], [42.1, 9.1, 'genoa'], [38.9, 1.4, 'spain'], [40.0, 4.0, 'spain'],
+  [57.0, -4.5, 'scotland'], [52.5, -8.5, 'england'], [59.0, 15.0, 'denmark'],
+];
+/** How far a realm reaches overland from its cities, in hexes. */
+const REALM_REACH = 6;
+
+/**
+ * Which realm holds each hex: every city claims the land around it, spreading overland (never across
+ * the sea) until it meets a neighbour's claim; the nearest city wins. Africa south of the fixed map
+ * belongs to its peoples, not to a realm.
+ */
+function realmMap(g: Grid, terrain: Uint8Array, sources: { hex: number; realm: RealmId }[]): Uint8Array {
+  const out = new Uint8Array(g.N);
+  const dist = new Int32Array(g.N).fill(-1);
+  let frontier: number[] = [];
+  for (const src of sources) {
+    if (src.hex < 0 || dist[src.hex] >= 0) continue;
+    dist[src.hex] = 0;
+    out[src.hex] = realmIndex(src.realm);
+    frontier.push(src.hex);
+  }
+  for (let d = 1; d <= REALM_REACH && frontier.length; d++) {
+    const next: number[] = [];
+    for (const h of frontier) {
+      for (const n of g.neighbors(h)) {
+        if (dist[n] >= 0 || isWater(terrain[n]) || g.lat(n) < FIXED_SOUTH - 1) continue;
+        dist[n] = d;
+        out[n] = out[h];
+        next.push(n);
+      }
+    }
+    frontier = next;
+  }
+  return out;
 }
 
 const edgePortals = (g: Grid, terrain: Uint8Array, col: number) =>
@@ -305,7 +358,7 @@ function africaLand(seed: number): (lat: number, lon: number) => boolean {
   };
 }
 
-export function generateOldWorld(seed: number): MapData {
+export function generateOldWorld(seed: number, crown: CrownId = 'spain'): MapData {
   const g = OLD;
   const africa = africaLand(seed);
   const land = new Uint8Array(g.N);
@@ -332,19 +385,27 @@ export function generateOldWorld(seed: number): MapData {
   const rng = mulberry32(hashSeed(seed, 24));
   const rivers = makeRivers(g, terrain, elevation, south.toSea, rng, (i) => g.lat(i) < FIXED_SOUTH - 2, 5);
 
+  // Cities go down largest first, each keeping one empty hex to its neighbours.
   const taken = new Set<number>();
-  const ports: PortDef[] = EUROPEAN_PORTS.map((p) => {
-    const hex = nearestCoastal(g, terrain, g.hexAt(p.lat, p.lon), taken);
+  const blocked = new Set<number>();
+  const ports: PortDef[] = CITIES.map((c) => {
+    const hex = placeCity(g, terrain, c.lat, c.lon, c.coastal, blocked);
     taken.add(hex);
-    return { id: p.id, name: p.name, map: 'old', hex, kind: p.kind, nation: p.nation, blurb: p.blurb };
+    blocked.add(hex);
+    for (const n of g.neighbors(hex)) blocked.add(n);
+    return {
+      id: c.id, name: c.name, map: 'old', hex, kind: c.realm === crown ? 'home' : 'foreign', nation: realmName(c.realm),
+      realm: c.realm, size: c.size, ...(c.coastal ? {} : { inland: true }), blurb: c.blurb,
+    };
   });
+  const realm = realmMap(g, terrain, [
+    ...ports.map((p) => ({ hex: p.hex, realm: p.realm! })),
+    ...REALM_SEEDS.map(([lat, lon, r]) => ({ hex: nearestLand(g, terrain, g.hexAt(lat, lon)), realm: r })),
+  ]);
   const coastalPeoples = placeSites(g, terrain, rng, 'old', [[20, 27.5, 2], [13, 20, 2], [7, 13, 2], [2, 7, 2], [-4, 2, 1]], (i) => g.lat(i) < 27.5 && !taken.has(i));
   for (const p of coastalPeoples) p.blurb = `A trading ground of the ${p.people}, who have heard rumours of strangers in ships from the north.`;
   ports.push(...coastalPeoples);
-  const decorCities = DECOR_CITIES.map(([name, lat, lon]) => {
-    const h = g.hexAt(lat, lon);
-    return { name, hex: isWater(terrain[h]) ? nearestCoastal(g, terrain, h, taken) : h };
-  });
+  const decorCities: MapData['decorCities'] = [];
   const islandNames = south.comps
     .filter((c) => c.length >= 2 && c.length < 40 && g.lat(c[0]) < FIXED_SOUTH - 1)
     .map((c) => ({ name: islandName(rng), hex: [...c].sort((a, b) => south.toSea[b] - south.toSea[a])[0] }));
@@ -354,7 +415,7 @@ export function generateOldWorld(seed: number): MapData {
   const rumours = placeRumours(g, terrain, south.toSea, rng, 5, south_);
   const nations = placeNations(g, terrain, south.toSea, rng, coastalPeoples, 'old');
   return {
-    id: 'old', terrain, elevation, rivers, wind, ports, decorCities, islandNames, monsters: [],
+    id: 'old', terrain, elevation, rivers, wind, ports, decorCities, islandNames, monsters: [], realm,
     portals: edgePortals(g, terrain, 0), mainland: south.mainland, deep: south.deep, resource, rumours, nations,
   };
 }
@@ -460,7 +521,7 @@ export function generateNewWorld(seed: number): MapData {
   const rumours = placeRumours(g, terrain, toSea, rng, 9, () => true);
   const nations = placeNations(g, terrain, toSea, rng, ports, 'new');
   return {
-    id: 'new', terrain, elevation, rivers, wind, ports, decorCities: [], islandNames, monsters,
+    id: 'new', terrain, elevation, rivers, wind, ports, decorCities: [], islandNames, monsters, realm: new Uint8Array(g.N),
     portals: edgePortals(g, terrain, g.W - 1), mainland, deep, resource, rumours, nations,
   };
 }
@@ -500,6 +561,6 @@ export function windField(g: Grid, seed: number, season: number, terrain: Uint8A
   return { angle, strength };
 }
 
-export function generateWorld(seed: number): World {
-  return { seed, old: generateOldWorld(seed), new: generateNewWorld(seed) };
+export function generateWorld(seed: number, crown: CrownId = 'spain'): World {
+  return { seed, crown, old: generateOldWorld(seed, crown), new: generateNewWorld(seed) };
 }

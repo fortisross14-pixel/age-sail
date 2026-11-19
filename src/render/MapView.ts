@@ -3,12 +3,14 @@ import { SHIPS } from '../data/ships';
 import { SEA_LABELS } from '../data/europe';
 import { isWater } from '../data/terrain';
 import { HEX_R, HEX_W, GRIDS, type Grid, type MapId } from '../sim/hex';
-import { Fog, seasonOf, type GameState, type World, type Fleet, type MapData } from '../sim/types';
+import { Fog, seasonOf, type GameState, type World, type Fleet, type MapData, type PortDef } from '../sim/types';
+import { realmSpec, realmAt } from '../data/realms';
+import { crownSpec } from '../data/rivals';
 import type { Assets } from './assets';
 import {
   buildField, drawWash, drawInk, drawFogMask, drawPaper, drawVeil, INK_RES, WASH_SCALE, VEIL_SCALE, PAPER_ALPHA, PAPER_TILE,
 } from './mapArt';
-import { CROWN, NATIVE } from './palette';
+import { CROWN, NATIVE, type CrownKey } from './palette';
 import { RESOURCES, RESOURCE_IDS } from '../data/city';
 import { UNIT_INFO } from '../data/court';
 import { colonyKind } from './colonyKind';
@@ -41,12 +43,13 @@ function canvasTexture(cv: HTMLCanvasElement, mip = false): Texture {
   return new Texture({ source: new CanvasSource({ resource: cv, autoGenerateMipmaps: mip, scaleMode: 'linear' }) });
 }
 
-function label(text: string, size: number, opts: { italic?: boolean; color?: string; spacing?: number } = {}) {
+function label(text: string, size: number, opts: { italic?: boolean; color?: string; spacing?: number; halo?: boolean } = {}) {
   const t = new Text({
     text,
     style: {
       fontFamily: '"IM Fell English", Georgia, serif', fontSize: size, fontStyle: opts.italic ? 'italic' : 'normal',
       fill: opts.color ?? '#3b2614', letterSpacing: opts.spacing ?? 0,
+      ...(opts.halo ? { stroke: { color: '#f3e6c8', width: Math.max(3, size / 4), join: 'round' as const } } : {}),
     },
     resolution: 3,
   });
@@ -139,7 +142,12 @@ class Scene {
   lastFogKey = '';
   lastSeason = -1;
 
-  constructor(readonly g: Grid, readonly m: MapData, private seed: number, private assets: Assets) {}
+  /** your crown's colours, for everything that is yours on the map */
+  readonly me: (typeof CROWN)[CrownKey];
+
+  constructor(readonly g: Grid, readonly m: MapData, private seed: number, private assets: Assets, crown: CrownKey = 'spain') {
+    this.me = CROWN[crown];
+  }
 
   async build(progress: (msg: string) => void) {
     const { g, m, assets } = this;
@@ -183,6 +191,7 @@ class Scene {
       ink.addChild(s);
     }
     this.root.addChild(ink);
+    if (m.realm.some((r) => r > 0)) this.root.addChild(this.realms());
     drawFogMask(g, this.fogKnown, [], Fog.Charted);
     drawVeil(this.veilInk, this.paper, this.fogKnown);
     this.veilInkTex = canvasTexture(this.veilInk);
@@ -200,6 +209,65 @@ class Scene {
       this.ports, this.colonyLayer, this.rivalLayer, this.parties, this.rivalShipLayer, this.fleets, this.plateLayer, this.hover, this.previewLabel);
     this.buildLabels();
     this.buildPorts();
+  }
+
+  /**
+   * Realms on the chart, as on a period map: a light wash of each realm's colour, a coloured band
+   * inside each border, a dashed ink line between neighbours, and the realm's name in spaced capitals.
+   */
+  private realms(): Container {
+    const { g, m } = this;
+    const root = new Container();
+    const wash = new Graphics(), bands = new Graphics(), ink = new Graphics(), names = new Container();
+    const colour = (code: number) => realmSpec(realmAt(code)!).color;
+    for (let i = 0; i < g.N; i++) if (m.realm[i]) wash.poly(g.corners(i)).fill({ color: colour(m.realm[i]), alpha: 0.13 });
+    const seen = new Set<string>();
+    for (let i = 0; i < g.N; i++) {
+      const r = m.realm[i];
+      if (!r || isWater(m.terrain[i])) continue;
+      const cs = g.corners(i);
+      const cx = g.cx(i), cy = g.cy(i);
+      for (const n of g.neighbors(i)) {
+        const rn = m.realm[n];
+        if (rn === r || isWater(m.terrain[n])) continue;
+        // the shared edge: the two corners of this hex closest to the neighbour's centre
+        const nx = g.cx(n), ny = g.cy(n);
+        const pts: [number, number][] = [];
+        for (let k = 0; k < cs.length; k += 2) pts.push([cs[k], cs[k + 1]]);
+        pts.sort((a, b) => Math.hypot(a[0] - nx, a[1] - ny) - Math.hypot(b[0] - nx, b[1] - ny));
+        const [a, b] = pts;
+        // inner band, pulled a little toward this hex's centre
+        const pull = 0.16;
+        bands.moveTo(a[0] + (cx - a[0]) * pull, a[1] + (cy - a[1]) * pull).lineTo(b[0] + (cx - b[0]) * pull, b[1] + (cy - b[1]) * pull);
+        bands.stroke({ width: 5, color: colour(r), alpha: 0.7, cap: 'round' });
+        const key = i < n ? `${i}|${n}` : `${n}|${i}`;
+        if (rn && !seen.has(key)) {
+          seen.add(key);
+          const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          for (let t = 0; t < len; t += 7) {
+            const u0 = t / len, u1 = Math.min(1, (t + 4) / len);
+            ink.moveTo(a[0] + (b[0] - a[0]) * u0, a[1] + (b[1] - a[1]) * u0).lineTo(a[0] + (b[0] - a[0]) * u1, a[1] + (b[1] - a[1]) * u1);
+          }
+        }
+      }
+    }
+    ink.stroke({ width: 1.6, color: INK_HEX, alpha: 0.8 });
+    // names at the middle of each realm's largest stretch of land, larger for larger realms
+    const byRealm = new Map<number, number[]>();
+    for (let i = 0; i < g.N; i++) if (m.realm[i] && !isWater(m.terrain[i])) (byRealm.get(m.realm[i]) ?? byRealm.set(m.realm[i], []).get(m.realm[i])!).push(i);
+    for (const [code, hexes] of byRealm) {
+      if (hexes.length < 6) continue;
+      const mx = hexes.reduce((t, h) => t + g.cx(h), 0) / hexes.length, my = hexes.reduce((t, h) => t + g.cy(h), 0) / hexes.length;
+      const at = hexes.reduce((b, h) => (Math.hypot(g.cx(h) - mx, g.cy(h) - my) < Math.hypot(g.cx(b) - mx, g.cy(b) - my) ? h : b));
+      const spec = realmSpec(realmAt(code)!);
+      const size = Math.min(30, 13 + Math.sqrt(hexes.length) * 1.1);
+      const t = label(spec.name.replace(/^the /, '').toUpperCase(), size, { color: '#4a321e', spacing: size * 0.45 });
+      t.alpha = 0.42;
+      t.position.set(g.cx(at), g.cy(at) + HEX_R * 0.9);
+      names.addChild(t);
+    }
+    root.addChild(wash, bands, ink, names);
+    return root;
   }
 
   private rhumbLines(): Container {
@@ -331,17 +399,45 @@ class Scene {
     return c;
   }
 
+  /** A city of the Old World, drawn plainly: a small town and its name, sized by the city's size. */
+  private buildCity(p: PortDef) {
+    const { g } = this;
+    const size = p.size ?? 2;
+    const node = new Container();
+    const key = p.inland ? (size === 1 ? 'colonies/fort-outpost' : 'colonies/fort-town') : size === 1 ? 'colonies/port-outpost' : 'colonies/port-town';
+    const icon = new Sprite(this.assets.tex(key));
+    icon.anchor.set(0.5, 0.72);
+    icon.width = HEX_W * (size === 3 ? 1.35 : size === 2 ? 1.1 : 0.85);
+    icon.scale.y = icon.scale.x;
+    node.addChild(icon);
+    node.position.set(g.cx(p.hex), g.cy(p.hex));
+    const name = new Container();
+    const t = label(p.name, size === 3 ? 17 : size === 2 ? 14 : 12.5, { italic: size === 1, halo: true, color: '#2a1a0c' });
+    name.addChild(t);
+    // a smaller city right beside a larger one puts its name above its icon instead of below
+    const m = this.m;
+    const crowded = m.ports.some((q) => q !== p && q.realm && g.distance(q.hex, p.hex) <= 2 && m.ports.indexOf(q) < m.ports.indexOf(p)
+      && Math.abs(g.cy(q.hex) - g.cy(p.hex)) < HEX_R * 2.2);
+    name.position.set(g.cx(p.hex), g.cy(p.hex) + (crowded ? -HEX_R * 1.25 : HEX_R * 0.78));
+    this.plates.push(name);
+    this.plateLayer.addChild(name);
+    this.portPlates.set(p.id, name);
+    this.ports.addChild(node);
+    this.portSprites.set(p.id, node);
+  }
+
   private buildPorts() {
     const { g, m } = this;
     for (const p of m.ports) {
+      if (p.realm) { this.buildCity(p); continue; }
       const node = new Container();
       const big = p.kind !== 'native';
       const icon = new Sprite(this.assets.tex(p.kind === 'native' ? 'colonies/trading-post-outpost' : p.kind === 'home' ? 'colonies/port-city' : 'colonies/port-town'));
       icon.anchor.set(0.5, 0.72);
-      icon.width = p.id === 'seville' ? HEX_W * 1.9 : big ? HEX_W * 1.5 : HEX_W * 1.15;
+      icon.width = big ? HEX_W * 1.5 : HEX_W * 1.15;
       icon.scale.y = icon.scale.x;
       // home ports carry the crown's colours; foreign ports a muted plate; native sites earth tones
-      const color = p.kind === 'home' ? CROWN.spain.primary : p.kind === 'native' ? NATIVE.plate : 0x8d8472;
+      const color = p.kind === 'home' ? this.me.primary : p.kind === 'native' ? NATIVE.plate : 0x8d8472;
       const plate = this.plate(p.name, color, p.kind === 'native' ? p.people : p.kind === 'foreign' ? p.nation : undefined);
       // when two ports sit side by side, put the second name above its icon
       const crowded = m.ports.some((q) => q !== p && g.distance(q.hex, p.hex) <= 2 && m.ports.indexOf(q) < m.ports.indexOf(p));
@@ -418,7 +514,7 @@ class Scene {
     this.syncParties(state, ui);
     this.landingG.clear();
     if (ui.landing && ui.map === g.id) {
-      for (const h of ui.landing) this.landingG.poly(g.corners(h, 0.9)).fill({ color: CROWN.spain.primary, alpha: 0.28 }).stroke({ width: 2, color: CROWN.spain.secondary, alpha: 0.9 });
+      for (const h of ui.landing) this.landingG.poly(g.corners(h, 0.9)).fill({ color: this.me.primary, alpha: 0.28 }).stroke({ width: 2, color: this.me.secondary, alpha: 0.9 });
     }
     this.drawRoutes(state, ui);
     this.drawHighlight(ui);
@@ -481,8 +577,8 @@ class Scene {
       const sel = ui.selectedParty === p.id;
       ps.ring.clear();
       if (sel) ps.ring.ellipse(0, 0, HEX_W * 0.5, HEX_W * 0.2).fill({ color: 0xfff6d8, alpha: 0.9 });
-      ps.ring.ellipse(0, 0, HEX_W * 0.36, HEX_W * 0.14).fill({ color: CROWN.spain.primary, alpha: p.moves > 0 ? 0.6 : 0.25 })
-        .stroke({ width: sel ? 2.4 : 1.4, color: CROWN.spain.secondary });
+      ps.ring.ellipse(0, 0, HEX_W * 0.36, HEX_W * 0.14).fill({ color: this.me.primary, alpha: p.moves > 0 ? 0.6 : 0.25 })
+        .stroke({ width: sel ? 2.4 : 1.4, color: this.me.secondary });
       ps.root.position.set(g.cx(p.hex), g.cy(p.hex) + HEX_R * 0.3);
     }
   }
@@ -499,7 +595,7 @@ class Scene {
     for (const n of m.nations) {
       const st = state.natives[n.id];
       if (!st) continue;
-      const color = st.relation === 'subject' ? CROWN.spain.primary : st.relation === 'allied' ? 0x3d6b38 : st.relation === 'war' || st.attitude <= -40 ? 0xa3231a : st.attitude < 0 ? 0xb07a2a : NATIVE.plate;
+      const color = st.relation === 'subject' ? this.me.primary : st.relation === 'allied' ? 0x3d6b38 : st.relation === 'war' || st.attitude <= -40 ? 0xa3231a : st.attitude < 0 ? 0xb07a2a : NATIVE.plate;
       for (const h of n.villages) {
         if (fog[h] < Fog.Explored) continue;
         const lost = st.lost.includes(h);
@@ -515,7 +611,7 @@ class Scene {
       }
       if (st.met && fog[n.siteHex] >= Fog.Explored) {
         const ring = new Graphics().circle(0, 0, HEX_R * 0.95).stroke({ width: 2.5, color, alpha: 0.75 });
-        if (st.post) ring.rect(-HEX_R * 0.9, -HEX_R * 0.9, 9, 9).fill(CROWN.spain.secondary);
+        if (st.post) ring.rect(-HEX_R * 0.9, -HEX_R * 0.9, 9, 9).fill(this.me.secondary);
         if (st.mission) ring.moveTo(HEX_R * 0.75, -HEX_R * 1.0).lineTo(HEX_R * 0.75, -HEX_R * 0.55).moveTo(HEX_R * 0.6, -HEX_R * 0.85).lineTo(HEX_R * 0.9, -HEX_R * 0.85).stroke({ width: 2, color: INK_HEX });
         ring.position.set(g.cx(n.siteHex), g.cy(n.siteHex));
         this.nationLayer.addChild(ring);
@@ -588,7 +684,7 @@ class Scene {
     this.colonyLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
     this.territoryG.clear();
     for (const c of mine) {
-      for (const h of g.within(c.hex, c.level === 'outpost' ? 1 : 2)) this.territoryG.poly(g.corners(h)).fill({ color: CROWN.spain.primary, alpha: 0.09 });
+      for (const h of g.within(c.hex, c.level === 'outpost' ? 1 : 2)) this.territoryG.poly(g.corners(h)).fill({ color: this.me.primary, alpha: 0.09 });
       const node = new Container();
       const icon = new Sprite(this.assets.tex(`colonies/${colonyKind(state, c)}-${c.level}`));
       icon.anchor.set(0.5, 0.72);
@@ -597,12 +693,12 @@ class Scene {
       node.addChild(icon);
       node.position.set(g.cx(c.hex), g.cy(c.hex));
       this.colonyLayer.addChild(node);
-      const plate = this.plate(`${c.name} · ${c.pop}`, CROWN.spain.primary);
+      const plate = this.plate(`${c.name} · ${c.pop}`, this.me.primary);
       plate.position.set(g.cx(c.hex), g.cy(c.hex) + HEX_R * 0.75);
       this.plates.push(plate);
       this.colonyLayer.addChild(plate);
     }
-    this.territoryG.stroke({ width: 1, color: CROWN.spain.secondary, alpha: 0.18 });
+    this.territoryG.stroke({ width: 1, color: this.me.secondary, alpha: 0.18 });
   }
 
   partyAt(mx: number, my: number): number | null {
@@ -661,7 +757,7 @@ class Scene {
       fs.ship.scale.x = Math.abs(fs.ship.scale.x) * fs.facing;
 
       const selected = ui.selectedFleet === f.id;
-      const c = CROWN.spain;
+      const c = this.me;
       fs.ring.clear();
       if (selected) fs.ring.ellipse(0, 0, HEX_W * 0.66, HEX_W * 0.27).fill({ color: 0xfff6d8, alpha: 0.85 });
       fs.ring.ellipse(0, 0, HEX_W * 0.5, HEX_W * 0.2).fill({ color: c.primary, alpha: f.moves > 0 ? 0.6 : 0.25 })
@@ -762,7 +858,7 @@ class Scene {
       h.circle(this.g.cx(p.hex), this.g.cy(p.hex), HEX_R * 1.3);
     }
     for (const fs of this.fleetSprites.values()) h.circle(fs.root.x, fs.root.y - 10, HEX_R * 1.1);
-    h.stroke({ width: 3, color: 0xffffff, alpha: 0.9 }).stroke({ width: 1.5, color: CROWN.spain.secondary });
+    h.stroke({ width: 3, color: 0xffffff, alpha: 0.9 }).stroke({ width: 1.5, color: this.me.secondary });
   }
 
   /** true while any fleet is still sailing along its last move */
@@ -873,7 +969,7 @@ export class MapView {
   /** Draw a board's art once; later calls wait for the same build. */
   private buildScene(id: MapId): Promise<void> {
     return (this.building[id] ??= (async () => {
-      const sc = new Scene(GRIDS[id], this.world[id], this.world.seed, this.assets);
+      const sc = new Scene(GRIDS[id], this.world[id], this.world.seed, this.assets, this.world.crown);
       await sc.build((m) => this.progress?.(`${id === 'old' ? 'Old World' : 'Mar Océano'}: ${m}`));
       if (this.destroyed) { sc.root.destroy({ children: true, texture: true }); return; }
       sc.root.visible = false;
@@ -918,8 +1014,8 @@ export class MapView {
     let fx: number, fy: number, sx: number;
     const mine = this.state?.fleets.find((f) => f.map === g.id && f.id === this.ui?.selectedFleet) ?? this.state?.fleets.find((f) => f.map === g.id);
     if (g.id === 'old') {
-      const seville = this.world.old.ports.find((p) => p.id === 'seville')!;
-      fx = g.cx(seville.hex); fy = g.cy(seville.hex); sx = (vw - right) * 0.62;
+      const home = this.world.old.ports.find((p) => p.id === crownSpec(this.world.crown).home)!;
+      fx = g.cx(home.hex); fy = g.cy(home.hex); sx = (vw - right) * 0.62;
     } else if (mine) {
       fx = g.cx(mine.hex); fy = g.cy(mine.hex); sx = (vw - right) * 0.6;
     } else {

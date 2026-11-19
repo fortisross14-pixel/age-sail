@@ -4,8 +4,9 @@ import { GRIDS } from '../sim/hex';
 import { Fog, seasonOf } from '../sim/types';
 import { deepPeril } from '../sim/game';
 import { nationAt, moodOf } from '../sim/natives';
-import { RIVALS } from '../data/rivals';
-const RIVAL_NAME = Object.fromEntries(RIVALS.map((r) => [r.id, r.name])) as Record<string, string>;
+import { CROWNS } from '../data/rivals';
+import { realmAt, realmSpec } from '../data/realms';
+const RIVAL_NAME = Object.fromEntries(CROWNS.map((r) => [r.id, r.name])) as Record<string, string>;
 import { RESOURCES, RESOURCE_IDS } from '../data/city';
 import { isWater } from '../data/terrain';
 import { latLabel, lonLabel, windFrom, windStrength } from './format';
@@ -27,6 +28,11 @@ export function HoverInfo() {
   else {
     parts.push(port ? port.name : TERRAIN_INFO[m.terrain[hex] as keyof typeof TERRAIN_INFO].name + (fog === Fog.Charted ? ' (seen from afar)' : ''));
     parts.push(`wind from the ${windFrom(wind.angle[hex])}, ${windStrength(wind.strength[hex])}`);
+  }
+  const realm = realmAt(m.realm[hex]);
+  if (fog !== Fog.Unknown && realm) {
+    const mine = realm === game.crown;
+    parts.push(port ? `${mine ? 'your city' : `a city of ${realmSpec(realm).name}`}${port.inland ? ', inland' : ''}` : mine ? 'your realm' : `lands of ${realmSpec(realm).name}`);
   }
   if (fog !== Fog.Unknown && !isWater(m.terrain[hex])) {
     const r = m.resource[hex];

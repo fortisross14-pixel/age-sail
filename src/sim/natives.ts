@@ -2,6 +2,7 @@
  * Native peoples: how they stand with the Crown, and every way of dealing with them, from trade and missions
  * to alliances, setting rivals against each other, and conquest. Battles are a matter of numbers.
  */
+import { crownSpec } from '../data/rivals';
 import { T, isWater } from '../data/terrain';
 import { UNIT_INFO } from '../data/court';
 import { GOOD_INFO, type GoodId } from '../data/goods';
@@ -45,7 +46,7 @@ export function initNatives(w: World): Record<string, NativeState> {
 export const isHostile = (st: NativeState) => st.relation === 'war' || (st.relation === 'peace' && st.attitude <= -40);
 
 export function moodOf(st: NativeState): string {
-  if (st.relation === 'subject') return 'subjects of the Crown';
+  if (st.relation === 'subject') return 'your subjects';
   if (st.relation === 'allied') return 'allied';
   if (st.relation === 'war') return 'at war';
   if (st.attitude <= -40) return 'hostile';
@@ -122,7 +123,7 @@ export function gift(w: World, s: GameState, id: string, ducats: number): Result
   if (ducats > s.treasury) return fail('The treasury cannot afford it.');
   const e = envoy(s);
   s.treasury -= ducats;
-  const gain = (ducats / 25) * (1 + 0.15 * skill(e, 'diplomacy'));
+  const gain = (ducats / 25) * (1 + 0.15 * skill(e, 'diplomacy')) * (crownSpec(s.crown).edge.gifts ?? 1);
   x.st.attitude += gain;
   clampAtt(x.st);
   return { ok: true, message: `${e?.name ?? 'Your envoy'} brings gifts to ${nameOf(x.n)}. They are ${moodOf(x.st)} now.` };
@@ -181,10 +182,10 @@ export function incorporate(w: World, s: GameState, id: string, log: Log, ev: Ev
   const x = requireMet(s, w, id);
   if (!x) return fail('You have not met that people.');
   if (x.st.converted < 1) return fail('The mission has not yet won them over.');
-  if (x.st.attitude < 40) return fail(`${nameOf(x.n)} are not friendly enough to join the Crown.`);
+  if (x.st.attitude < 40) return fail(`${nameOf(x.n)} are not friendly enough to join your realm.`);
   x.st.relation = 'subject';
-  log('discovery', `${nameOf(x.n)} choose to live under the Crown. Their lands are part of the realm now.`);
-  ev({ kind: 'people', title: `The ${x.n.people} join the Crown`, map: x.n.map, hex: x.n.siteHex, text: `After years of the mission among them, ${nameOf(x.n)} agree to become subjects of the Crown of Castile. No blood was spilled.` });
+  log('discovery', `${nameOf(x.n)} choose to live under your rule. Their lands are part of your realm now.`);
+  ev({ kind: 'people', title: `The ${x.n.people} join your realm`, map: x.n.map, hex: x.n.siteHex, text: `After years of the mission among them, ${nameOf(x.n)} agree to become your subjects. No blood was spilled.` });
   return { ok: true };
 }
 
@@ -236,7 +237,7 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
   if (!n) return fail('There is no village there.');
   const st = s.natives[n.id];
   if (st.lost.includes(hex)) return fail('That village is already abandoned.');
-  if (st.relation === 'subject') return fail(`${nameOf(n)} are already subjects of the Crown.`);
+  if (st.relation === 'subject') return fail(`${nameOf(n)} are already your subjects.`);
   const a = partyStrength(s, p) + alliedHelp(w, s, n);
   const d = defenceOf(w, n, st, hex);
   if (a <= 0) return fail('The party has no one who can fight.');
@@ -259,9 +260,9 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
       const loot = n.empire ? int(rng, 3000, 6000) : int(rng, 300, 900);
       s.treasury += loot;
       s.prestige += n.empire ? 40 : 10;
-      log('peril', `${who} defeats ${nameOf(n)}.${loss} They submit to the Crown and must pay tribute. Spoils worth ${loot} ducats are sent home.`);
+      log('peril', `${who} defeats ${nameOf(n)}.${loss} They submit to you and must pay tribute. Spoils worth ${loot} ducats are sent home.`);
       ev({ kind: 'people', title: n.empire ? 'An empire falls' : `The ${n.people} submit`, map: n.map, hex,
-        text: `${who}’s party has defeated ${nameOf(n)}${n.empire ? ', the greatest power of these lands' : ''}. They are subjects of the Crown now, paying tribute. Every other people has heard of it.` });
+        text: `${who}’s party has defeated ${nameOf(n)}${n.empire ? ', the greatest power of these lands' : ''}. They are your subjects now, paying tribute. Every other people has heard of it.` });
     } else {
       log('peril', `${who} takes a village of ${nameOf(n)}; its people flee inland.${loss} ${nameOf(n)} still have ${st.warriors} warriors.`);
     }
@@ -304,7 +305,7 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
       st.attitude += 1;
       if (st.converted < 1) {
         st.converted = Math.min(1, st.converted + 0.035);
-        if (st.converted >= 1) log('court', `The mission among ${nameOf(n)} has won most of them over. They might join the Crown, if asked.`);
+        if (st.converted >= 1) log('court', `The mission among ${nameOf(n)} has won most of them over. They might join your realm, if asked.`);
       }
     }
     // colonies on their land

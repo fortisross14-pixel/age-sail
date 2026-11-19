@@ -45,13 +45,13 @@ describe('the Old World board', () => {
   for (const seed of SEEDS) {
     it(`seed ${seed}: every port and coastal people can be reached from Sevilla, and so can the western edge`, () => {
       const m = generateOldWorld(seed);
-      const ports = new Set(m.ports.map((p) => p.hex));
+      const ports = new Set(m.ports.filter((p) => !p.inland).map((p) => p.hex));
       const fog = new Array(OLD.N).fill(Fog.Explored);
       const o = { explorer: true, ports, fog, movesLeft: 12, movesMax: 12, windward: 0.5 };
       const seville = m.ports.find((p) => p.id === 'seville')!;
       expect(m.ports.filter((p) => p.kind === 'native').length).toBeGreaterThanOrEqual(6);
       for (const p of m.ports) {
-        if (p.id !== 'seville') expect(planRoute(OLD, m, 0, seville.hex, p.hex, o), p.name).not.toBeNull();
+        if (p.id !== 'seville' && !p.inland) expect(planRoute(OLD, m, 0, seville.hex, p.hex, o), p.name).not.toBeNull();
       }
       expect(planRoute(OLD, m, 0, seville.hex, m.portals[40], o)).not.toBeNull();
     });
@@ -94,6 +94,8 @@ type Game = ReturnType<typeof newGame>;
 
 /** The opening moves: merge the two ships, make the best navigator an explorer, wait, put them in command. */
 function expedition({ world, state }: Game) {
+  // these tests follow the explorer's own unit: leave the colonist and soldier of the start at home
+  state.units = state.units.filter((u) => u.city == null);
   const [a, b] = state.fleets;
   expect(mergeFleets(state, a.id, b.id).ok).toBe(true);
   const f = state.fleets[0];
@@ -290,6 +292,9 @@ describe('M3: the court', () => {
   it('starts with nine people, two ships with nobody in command, and petitioners', () => {
     const { state } = newGame(1492);
     expect(state.people.length).toBe(9);
+    expect(state.crown).toBe('spain');
+    // a plain start: a colonist and a soldier wait in Sevilla, and Castile's edge adds a colonist
+    expect(state.units.filter((u) => u.city === 'seville').map((u) => u.type).sort()).toEqual(['colonist', 'colonist', 'infantry']);
     expect(state.fleets.length).toBe(2);
     expect(state.fleets.every((f) => f.leader == null)).toBe(true);
     expect(state.petitioners.length).toBeGreaterThan(0);

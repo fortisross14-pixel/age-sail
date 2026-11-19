@@ -40,7 +40,7 @@ export const TECHS: Tech[] = [
   },
   {
     id: 'chancery', name: 'Royal chancery', branch: 'state', cost: 25, requires: [],
-    effect: '2 more research points every season.', blurb: 'Clerks, copyists and cosmographers paid from the Crown’s purse.',
+    effect: '2 more research points every season.', blurb: 'Clerks, copyists and cosmographers paid from your purse.',
   },
 ];
 

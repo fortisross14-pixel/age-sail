@@ -1,6 +1,6 @@
 /** Colonies: founding them, working the land around them, feeding and clothing the settlers, growing. */
 import { GOODS, GOOD_INFO, NEEDS, LUXURIES, LUXURY_NEED, type GoodId } from '../data/goods';
-import { EUROPEAN_PORTS } from '../data/europe';
+import { cityById } from '../data/europe';
 import { RESOURCE_IDS } from '../data/city';
 import { T, isWater } from '../data/terrain';
 import { GRIDS } from './hex';
@@ -69,7 +69,7 @@ export function tileOptions(world: World, map: MapId, hex: number): { good: Good
 }
 
 const VALUE: Partial<Record<GoodId, number>> = Object.fromEntries(
-  GOODS.map((g) => [g, EUROPEAN_PORTS[0].market[g]?.[0] ?? 20]),
+  GOODS.map((g) => [g, cityById('seville')!.market![g]?.[0] ?? 20]),
 ) as Partial<Record<GoodId, number>>;
 
 export const colonyRadius = (c: Colony) => LEVELS[c.level].radius;
@@ -185,7 +185,7 @@ export function canFound(world: World, s: GameState, p: Party): { ok: boolean; w
   const rival = s.rivalColonies.find((c) => c.map === p.map && g.distance(c.hex, p.hex) <= 3);
   if (rival) return { ok: false, why: `This coast is claimed by ${rival.name}, a rival colony.` };
   const free = s.freeStates.find((c) => c.map === p.map && g.distance(c.hex, p.hex) <= 3);
-  if (free) return { ok: false, why: `This coast belongs to ${free.name}, which broke away from the Crown.` };
+  if (free) return { ok: false, why: `This coast belongs to ${free.name}, which broke away from your rule.` };
   if (m.ports.some((x) => g.distance(x.hex, p.hex) <= 2)) return { ok: false, why: 'Too close to a trading ground or port.' };
   if (p.map === 'old' && g.lat(p.hex) >= 30) return { ok: false, why: 'This land already belongs to European crowns.' };
   const needs = foundingNeeds(s, p);

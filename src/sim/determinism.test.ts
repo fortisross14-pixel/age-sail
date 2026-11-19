@@ -34,10 +34,10 @@ describe('determinism', () => {
 });
 
 function digest(seed: number, w = generateWorld(seed)) {
-  return createHash('sha1').update(w.old.terrain).update(w.new.terrain).update(w.new.resource)
+  return createHash('sha1').update(w.old.terrain).update(w.old.realm).update(w.new.terrain).update(w.new.resource)
     .update(JSON.stringify([w.old.ports, w.new.ports, w.new.nations, w.new.rumours])).digest('hex');
 }
 
 const PINNED_RNG = [626777223, 453098907, 782630688];
 const PINNED_HASH = [1359080152, 904822223, 84702589];
-const PINNED_WORLD = 'fd8d72a76eda1a9b60485f13bfb6d128a5660b13';
+const PINNED_WORLD = '9f202b081a8c2b51e8954d916346bb5b99837804';

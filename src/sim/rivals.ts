@@ -1,9 +1,9 @@
 /**
  * Rival crowns. They are not simulated in full: they research the crossing on a schedule, send ships to found
- * colonies at good sites and to trade with native peoples, grow their colonies, and go to war with Castile when
+ * colonies at good sites and to trade with native peoples, grow their colonies, and go to war with you when
  * relations sour. Everything they do happens on the map, where the player can see it.
  */
-import { RIVALS, rivalSpec, type CrownId } from '../data/rivals';
+import { CROWNS, rivalSpec, rivalsOf, type CrownId } from '../data/rivals';
 import { SHIPS } from '../data/ships';
 import { isWater } from '../data/terrain';
 import { RESOURCE_IDS } from '../data/city';
@@ -19,14 +19,20 @@ const fail = (error: string): Result => ({ ok: false, error });
 type Log = (kind: 'discovery' | 'peril' | 'court' | 'trade', text: string) => void;
 type Ev = (e: GameEvent) => void;
 
+/** The player's crown, as the rivals' messages name it. */
+const me = (s: GameState) => rivalSpec(s.crown).name;
+
 const NAMES: Record<CrownId, string[]> = {
+  spain: ['Santo Domingo', 'Villa Rica', 'San Cristóbal', 'Nueva Sevilla', 'Santiago', 'La Concepción', 'San Agustín', 'Puerto Real', 'Santa Fe'],
+  france: ['Port-Royal', 'Fort Caroline', 'Charlesbourg', 'Nouvelle-Rochelle', 'Fort Saint-Louis', 'Sainte-Croix', 'Port-Dauphin', 'Fort Coligny'],
   portugal: ['São Jorge', 'Santa Maria', 'Nova Lisboa', 'São Tomé', 'Porto Seguro', 'Vila Nova', 'São Vicente', 'Santo Antão', 'Nossa Senhora'],
   england: ['New Hope', 'Kingsport', 'Fort George', 'Middleton', 'Port Charles', 'Newbury', 'Fort William', 'Southhaven', 'Fairhaven'],
   netherlands: ['Nieuw Antwerpen', 'Fort Nassau', 'Zeehaven', 'Nieuwpoort', 'Fort Oranje', 'Nieuw Middelburg', 'Goede Hoop', 'Fort Zeelandia'],
 };
 
-export function initRivals(): Record<CrownId, RivalState> {
-  return Object.fromEntries(RIVALS.map((r) => [r.id, { attitude: 10, relation: 'peace', next: r.start, revenue: 0, posts: [], warSince: null }])) as unknown as Record<CrownId, RivalState>;
+/** Every crown gets a record; the one you play is never used. */
+export function initRivals(_me: CrownId = 'spain'): Record<CrownId, RivalState> {
+  return Object.fromEntries(CROWNS.map((r) => [r.id, { attitude: 10, relation: 'peace', next: r.start, revenue: 0, posts: [], warSince: null }])) as unknown as Record<CrownId, RivalState>;
 }
 
 const MOVES = 15;
@@ -114,10 +120,14 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
   // a treaty divides the world: Africa to Portugal, the west to Castile
   if (s.turn === 6) {
     log('court', 'At Tordesillas, the Pope’s envoys draw a line down the Mar Océano: Africa and the East to Portugal, the lands to the west to Castile.');
-    ev({ kind: 'people', title: 'The Treaty of Tordesillas', map: 'old', hex: w.old.ports.find((p) => p.id === 'lisbon')!.hex,
-      text: 'Castile and Portugal divide the unknown world between them. Portugal will resent Castilian colonies on the African coast; the lands across the ocean are yours to claim, if you can.' });
+    const text = s.crown === 'spain'
+      ? 'Castile and Portugal divide the unknown world between them. Portugal will resent your colonies on the African coast; the lands across the ocean are yours to claim, if you can.'
+      : s.crown === 'portugal'
+        ? 'Castile and Portugal divide the unknown world between them. Africa and the route to the East are yours; Castile will resent your colonies across the ocean.'
+        : `Castile and Portugal divide the unknown world between them, as if no one else sailed. ${me(s)} does not recognise the line, but Portugal will resent colonies on the African coast.`;
+    ev({ kind: 'people', title: 'The Treaty of Tordesillas', map: 'old', hex: w.old.ports.find((p) => p.id === 'lisbon')!.hex, text });
   }
-  for (const spec of RIVALS) {
+  for (const spec of rivalsOf(s.crown)) {
     const r = s.rivals[spec.id];
     // new expeditions
     if (s.turn >= r.next) {
@@ -143,12 +153,13 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
     for (const c of s.colonies) {
       if (s.rivalColonies.some((x) => x.crown === spec.id && x.map === c.map && GRIDS[c.map].distance(x.hex, c.hex) <= 6)) r.attitude -= 3;
       if (spec.id === 'portugal' && s.turn > 6 && c.map === 'old') r.attitude -= 2;
+      if (spec.id === 'spain' && s.crown === 'portugal' && s.turn > 6 && c.map === 'new') r.attitude -= 1;
     }
     r.attitude = Math.max(-100, Math.min(100, r.attitude));
     if (r.relation === 'peace' && r.attitude < -50 && rng() < 0.15) {
       r.relation = 'war';
       r.warSince = s.turn;
-      log('peril', `${spec.name} declares war on Castile.`);
+      log('peril', `${spec.name} declares war on ${me(s)}.`);
       ev({ kind: 'lost', title: `War with ${spec.name}`, map: 'old', hex: w.old.ports.find((p) => p.id === spec.home)!.hex,
         text: `${spec.name} has declared war. Their privateers will hunt your ships and their soldiers may fall on your colonies. You can make peace at court, or carry the war to their colonies.` });
     }
@@ -191,7 +202,8 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
         sail(w, s, ship);
       }
       // ships in your own home ports are safe under the harbour guns
-      if (g.distance(prey.hex, ship.hex) <= 1 && prey.at !== 'seville' && prey.at !== 'cadiz') seaBattle(s, prey, ship, rng, log, onFleetLost);
+      const safe = prey.at != null && !!s.cities[prey.at];
+      if (g.distance(prey.hex, ship.hex) <= 1 && !safe) seaBattle(s, prey, ship, rng, log, onFleetLost);
       continue;
     }
     sail(w, s, ship);
@@ -226,7 +238,8 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
 }
 
 function fleetGuns(s: GameState, f: Fleet) {
-  return f.ships.reduce((t, x) => t + SHIPS[x.type].guns * (x.hull / 100), 0) + 1 + skill(personById(s, f.leader), 'military');
+  const guns = f.ships.reduce((t, x) => t + SHIPS[x.type].guns * (x.hull / 100), 0) * (rivalSpec(s.crown).edge.guns ?? 1);
+  return guns + 1 + skill(personById(s, f.leader), 'military');
 }
 
 function seaBattle(s: GameState, f: Fleet, ship: RivalShip, rng: Rng, log: Log, onFleetLost: (f: Fleet, why: string) => void) {
@@ -253,12 +266,12 @@ function seaBattle(s: GameState, f: Fleet, ship: RivalShip, rng: Rng, log: Log, 
 
 export function declareWar(s: GameState, crown: CrownId, log: Log): Result {
   const r = s.rivals[crown];
-  if (!r) return fail('No such crown.');
+  if (!r || crown === s.crown) return fail('No such crown.');
   if (r.relation === 'war') return fail('You are already at war.');
   r.relation = 'war';
   r.warSince = s.turn;
   r.attitude = Math.min(r.attitude, -60);
-  log('peril', `Castile declares war on ${rivalSpec(crown).name}.`);
+  log('peril', `${me(s)} declares war on ${rivalSpec(crown).name}.`);
   return { ok: true, message: `War with ${rivalSpec(crown).name}.` };
 }
 
@@ -298,7 +311,7 @@ export function stormColony(_w: World, s: GameState, p: Party, colonyId: string,
     s.colonies.push(col);
     for (const u of units) if (u.type === 'infantry') { u.party = null; u.colony = col.id; }
     s.prestige += 15;
-    log('peril', `${c.name} falls to Castile. Its settlers stay on under a new flag.`);
+    log('peril', `${c.name} falls to ${me(s)}. Its settlers stay on under a new flag.`);
     ev({ kind: 'people', title: `${c.name} taken`, map: c.map, hex: c.hex, text: `The colony of ${spec.name} at ${c.name} has fallen. It is yours now, with ${col.pop} of its settlers. ${spec.name} will want it back.` });
     if (!s.units.some((u) => u.party === p.id)) {
       const l = personById(s, p.leader);

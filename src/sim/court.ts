@@ -2,12 +2,13 @@
 import { RANK_INFO } from '../data/court';
 import { type Rng, int, pick, range, shuffle } from './rng';
 import { explorerName } from './names';
+import { crownSpec, type CrownId } from '../data/rivals';
 import { SKILLS, yearOf, type Fleet, type GameState, type Person, type Skill, type TraitId } from './types';
 
 const TRAITS: TraitId[] = ['learned', 'hardy', 'bold', 'shrewd', 'pious', 'ambitious'];
 
 /** A new person, strong in one or two skills. */
-export function makePerson(rng: Rng, id: number, year: number, taken: string[], focus?: Skill): Person {
+export function makePerson(rng: Rng, id: number, year: number, taken: string[], focus?: Skill, crown: CrownId = 'spain', city = 'seville'): Person {
   const skills = Object.fromEntries(SKILLS.map((k) => [k, int(rng, 0, 2)])) as Record<Skill, number>;
   const main = focus ?? pick(rng, SKILLS);
   skills[main] = int(rng, 3, 5);
@@ -16,16 +17,18 @@ export function makePerson(rng: Rng, id: number, year: number, taken: string[], 
     skills[second] = Math.max(skills[second], int(rng, 2, 4));
   }
   return {
-    id, name: explorerName(rng, taken), born: year - int(rng, 21, 52), skills, trait: pick(rng, TRAITS),
-    rank: 'courtier', ready: 0, unitType: null, fleet: null, city: 'seville', alive: true, discoveries: 0,
+    id, name: explorerName(rng, taken, crown), born: year - int(rng, 21, 52), skills, trait: pick(rng, TRAITS),
+    rank: 'courtier', ready: 0, unitType: null, fleet: null, city, alive: true, discoveries: 0,
   };
 }
 
 /** Nine people at court in 1492, so every skill has someone worth sending. */
-export function initialCourt(rng: Rng, nextId: () => number, year: number): Person[] {
-  const focus: Skill[] = shuffle(rng, ['navigation', 'navigation', 'commerce', 'commerce', 'construction', 'diplomacy', 'military', 'military', 'navigation']);
+export function initialCourt(rng: Rng, nextId: () => number, year: number, crown: CrownId = 'spain', city = 'seville', extra = 0): Person[] {
+  const base: Skill[] = ['navigation', 'navigation', 'commerce', 'commerce', 'construction', 'diplomacy', 'military', 'military', 'navigation'];
+  const more: Skill[] = ['diplomacy', 'commerce', 'construction'];
+  const focus: Skill[] = shuffle(rng, [...base, ...more.slice(0, extra)]);
   const people: Person[] = [];
-  for (const f of focus) people.push(makePerson(rng, nextId(), year, people.map((p) => p.name), f));
+  for (const f of focus) people.push(makePerson(rng, nextId(), year, people.map((p) => p.name), f, crown, city));
   return people;
 }
 
@@ -60,7 +63,7 @@ export function newPetitioners(s: GameState, rng: Rng, nextId: () => number) {
   const n = int(rng, 1, 2);
   for (let k = 0; k < n && s.petitioners.length < 4; k++) {
     const taken = [...s.people.map((p) => p.name), ...s.petitioners.map((x) => x.person.name)];
-    const person = makePerson(rng, nextId(), yearOf(s.turn), taken);
+    const person = makePerson(rng, nextId(), yearOf(s.turn), taken, undefined, s.crown, crownSpec(s.crown).home);
     person.born = yearOf(s.turn) - int(rng, 19, 40);
     s.petitioners.push({ person, cost: Math.round(hireCost(person) * range(rng, 0.85, 1.15)) });
   }

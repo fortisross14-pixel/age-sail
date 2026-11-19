@@ -6,7 +6,10 @@ import { SHIPS } from '../data/ships';
 import { SKILLS, yearOf, type EventChoice, type GameEvent, type GameState, type Person, type World, type Skill } from './types';
 import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { personById, skill } from './court';
-import { rivalSpec, type CrownId } from '../data/rivals';
+import { rivalSpec, crownSpec, type CrownId } from '../data/rivals';
+import { CITIES } from '../data/europe';
+
+const CITY_NAME: Record<string, string> = Object.fromEntries(CITIES.map((c) => [c.id, c.name]));
 import { GRIDS } from './hex';
 import { Fog } from './types';
 import { allNations } from './natives';
@@ -26,7 +29,9 @@ interface Story {
 
 const atCourt = (s: GameState) => s.people.filter((p) => p.alive && p.fleet == null && !s.parties.some((x) => x.leader === p.id) && p.rank !== 'governor');
 const person = (s: GameState, c: Ctx, k = 'person') => personById(s, Number(c[k])) as Person;
-const sevilla = (w: World) => w.old.ports.find((p) => p.id === 'seville')!.hex;
+/** Your crown's main port: where news reaches the court. */
+const homeId = (s: GameState) => crownSpec(s.crown).home;
+const homeHex = (w: World, s: GameState) => w.old.ports.find((p) => p.id === homeId(s))!.hex;
 const bump = (p: Person, k: Skill, d: number) => { p.skills[k] = Math.max(0, Math.min(5, p.skills[k] + d)); };
 
 const STORIES: Story[] = [
@@ -53,11 +58,11 @@ const STORIES: Story[] = [
   {
     id: 'plague', cooldown: 40,
     when: (_w, _s, rng) => (rng() < 0.3 ? {} : null),
-    title: () => 'Plague in Sevilla',
-    text: () => 'Sickness has come up the river with a ship from the south. The physicians fear it will spread through the city.',
+    title: (s) => `Plague in ${CITY_NAME[homeId(s)]}`,
+    text: () => 'Sickness has come in with a ship from the south. The physicians fear it will spread through the city.',
     choices: () => [
-      { label: 'Close the port', hint: 'No taxes from Sevilla this season; the yards stop', apply: (_w, s) => {
-        s.treasury -= 160; const c = s.cities.seville; if (c.project) c.project.turnsLeft++;
+      { label: 'Close the port', hint: 'No taxes from your main port this season; the yards stop', apply: (_w, s) => {
+        s.treasury -= 160; const c = s.cities[homeId(s)]; if (c?.project) c.project.turnsLeft++;
         return 'The port is closed. The plague burns out in a few weeks, and trade resumes.';
       } },
       { label: 'Keep trade moving', hint: 'Someone at court may fall ill', apply: (_w, s, _c, rng) => {
@@ -87,7 +92,7 @@ const STORIES: Story[] = [
     id: 'bankers', cooldown: 30,
     when: (_w, s) => (s.treasury < 1500 ? {} : null),
     title: () => 'The Genoese bankers',
-    text: () => 'Bankers from Genova offer the Crown a loan of 4,000 ducats, repaid at 150 a season for ten years.',
+    text: () => 'Bankers from Genova offer you a loan of 4,000 ducats, repaid at 150 a season for ten years.',
     choices: () => [
       { label: 'Take the loan', hint: '+4,000 now, −150 a season for 40 seasons', apply: (_w, s) => { s.treasury += 4000; s.loans.push({ perSeason: 150, left: 40 }); return 'The money arrives in Sevilla in sealed chests.'; } },
       { label: 'Refuse', apply: () => 'The bankers bow and leave.' },
@@ -157,15 +162,15 @@ const STORIES: Story[] = [
   },
   {
     id: 'armada', cooldown: 999,
-    when: (_w, s) => (yearOf(s.turn) >= 1586 && yearOf(s.turn) <= 1590 ? {} : null),
+    when: (_w, s) => (s.crown === 'spain' && yearOf(s.turn) >= 1586 && yearOf(s.turn) <= 1590 ? {} : null),
     title: () => 'The Great Armada',
-    text: () => 'The King is gathering a great fleet against England and demands that every lord of the sea contribute.',
+    text: () => 'Your admirals urge a great armada against England, and every port is asked to give a ship or the money for one.',
     choices: (s) => {
-      const g = s.fleets.find((f) => f.at === 'seville' && f.ships.some((x) => x.type === 'galleon'));
+      const g = s.fleets.find((f) => f.at === homeId(s) && f.ships.some((x) => x.type === 'galleon'));
       return [
         ...(g ? [{ label: 'Send a galleon', hint: 'Lose the ship; +40 prestige; war with England', apply: (_w: World, st: GameState) => { const f = st.fleets.find((x) => x.id === g.id)!; const ship = f.ships.find((x) => x.type === 'galleon')!; f.ships = f.ships.filter((x) => x !== ship); if (!f.ships.length) st.fleets = st.fleets.filter((x) => x !== f); st.prestige += 40; st.rivals.england.relation = 'war'; st.rivals.england.warSince = st.turn; return `The ${ship.name} sails with the Armada. She does not come back, but the King remembers who answered.`; } }] : []),
-        { label: 'Pay the levy', hint: '−3,000 ducats', apply: (_w, st) => { st.treasury -= 3000; return 'Your ducats pay for cannon and biscuit.'; } },
-        { label: 'Plead poverty', hint: '−30 prestige', apply: (_w, st) => { st.prestige -= 30; return 'The King’s secretary writes your name in a short, cold list.'; } },
+        { label: 'Pay for the fleet', hint: '−3,000 ducats; +15 prestige', apply: (_w, st) => { st.treasury -= 3000; st.prestige += 15; return 'Your ducats pay for cannon and biscuit.'; } },
+        { label: 'Not this year', hint: '−20 prestige', apply: (_w, st) => { st.prestige -= 20; return 'The admirals grumble, and the court talks of nothing else for a season.'; } },
       ];
     },
   },
@@ -173,11 +178,11 @@ const STORIES: Story[] = [
     id: 'prices', cooldown: 999,
     when: (_w, s) => (yearOf(s.turn) >= 1550 && s.finds.some((f) => f.resource === 'silver' || f.resource === 'gold') ? {} : null),
     title: () => 'The price revolution',
-    text: () => 'So much gold and silver has come from beyond the sea that prices rise all over Castile. Bread, cloth and timber cost more every year.',
+    text: () => 'So much gold and silver has come from beyond the sea that prices rise all over Europe. Bread, cloth and timber cost more every year.',
     choices: () => [
       { label: 'So be it', hint: 'European staples cost a third more', apply: (_w, s) => {
-        for (const id of ['seville', 'cadiz']) for (const g of ['tools', 'timber', 'cloth', 'wine', 'food', 'stone'] as const) { const m = s.markets[id]?.[g]; if (m) m.base = Math.round(m.base * 1.33); }
-        return 'The price of everything in Sevilla and Cádiz rises.';
+        for (const id of Object.keys(s.cities)) for (const g of ['tools', 'timber', 'cloth', 'wine', 'food', 'stone'] as const) { const m = s.markets[id]?.[g]; if (m) m.base = Math.round(m.base * 1.33); }
+        return 'The price of everything in your cities rises.';
       } },
     ],
   },
@@ -204,7 +209,7 @@ export function maybeStory(w: World, s: GameState, ev: (e: GameEvent) => void) {
     if (!ctx) continue;
     s.told[st.id] = s.turn;
     ev({
-      kind: 'story', story: st.id, ctx, title: st.title(s, ctx), text: st.text(s, ctx, w), map: 'old', hex: sevilla(w),
+      kind: 'story', story: st.id, ctx, title: st.title(s, ctx), text: st.text(s, ctx, w), map: 'old', hex: homeHex(w, s),
       choices: st.choices(s, ctx).map(({ label, hint }) => ({ label, hint })),
     });
     return;

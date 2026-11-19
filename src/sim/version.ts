@@ -3,4 +3,4 @@
  * and rebuild the world from the seed, so a save made under another generator would load onto a
  * different map; src/save.ts refuses those.
  */
-export const GEN_VERSION = 1;
+export const GEN_VERSION = 2;

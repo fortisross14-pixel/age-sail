@@ -5,8 +5,10 @@ import type { GameState } from './sim/types';
  * Save format. Bump SAVE_VERSION when the shape of GameState changes and add a migration from the
  * previous version; keep every migration, or saves of that version are stranded.
  * Version 10 is the M8 state (stored bare under `age-sail:save:v9`), now wrapped in an envelope.
+ * Version 11 (M9) adds the crown you play and city sizes; M9 also redrew the maps (genVersion 2), so
+ * older saves are refused rather than migrated.
  */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 export const SAVE_KEY = 'age-sail:save';
 /** Keys used before the envelope. v9 is migrated; older ones can't be read and are removed. */
 export const LEGACY_KEY = 'age-sail:save:v9';

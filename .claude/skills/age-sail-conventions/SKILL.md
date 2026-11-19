@@ -31,6 +31,12 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
 - **Determinism.** All randomness goes through `mulberry32(hashSeed(seed, turn, ...))` from
   `src/sim/rng.ts`, keyed by stable ids, so one seed replays one game. A new random roll gets
   its own key; never reuse a stream another system draws from.
+- **The player's crown** (`state.crown`, `world.crown`) decides which Old World cities are home:
+  `generateWorld(seed, crown)` marks them `kind: 'home'`. Never hard-code Castile or Sevilla: use
+  `mainPort(s)`, `crownSpec(s.crown)` and `rivalsOf(s.crown)`. Messages speak to the player as the
+  ruler ("your realm"), never about "the Crown" as someone else.
+- **Cities** come from `CITIES` in `src/data/europe.ts` (largest first; placement keeps an empty hex
+  between any two). Inland cities have no market or docks; their units march to the nearest port.
 - **The world is regenerated from the seed on load**, not saved. Any change to `mapgen.ts`
   output changes every existing save's map: bump the generator version (see Saves).
 

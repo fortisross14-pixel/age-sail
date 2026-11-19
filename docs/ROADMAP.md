@@ -70,6 +70,12 @@ other. Later: wars with rival crowns for space, and independence wars against in
   out; England and Portugal reach scores near 10,000 by 1642. A player needs a handful of large, loyal colonies to compete.
   The whole simulation stays under a millisecond a season, and a save stays under 100 KB.
 
+- M9: each crown's base city taxes are scaled toward 200 a season (between ×0.75 and ×1.6), so a
+  big realm is richer but no crown starts broke. With no player orders for 200 seasons, treasuries
+  end between about 8,000 (the Netherlands) and 27,000 (Castile). As AI rivals, Castile is strongest
+  (15–17 colonies by 1542) and France and the Netherlands weakest (1–4): for the balance pass.
+  A season costs under 0.6 ms with 35 markets; a save is about 150 KB.
+
 ## Milestones
 
 | # | Milestone | Status |
@@ -84,8 +90,8 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | M7 | Rival crowns: Portugal, England and the Netherlands, each with its own pace, preferred coasts and taste for trade; their ships sail visibly to found colonies at the richest sites (blocking yours) and to open trading posts that thin native trade; their colonies grow; attitude sours when you settle near them (and, after the Tordesillas event, on Portugal's African coast); wars with privateers hunting your fleets (sea battles by guns), raids on colonies, storming and taking their colonies, paying for peace; standings in Court → Crowns and your rank in the HUD | done |
 | M8 | The long game: five eras with cards; colonial loyalty drifting toward a target (taxes, generations overseas, era, size, distance, garrison, charter, needs, luxuries), unrest, independence risings decided by the garrison, free states that can be retaken; a colonial tax rate; royal charters and festivals; a dozen stories with choices (mutiny, plague, court quarrels, Genoese loans, a scholar, a pilot's secret, colony petitions, survivors at sea, native envoys, a marriage, the Armada, the price revolution); short, standard or full games ending in 1550, 1650 or 1750 with final standings and victory, and play on | done |
 | Pass 1 | Best practices: game-dev skills in `.claude/skills/`, audit (`docs/AUDIT.md`), versioned saves, crash recovery, render on demand, lazy New World art, determinism tests | done |
-| M9 | Your realm: play any of the five Atlantic crowns; a fuller Old World of named cities with realm borders; every mainland city of your realm is yours to specialise; you are the Crown; a plain sandbox start | next |
-| M10 | GUI pass: city screen with tabs and building slots, portrait court, icons over text everywhere | |
+| M9 | Your realm: play any of the five Atlantic crowns, each with a national edge; 53 named Old World cities in 15 realms (the five crowns plus the Ottomans, Morocco, Venice, Genoa, the Papal States, Naples, the Hanse, Denmark, Scotland and the Empire), at least one empty hex apart; realm borders and names on the chart; every city of your realm is yours to build in (inland ones train units that march to the nearest port); you are the Crown, with no charge or deadline; a plain start with two ships, a colonist and a soldier | done |
+| M10 | GUI pass: city screen with tabs and building slots, portrait court, icons over text everywhere. Starts with three example directions to choose from | next |
 | Pass 3 | Balance: tuning numbers in one place, autoplay harness, retune for five crowns | |
 | later | Scenarios with goals (the old Crown's charge belongs here), Mediterranean powers as playable nations | |
 | later | Rival AI depth (real fleets and economies, rival-native alliances), Old World depth (buildings, full research), events and characters' stories, eras, score and victory, Chronicle, iPad performance, an illustrator's cohesive art set | |

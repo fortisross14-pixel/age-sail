@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useStore, clearSave } from '../store';
 import { spriteUrl } from '../render/assets';
 import { GAME_LENGTHS, DEFAULT_UNTIL } from '../data/eras';
+import { CROWNS, type CrownId } from '../data/rivals';
+import { CROWN } from '../render/palette';
+import { cityById } from '../data/europe';
 
 export function Menu() {
   const hasSave = useStore((s) => s.hasSave);
@@ -12,6 +15,7 @@ export function Menu() {
   const checkSave = useStore((s) => s.checkSave);
   const [seed, setSeed] = useState(() => String(Math.floor(Math.random() * 1e6)));
   const [until, setUntil] = useState<number>(DEFAULT_UNTIL);
+  const [crown, setCrown] = useState<CrownId>('spain');
   useEffect(() => { void checkSave(); }, [checkSave]);
   const loading = phase === 'loading';
   return (
@@ -19,13 +23,23 @@ export function Menu() {
       <div className="menu-card">
         <img className="menu-rose" src={spriteUrl('ornaments/compass-large')} alt="" />
         <h1>Age of Sail</h1>
-        <p className="tagline">Chart the unknown. Trade across the ocean. Fill the Crown’s treasury.</p>
+        <p className="tagline">Chart the unknown. Trade across the ocean. Build an empire.</p>
         <div className="menu-actions">
           {saveProblem && <p className="save-problem" role="status">{saveProblem}</p>}
           {hasSave && <button className="primary" disabled={loading} onClick={() => void continueGame()}>Continue voyage</button>}
-          <button className={hasSave ? '' : 'primary'} disabled={loading} onClick={async () => { await clearSave(); await newGame(Number(seed) || 1492, until); }}>
+          <button className={hasSave ? '' : 'primary'} disabled={loading} onClick={async () => { await clearSave(); await newGame(Number(seed) || 1492, until, crown); }}>
             {loading ? 'Preparing the charter…' : 'New voyage'}
           </button>
+          <div className="crowns" role="radiogroup" aria-label="Crown to lead">
+            {CROWNS.map((c) => (
+              <button key={c.id} role="radio" aria-checked={crown === c.id} className={`crown-pick ${crown === c.id ? 'on' : ''}`} onClick={() => setCrown(c.id)} title={c.blurb}>
+                <span className="crown-flag big" style={{ background: CROWN[c.id].css, borderColor: CROWN[c.id].css2 }} aria-hidden />
+                <span className="crown-pick-name">{c.name.replace(/^the /, "")}</span>
+                <span className="crown-pick-home">{cityById(c.home)?.name}</span>
+              </button>
+            ))}
+          </div>
+          <p className="crown-edge">{CROWNS.find((c) => c.id === crown)!.edge.label}</p>
           <div className="lengths" role="radiogroup" aria-label="Length of the game">
             {GAME_LENGTHS.map((l) => (
               <button key={l.id} role="radio" aria-checked={until === l.until} className={until === l.until ? 'on' : ''} title={l.blurb} onClick={() => setUntil(l.until)}>
@@ -35,7 +49,7 @@ export function Menu() {
           </div>
           <label className="seed">World seed <input value={seed} onChange={(e) => setSeed(e.target.value.replace(/\D/g, ''))} inputMode="numeric" /></label>
         </div>
-        <p className="muted small">Version 0.8 · lead Castile through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
+        <p className="muted small">Version 0.9 · lead one of the five Atlantic crowns through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
       </div>
     </div>
   );

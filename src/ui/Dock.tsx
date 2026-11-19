@@ -14,7 +14,7 @@ export function Dock() {
   const game = useStore((s) => s.game)!;
   const set = useStore((s) => s.set);
   const badge: Record<DrawerId, number> = {
-    cities: Object.values(game.cities).filter((c) => !c.project).length,
+    cities: Object.values(game.cities).filter((c) => !c.project && c.buildings.docks > 0).length,
     markets: 0,
     fleets: game.fleets.filter((f) => f.moves > 0 && !f.order && !f.at).length + game.parties.filter((p) => p.moves > 0 && !p.order).length,
     court: game.people.filter((p) => p.alive && p.ready === 0 && p.fleet == null && (p.rank === 'explorer' || p.rank === 'merchant') && !game.parties.some((x) => x.leader === p.id)).length,

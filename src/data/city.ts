@@ -28,7 +28,7 @@ export const BUILDINGS: Record<BuildingId, BuildingSpec> = {
     effect: ['', 'Trains missionaries.'],
   },
   university: {
-    name: 'University', blurb: 'Cosmographers, physicians and lawyers. Knowledge for the Crown.',
+    name: 'University', blurb: 'Cosmographers, physicians and lawyers. Knowledge for the realm.',
     levels: [{ cost: 0, build: 0 }, { cost: 2500, build: 3 }, { cost: 4000, build: 4 }],
     effect: ['', '+2 research points a season.', '+4 research points a season.'],
   },
@@ -41,10 +41,18 @@ export const BUILDINGS: Record<BuildingId, BuildingSpec> = {
 
 export const BUILDING_ORDER: BuildingId[] = ['docks', 'barracks', 'church', 'university', 'market'];
 
-/** Building places in each city: every level of every building takes one. */
-export const CITY_SPACE: Record<string, { slots: number; taxes: number; start: Partial<Record<BuildingId, number>> }> = {
-  seville: { slots: 7, taxes: 100, start: { docks: 2, market: 1 } },
-  cadiz: { slots: 5, taxes: 40, start: { docks: 1 } },
+/**
+ * A crown's base taxes are scaled toward this total, within REALM_TAX_RANGE, so a realm of many
+ * cities is somewhat richer than a small one but no crown starts broke. Tune in the balance pass.
+ */
+export const REALM_TAX_TARGET = 200;
+export const REALM_TAX_RANGE: [number, number] = [0.75, 1.6];
+
+/** Building places and base taxes by city size (3 great city, 2 city, 1 town). */
+export const CITY_SIZE: Record<1 | 2 | 3, { slots: number; taxes: number }> = {
+  3: { slots: 7, taxes: 45 },
+  2: { slots: 5, taxes: 15 },
+  1: { slots: 3, taxes: 6 },
 };
 
 export interface UnitSpec { cost: number; build: number; needs: BuildingId | null; upkeep: number; moves: number }

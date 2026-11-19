@@ -5,7 +5,7 @@ import { GOOD_INFO, GOODS, type GoodId } from '../data/goods';
 import { RANK_INFO, UNIT_INFO, SKILL_INFO } from '../data/court';
 import {
   cargoUsed, cargoCapacity, crewNeeded, provisionCost, repairCost, portById, provisionsMax, maxMoves, leaderOf, isPortal, canCross,
-  slotsMax, slotsUsed, unitsAboard, allPorts,
+  slotsMax, slotsUsed, unitsAboard, allPorts, mainPort,
 } from '../sim/game';
 import { SKILLS, type Fleet, type TradeRoute, type TradeStop } from '../sim/types';
 import { fmt } from './format';
@@ -183,9 +183,9 @@ function RouteEditor({ fleet }: { fleet: Fleet }) {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const run = useStore((s) => s.run);
-  const known = [...allPorts(world).filter((p) => p.map === fleet.map && (p.kind !== 'native' || game.discovered.includes(p.id))),
+  const known = [...allPorts(world).filter((p) => p.map === fleet.map && !p.inland && (p.kind !== 'native' || game.discovered.includes(p.id))),
     ...game.colonies.filter((c) => c.map === fleet.map).map((c) => ({ id: c.id, name: `${c.name} (colony)` }))];
-  const [draft, setDraft] = useState<TradeRoute>(() => fleet.route ?? { stops: [emptyStop(fleet.at ?? 'seville'), emptyStop(known.find((p) => p.id !== (fleet.at ?? 'seville'))?.id ?? 'antwerp')], next: 0, active: false });
+  const [draft, setDraft] = useState<TradeRoute>(() => fleet.route ?? { stops: [emptyStop(fleet.at ?? mainPort(game)), emptyStop(known.find((p) => p.id !== (fleet.at ?? mainPort(game)))?.id ?? 'antwerp')], next: 0, active: false });
   const update = (k: number, st: TradeStop) => setDraft({ ...draft, stops: draft.stops.map((x, i) => (i === k ? st : x)) });
   const save = (active: boolean) => void run({ kind: 'tradeRoute', fleet: fleet.id, route: { ...draft, active } });
   return (

@@ -4,7 +4,7 @@ import { GRIDS } from './hex';
 import { mulberry32, hashSeed, int } from './rng';
 import { LEVELS, score } from './colony';
 import { rivalScore } from './rivals';
-import { RIVALS } from '../data/rivals';
+import { rivalsOf, rivalSpec } from '../data/rivals';
 import { yearOf, type Colony, type GameEvent, type GameState, type World, type Party } from './types';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -22,7 +22,7 @@ export function loyaltyFactors(s: GameState, c: Colony): { label: string; value:
   const years = (s.turn - c.founded) / 4;
   const garrison = s.units.filter((u) => u.colony === c.id && u.type === 'infantry').length;
   const f: { label: string; value: number }[] = [
-    { label: 'Settlers loyal to the Crown', value: 75 },
+    { label: 'Settlers loyal to you', value: 75 },
     { label: 'Generations born overseas', value: -Math.min(30, Math.floor(years / 25) * 8) },
     { label: `The ${eraAt(yearOf(s.turn)).name}`, value: -eraIndex(yearOf(s.turn)) * 6 },
     { label: `${s.taxRate[0].toUpperCase()}${s.taxRate.slice(1)} taxes`, value: TAX[s.taxRate].loyalty },
@@ -53,7 +53,7 @@ export function festival(s: GameState, colonyId: string): Result {
   if (s.treasury < cost) return fail(`A festival in ${c.name} costs ${cost} ducats.`);
   s.treasury -= cost;
   c.loyalty = Math.min(100, c.loyalty + 12);
-  return { ok: true, message: `Bells, wine and a royal proclamation in ${c.name}. The settlers cheer the Crown, for now.` };
+  return { ok: true, message: `Bells, wine and a royal proclamation in ${c.name}. The settlers cheer you, for now.` };
 }
 
 export function setTaxRate(s: GameState, rate: GameState['taxRate']): Result {
@@ -69,7 +69,7 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
   const era = ERAS.find((e) => e.year === year && s.turn % 4 === 0);
   if (era && era.year > 1492) {
     log('court', `A new age begins: the ${era.name}.`);
-    ev({ kind: 'era', title: era.name, map: 'old', hex: w.old.ports.find((p) => p.id === 'seville')!.hex, text: era.blurb });
+    ev({ kind: 'era', title: era.name, map: 'old', hex: w.old.ports.find((p) => p.id === rivalSpec(s.crown).home)!.hex, text: era.blurb });
   }
   // loans
   for (const l of s.loans) { s.treasury -= l.perSeason; l.left--; }
@@ -80,21 +80,21 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
     c.loyalty += Math.max(-2, Math.min(2, (target - c.loyalty) * 0.15));
     const wasUnrest = c.unrest;
     c.unrest = c.loyalty < 30;
-    if (c.unrest && !wasUnrest) log('peril', `Unrest in ${c.name}: the settlers grumble against the Crown’s officers, and work slows.`);
+    if (c.unrest && !wasUnrest) log('peril', `Unrest in ${c.name}: the settlers grumble against your officers, and work slows.`);
     if (c.loyalty < 15 && c.pop >= 6 && rng() < 0.12) {
       const garrison = s.units.filter((u) => u.colony === c.id && u.type === 'infantry').length;
       const rebels = c.pop * 0.8;
       if (rng() < (garrison * 4) / (garrison * 4 + rebels)) {
         c.pop = Math.max(1, c.pop - 1);
         c.loyalty += 10;
-        log('peril', `The settlers of ${c.name} rise against the Crown. The garrison puts the rising down; the ringleaders hang.`);
+        log('peril', `The settlers of ${c.name} rise against you. The garrison puts the rising down; the ringleaders hang.`);
       } else {
         s.colonies = s.colonies.filter((x) => x !== c);
         s.units = s.units.filter((u) => u.colony !== c.id);
         s.freeStates.push({ id: `free-${s.nextId++}`, name: c.name, map: c.map, hex: c.hex, pop: c.pop, level: c.level, since: s.turn });
-        log('peril', `${c.name} declares its independence from the Crown.`);
+        log('peril', `${c.name} declares its independence.`);
         ev({ kind: 'lost', title: `${c.name} breaks away`, map: c.map, hex: c.hex,
-          text: `The settlers of ${c.name}, ${c.pop} strong, have thrown out the Crown’s officers and declared themselves free. You may let them go, or send soldiers to bring them back.` });
+          text: `The settlers of ${c.name}, ${c.pop} strong, have thrown out your officers and declared themselves free. You may let them go, or send soldiers to bring them back.` });
       }
     }
   }
@@ -105,13 +105,14 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
     s.ended = true;
     const st = standings(w, s);
     const first = st[0];
-    const mine = st.find((x) => x.id === 'castile')!;
+    const mine = st.find((x) => x.mine)!;
     const place = st.indexOf(mine) + 1;
-    log('court', `The age ends. Castile stands ${['first', 'second', 'third', 'fourth'][place - 1]} among the crowns, with a score of ${mine.total}.`);
-    ev({ kind: 'end', title: place === 1 ? 'Castile triumphant' : 'The age ends', map: 'old', hex: w.old.ports.find((p) => p.id === 'seville')!.hex,
+    const nth = ['first', 'second', 'third', 'fourth', 'fifth'][place - 1];
+    log('court', `The age ends. ${mine.name} stands ${nth} among the crowns, with a score of ${mine.total}.`);
+    ev({ kind: 'end', title: place === 1 ? `${mine.name} triumphant` : 'The age ends', map: 'old', hex: w.old.ports.find((p) => p.id === rivalSpec(s.crown).home)!.hex,
       text: place === 1
-        ? `As the age closes, no crown can match Castile: ${mine.pop} colonists, ${mine.territory} hexes of land, and ${mine.commerce} in commerce. The chroniclers will remember your reign.`
-        : `As the age closes, ${first.name} leads the crowns of Europe. Castile stands ${['first', 'second', 'third', 'fourth'][place - 1]}, with ${mine.total} points. You may play on.` });
+        ? `As the age closes, no crown can match ${mine.name}: ${mine.pop} colonists, ${mine.territory} hexes of land, and ${mine.commerce} in commerce. The chroniclers will remember your reign.`
+        : `As the age closes, ${first.name} leads the crowns of Europe. ${mine.name} stands ${nth}, with ${mine.total} points. You may play on.` });
   }
   void int;
 }
@@ -119,8 +120,8 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
 export function standings(w: World, s: GameState) {
   const me = score(s, w);
   return [
-    { id: 'castile', name: 'Castile', ...me },
-    ...RIVALS.map((r) => ({ id: r.id, name: r.name, ...rivalScore(s, r.id) })),
+    { id: s.crown, name: rivalSpec(s.crown).name, mine: true, ...me },
+    ...rivalsOf(s.crown).map((r) => ({ id: r.id, name: r.name, mine: false, ...rivalScore(s, r.id) })),
   ].sort((a, b) => b.total - a.total);
 }
 

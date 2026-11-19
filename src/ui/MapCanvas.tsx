@@ -63,6 +63,11 @@ export function MapCanvas() {
           const port = colony ? { id: colony.id, kind: 'colony' as const } : world[map].ports.find((p) => p.hex === hex && (p.kind !== 'native' || g.discovered.includes(p.id)));
           const fleet = g.fleets.find((f) => f.id === s.selectedFleet && f.map === map);
           const again = s.preview?.dest === hex && s.preview.map === map;
+          // inland cities: yours open the city panel; foreign ones are names on the chart
+          if (port && 'inland' in port && port.inland) {
+            if (port.kind === 'home') s.set({ selectedPort: port.id, preview: null, drawer: 'cities' });
+            return;
+          }
           if (port) {
             if (fleet && fleet.hex !== hex) {
               if (again) void s.confirmPreview();

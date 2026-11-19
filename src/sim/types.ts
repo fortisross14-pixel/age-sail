@@ -3,6 +3,8 @@ import type { ShipType } from '../data/ships';
 import type { TechId } from '../data/tech';
 import type { BuildingId, ResourceId } from '../data/city';
 import type { CrownId } from '../data/rivals';
+import type { RealmId } from '../data/realms';
+import type { CitySize } from '../data/europe';
 import type { MapId } from './hex';
 
 export type { MapId };
@@ -25,6 +27,10 @@ export interface PortDef {
   hex: number;
   kind: 'home' | 'foreign' | 'native' | 'colony';
   nation?: string;
+  /** Old World cities: the realm that holds it, its size, and whether ships can reach it */
+  realm?: RealmId;
+  size?: CitySize;
+  inland?: boolean;
   /** for native trading sites: the people who trade there */
   people?: string;
   blurb: string;
@@ -45,6 +51,8 @@ export interface MapData {
   monsters: { kind: 'serpent' | 'whale'; hex: number }[];
   /** open-water hexes on the board edge that lead to the other board */
   portals: number[];
+  /** realm holding each hex (Old World): realmIndex code, 0 for none */
+  realm: Uint8Array;
   /** 1 where a hex belongs to a large landmass (not a small island) */
   mainland: Uint8Array;
   /** 1 for open ocean far from any land, where ships without long-distance navigation suffer */
@@ -57,6 +65,8 @@ export interface MapData {
 
 export interface World {
   seed: number;
+  /** the crown the player leads: decides which cities are home */
+  crown: CrownId;
   old: MapData;
   new: MapData;
 }
@@ -294,6 +304,11 @@ export type Project = ProjectKind & { turnsLeft: number; total: number };
 
 export interface City {
   id: string;
+  size: CitySize;
+  /** inland cities build and train but have no quay: no docks, and their units march to the nearest port */
+  inland: boolean;
+  /** base taxes a season, before market dues */
+  taxes: number;
   buildings: Record<BuildingId, number>;
   project: Project | null;
   governor: number | null;
@@ -322,6 +337,8 @@ export interface GameEvent {
 
 export interface GameState {
   seed: number;
+  /** the crown you lead */
+  crown: CrownId;
   turn: number;
   treasury: number;
   prestige: number;

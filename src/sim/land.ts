@@ -133,7 +133,7 @@ function rumour(world: World, s: GameState, p: Party, log: (kind: 'discovery' | 
       s.treasury += d;
       s.prestige += 20;
       log('discovery', `${who} reaches the lost city of the stories. Its storerooms hold treasure worth ${d} ducats.`);
-      event({ kind: 'people', title: 'The lost city', map: p.map, hex: p.hex, text: `${who} has found the city the stories spoke of, half swallowed by the land. Its treasure, worth ${d} ducats, is on its way to the Crown.` });
+      event({ kind: 'people', title: 'The lost city', map: p.map, hex: p.hex, text: `${who} has found the city the stories spoke of, half swallowed by the land. Its treasure, worth ${d} ducats, is on its way to your treasury.` });
     } else if (roll < 0.45) { reveal(9); log('discovery', `${who} meets guides at the edge of the lost city, who show the way through the whole region.`); }
     else if (roll < (guarded ? 0.9 : 0.78)) log('discovery', `${who} follows the stories of a golden city for weeks, and finds nothing.`);
     else lose('Hunger and an ambush on the trail to the lost city.');

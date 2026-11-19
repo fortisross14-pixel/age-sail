@@ -23,10 +23,12 @@ describe('saves', () => {
     expect(b).toEqual(a);
   });
 
-  it('upgrades the bare M8 save', () => {
+  it('reads the bare M8 save, then refuses it because the maps were redrawn in M9', () => {
     const env = fromLegacy(structuredClone(state));
     expect(env).not.toBeNull();
-    expect(readSave(env).ok).toBe(true);
+    const r = readSave(env);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toMatch(/redrawn/);
     expect(fromLegacy({ nonsense: true })).toBeNull();
   });
 

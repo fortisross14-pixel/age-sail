@@ -54,7 +54,7 @@ function Markets() {
   const portId = useStore((s) => s.selectedPort);
   const set = useStore((s) => s.set);
   const [tab, setTab] = useState<'port' | 'compare'>(portId ? 'port' : 'compare');
-  const known = allPorts(world).filter((p) => p.kind !== 'native' || game.discovered.includes(p.id));
+  const known = allPorts(world).filter((p) => !p.inland && (p.kind !== 'native' || game.discovered.includes(p.id)));
   return (
     <>
       <div className="row between">
@@ -135,7 +135,7 @@ function Compare() {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const set = useStore((s) => s.set);
-  const known = allPorts(world).filter((p) => p.kind !== 'native' || game.discovered.includes(p.id));
+  const known = allPorts(world).filter((p) => !p.inland && (p.kind !== 'native' || game.discovered.includes(p.id)));
   const best = (g: GoodId, hi: boolean) => {
     const vals = known.map((p) => game.markets[p.id]?.[g]).filter(Boolean).map((m) => unitPrice(m!));
     return vals.length ? (hi ? Math.max(...vals) : Math.min(...vals)) : 0;
