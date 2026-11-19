@@ -83,5 +83,47 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | M6 | Native peoples: every trading ground is a people with inland villages, warriors and rivals, one empire per board; attitude from trade, gifts, posts, missions, encroaching colonies and attacks; trading posts (more trade), missions (conversion, then peaceful joining), alliances, inciting rivals, peace; numbers-based battles with terrain and allies; conquest makes subjects who pay tribute and whose land counts as territory; hostile peoples raid colonies and ambush parties; an epidemic some seasons after first contact | done |
 | M7 | Rival crowns: Portugal, England and the Netherlands, each with its own pace, preferred coasts and taste for trade; their ships sail visibly to found colonies at the richest sites (blocking yours) and to open trading posts that thin native trade; their colonies grow; attitude sours when you settle near them (and, after the Tordesillas event, on Portugal's African coast); wars with privateers hunting your fleets (sea battles by guns), raids on colonies, storming and taking their colonies, paying for peace; standings in Court → Crowns and your rank in the HUD | done |
 | M8 | The long game: five eras with cards; colonial loyalty drifting toward a target (taxes, generations overseas, era, size, distance, garrison, charter, needs, luxuries), unrest, independence risings decided by the garrison, free states that can be retaken; a colonial tax rate; royal charters and festivals; a dozen stories with choices (mutiny, plague, court quarrels, Genoese loans, a scholar, a pilot's secret, colony petitions, survivors at sea, native envoys, a marriage, the Armada, the price revolution); short, standard or full games ending in 1550, 1650 or 1750 with final standings and victory, and play on | done |
-| next | Your call: playtest feedback, balance, and the 'later' list below | |
+| Pass 1 | Best practices: game-dev skills in `.claude/skills/`, audit (`docs/AUDIT.md`), versioned saves, crash recovery, render on demand, lazy New World art, determinism tests | done |
+| M9 | Your realm: play any of the five Atlantic crowns; a fuller Old World of named cities with realm borders; every mainland city of your realm is yours to specialise; you are the Crown; a plain sandbox start | next |
+| M10 | GUI pass: city screen with tabs and building slots, portrait court, icons over text everywhere | |
+| Pass 3 | Balance: tuning numbers in one place, autoplay harness, retune for five crowns | |
+| later | Scenarios with goals (the old Crown's charge belongs here), Mediterranean powers as playable nations | |
 | later | Rival AI depth (real fleets and economies, rival-native alliances), Old World depth (buildings, full research), events and characters' stories, eras, score and victory, Chronicle, iPad performance, an illustrator's cohesive art set | |
+
+## M9: Your realm (plan)
+
+Decided with the player after M8:
+
+- **Five playable crowns**: Castile, Portugal, England, France and the Netherlands, chosen on the
+  menu. Each has its own home cities, coast, starting ships and a national edge (Castile: more
+  colonists and missionaries; Portugal: a head start in navigation research; England: privateers
+  and cheaper guns; France: a larger court and diplomacy; Netherlands: commerce and cheaper
+  cargo ships). The four you don't pick are the AI rivals.
+- **The Old World fills out**: about 40 named cities across Europe and the Maghreb, at least one
+  empty hex between any two (Cádiz moves away from Sevilla). Every city belongs to a realm: the
+  five crowns, plus non-playable powers with their own cities (Ottomans, Morocco, Venice, Genoa,
+  the Hanse, the Papal States). Realm borders are drawn on the chart as a thin ink line and a
+  light wash; cities are shown plainly with their names.
+- **All your mainland cities are yours** from the start. Each has building slots by size, and its
+  role comes from what you build there: a market makes a trade centre (better prices for its sea),
+  barracks a military centre, docks a seaport and shipyard, a university a research seat. Convoys
+  can run between your own cities, or you can centralise everything in one. Foreign cities trade.
+- **You are the Crown.** Messages come from your advisers and your treasury, never from "the
+  Crown". No charge or deadline: the base game is a sandbox scored on population, commerce and
+  territory. Scenarios with goals come later.
+- **A plain start**, as in other strategy games: a couple of ships in your main port, a colonist and
+  a soldier ready, and your court.
+
+## M10: GUI pass (plan)
+
+"This is not a text game": an indie game with quality.
+
+- **City screen with tabs.** *Buildings*: a grid of slots, limited by city size; an empty slot opens
+  a picker showing each building's icon, name, cost and one line, with an info button for the
+  details. *Economy*: what the city makes, uses and pays, as icons and bars. *Recruitment*: unit
+  cards with cost and time.
+- **The court as portraits**: a card per courtier with a portrait, age and skill pips; text only in
+  the detail view.
+- **Icons and numbers first** in the HUD, drawers and news; prose moves to tooltips and info
+  panels. Readable sizes (no text under 14 px), Escape closes anything, reduced motion honoured.
+- Art requests for portraits and building icons: `art/PROMPTS.md`.
