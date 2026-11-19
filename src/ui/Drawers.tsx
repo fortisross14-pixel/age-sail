@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useStore, type DrawerId } from '../store';
 import type { GameState } from '../sim/types';
+import { realmSpec } from '../data/realms';
 import { Frame } from './theme/Frame';
 import { Icon, type IconName } from './theme/icons';
 import { sfx } from './sound';
@@ -94,23 +95,48 @@ function Markets() {
   const world = useStore((s) => s.world)!;
   const portId = useStore((s) => s.selectedPort);
   const set = useStore((s) => s.set);
-  const [tab, setTab] = useState<'port' | 'compare'>(portId ? 'port' : 'compare');
+  const [tab, setTab] = useState<'port' | 'compare'>('port');
   const known = allPorts(world).filter((p) => !p.inland && (p.kind !== 'native' || game.discovered.includes(p.id)));
+  const current = known.find((p) => p.id === portId) ?? known.find((p) => p.id === game.fleets.find((f) => f.at)?.at) ?? known[0];
+  const groups: [string, typeof known][] = [
+    ['Your ports', known.filter((p) => p.kind === 'home')],
+    ['Foreign ports', known.filter((p) => p.kind === 'foreign')],
+    ['Trading grounds', known.filter((p) => p.kind === 'native')],
+  ];
   return (
     <>
-      <div className="row between">
-        <Tabs value={tab} onChange={setTab} tabs={[['port', 'Port'], ['compare', 'Compare prices']]} />
-        {tab === 'port' && (
-          <select className="text" value={portId ?? ''} onChange={(e) => set({ selectedPort: e.target.value || null })} aria-label="Port">
-            <option value="">Choose a port…</option>
-            {known.map((p) => <option key={p.id} value={p.id}>{p.name}{p.kind === 'native' ? ` (${p.people})` : ''}</option>)}
-          </select>
-        )}
-      </div>
-      {tab === 'port' ? (portId ? <PortMarket portId={portId} /> : <p className="muted">Choose a port, or click one on the map.</p>) : <Compare />}
+      <Tabs value={tab} onChange={setTab} tabs={[['port', 'Ports'], ['compare', 'Compare prices']]} />
+      {tab === 'compare' ? <Compare /> : (
+        <div className="split">
+          <div className="split-list">
+            {groups.filter(([, ps]) => ps.length).map(([title, ps]) => (
+              <section key={title} className="fleet-group">
+                <h3>{title} <span className="muted small">{ps.length}</span></h3>
+                <ul className="fleet-list">
+                  {ps.map((p) => {
+                    const docked = game.fleets.filter((f) => f.at === p.id).length;
+                    return (
+                      <li key={p.id}>
+                        <button className={`fleet-row ${p.id === current?.id ? 'sel' : ''}`} onClick={() => { sfx('select'); set({ selectedPort: p.id }); }}>
+                          {p.realm ? <span className="crown-flag" style={{ background: hexColor(realmSpec(p.realm).color), borderColor: '#2a1806' }} aria-hidden /> : <span className="crown-flag native" aria-hidden />}
+                          <span className="fleet-name">{p.name}<span className="muted small">{p.kind === 'native' ? ` · the ${p.people}` : p.kind === 'foreign' ? ` · ${p.nation}` : ''}</span></span>
+                          <span className="fleet-where">{docked ? `${docked} fleet${docked > 1 ? 's' : ''} in port` : ''}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
+          <div className="split-detail detail-card">{current ? <PortMarket key={current.id} portId={current.id} /> : <p className="muted">No markets known yet.</p>}</div>
+        </div>
+      )}
     </>
   );
 }
+
+const hexColor = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 function PortMarket({ portId }: { portId: string }) {
   const game = useStore((s) => s.game)!;
@@ -136,37 +162,33 @@ function PortMarket({ portId }: { portId: string }) {
           <label className="qty">Lot {[1, 10, 50].map((q) => <button key={q} className={qty === q ? 'on' : ''} onClick={() => setQty(q)}>{q}</button>)}</label>
         </div>
       ) : <div className="muted small notice">Prices this season. Bring a fleet into port to trade.</div>}
-      <table className="market">
-        <thead><tr><th>Good</th><th>Buy</th><th>Sell</th><th>Stock</th><th>Trend</th>{fleet && <><th>Hold</th><th /></>}</tr></thead>
-        <tbody>
-          {GOODS.filter((g) => book[g]).map((good) => {
-            const m = book[good]!;
-            const have = fleet?.cargo[good] ?? 0;
-            const buyQ = Math.max(1, Math.min(qty, Math.floor(m.stock), free));
-            const sellQ = Math.max(1, Math.min(qty, have));
-            const hist = m.history;
-            return (
-              <tr key={good} title={GOOD_INFO[good].blurb}>
-                <td className="good"><GoodIcon good={good} />{GOOD_INFO[good].name}</td>
-                <td className="num">{fmt(unitPrice(m) * (1 + sp))}</td>
-                <td className="num">{fmt(unitPrice(m) * (1 - sp))}</td>
-                <td className="num">{fmt(m.stock)}</td>
-                <td className={hist.length > 1 && hist[hist.length - 1] < hist[hist.length - 2] ? 'down' : 'up'}><Sparkline values={hist} /></td>
-                {fleet && (
-                  <>
-                    <td className="num">{have || '–'}</td>
-                    <td className="trade">
-                      <button disabled={free <= 0 || m.stock < 1} title={`Buy ${buyQ} for ${fmt(buyCost(m, buyQ, sp))}`} onClick={() => void run({ kind: 'buy', fleet: fleet.id, good, qty })}>Buy {buyQ}</button>
-                      <button disabled={!have} title={have ? `Sell ${sellQ} for ${fmt(sellValue(m, sellQ, sp))}` : ''} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty })}>Sell {sellQ}</button>
-                      <button disabled={!have} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty: have })}>All</button>
-                    </td>
-                  </>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="goods-list">
+        {GOODS.filter((g) => book[g]).map((good) => {
+          const m = book[good]!;
+          const have = fleet?.cargo[good] ?? 0;
+          const buyQ = Math.max(1, Math.min(qty, Math.floor(m.stock), free));
+          const sellQ = Math.max(1, Math.min(qty, have));
+          const hist = m.history;
+          const falling = hist.length > 1 && hist[hist.length - 1] < hist[hist.length - 2];
+          return (
+            <div key={good} className="good-row" title={GOOD_INFO[good].blurb}>
+              <GoodIcon good={good} size={40} />
+              <span className="g-name"><b>{GOOD_INFO[good].name}</b><span className="stock" title={`${fmt(m.stock)} in stock`}><i style={{ width: `${Math.min(100, (m.stock / Math.max(1, m.ref)) * 100)}%` }} /></span></span>
+              <span className="g-price"><b>{fmt(unitPrice(m) * (1 - sp))}</b><span>sell</span></span>
+              <span className="g-price buy"><b>{fmt(unitPrice(m) * (1 + sp))}</b><span>buy</span></span>
+              <span className={`g-trend ${falling ? 'down' : 'up'}`}><Sparkline values={hist} /></span>
+              {fleet && (
+                <span className="g-trade">
+                  {have > 0 && <span className="hold">{have} aboard</span>}
+                  <button disabled={free <= 0 || m.stock < 1} title={`Buy ${buyQ} for ${fmt(buyCost(m, buyQ, sp))}`} onClick={() => void run({ kind: 'buy', fleet: fleet.id, good, qty })}>Buy {buyQ}</button>
+                  <button disabled={!have} title={have ? `Sell ${sellQ} for ${fmt(sellValue(m, sellQ, sp))}` : ''} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty })}>Sell {sellQ}</button>
+                  <button disabled={!have} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty: have })}>All</button>
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
       <div className="muted small">Every lot moves the price: spread big cargoes across ports.</div>
     </div>
   );

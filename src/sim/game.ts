@@ -91,6 +91,9 @@ export function portAt(w: World, map: MapId, hex: number, s?: GameState): PortDe
   return c ? Col.colonyPort(c) : w[map].ports.find((p) => p.hex === hex);
 }
 export const fleetById = (s: GameState, id: number) => s.fleets.find((f) => f.id === id);
+/** "The Pinta", but never "The La Magdalena" or "The San Gabriel". */
+export const fleetName = (ship: string) => (/^(la|el|los|las|san|santa|santo|são|sao|nossa|le|les|de|het|st\.?|saint)\b/i.test(ship) ? ship : `The ${ship}`);
+
 /** Your crown's main port: where the game starts and where the court sends its people. */
 export const mainPort = (s: GameState) => crownSpec(s.crown).home;
 /** The nearest of your own ports to a city, for units trained inland. */
@@ -269,7 +272,7 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
   const home = portById(world, spec.home)!;
   for (const type of ['caravel', 'carrack'] as const) {
     const ship = newShip(state, type, rng);
-    state.fleets.push(makeFleet(state, `The ${ship.name}`, [ship], home));
+    state.fleets.push(makeFleet(state, fleetName(ship.name), [ship], home));
   }
   for (const type of ['colonist', 'infantry', ...(spec.edge.extraUnits ?? [])] as UnitType[]) {
     state.units.push({ id: state.nextId++, type, fleet: null, city: home.id, party: null });

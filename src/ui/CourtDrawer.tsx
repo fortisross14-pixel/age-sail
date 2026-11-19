@@ -7,12 +7,17 @@ import { ageOf, salary, hireCost } from '../sim/court';
 import { SKILLS, dateLabel, yearOf, type Person, type UnitType } from '../sim/types';
 import { fmt } from './format';
 import { KIND_MARK } from './NewsFeed';
-import { Tabs, Pips } from './Drawers';
+import { Tabs } from './Drawers';
+import { Icon } from './theme/icons';
+import { Art } from './theme/Art';
+import { Portrait } from './theme/Portrait';
+import { sfx } from './sound';
 import { getView } from './MapCanvas';
 import { allNations, moodOf, envoy } from '../sim/natives';
 import { rivalsOf, crownSpec } from '../data/rivals';
 import { rivalScore } from '../sim/rivals';
 import { score } from '../sim/colony';
+import { CROWN } from '../render/palette';
 import { SKILL_INFO as SK } from '../data/court';
 
 export function Court() {
@@ -35,15 +40,34 @@ export function Court() {
   );
 }
 
-function Skills({ p }: { p: Person }) {
+const RANK_TONE: Record<Person['rank'], string> = { courtier: 'court', explorer: 'sea', merchant: 'gold', governor: 'blood' };
+const topSkills = (p: Person) => [...SKILLS].sort((a, b) => p.skills[b] - p.skills[a]).slice(0, 2);
+
+function SkillBars({ p }: { p: Person }) {
   return (
-    <div className="skills">
+    <div className="skillbars">
       {SKILLS.map((k) => (
-        <span key={k} className="skill" title={`${SKILL_INFO[k].name}: ${SKILL_INFO[k].blurb}`}>
-          <span className="skill-name">{SKILL_INFO[k].short}</span><Pips n={p.skills[k]} />
-        </span>
+        <div key={k} className="skillbar" title={SKILL_INFO[k].blurb}>
+          <Icon name={k} size={20} tone="ink" />
+          <span>{SKILL_INFO[k].name}</span>
+          <span className="track" aria-label={`${p.skills[k]} of 5`}>{[1, 2, 3, 4, 5].map((v) => <i key={v} className={v <= p.skills[k] ? 'on' : ''} />)}</span>
+          <b>{p.skills[k]}</b>
+        </div>
       ))}
     </div>
+  );
+}
+
+function CourtierCard({ p, selected, onPick, note }: { p: Person; selected: boolean; onPick: () => void; note?: string }) {
+  const game = useStore((s) => s.game)!;
+  return (
+    <button className={`courtier tone-${RANK_TONE[p.rank]} ${selected ? 'selected' : ''} ${p.alive ? '' : 'dead'}`} onClick={() => { sfx('select'); onPick(); }} aria-pressed={selected}>
+      <span className="rank-ribbon">{note ?? RANK_INFO[p.rank].name}</span>
+      <Portrait p={p} turn={game.turn} />
+      <b>{p.name.replace(/ (de|van) /, ' $1\u00a0')}</b>
+      <span className="meta">{p.alive ? `${ageOf(p, game.turn)} · ${TRAIT_INFO[p.trait].name}` : `died ${p.died != null ? yearOf(p.died) : ''}`}</span>
+      <span className="top-skills">{topSkills(p).map((k) => <span key={k} title={SKILL_INFO[k].name}><Icon name={k} size={16} tone="ink" />{p.skills[k]}</span>)}</span>
+    </button>
   );
 }
 
@@ -62,28 +86,36 @@ function status(game: ReturnType<typeof useStore.getState>['game'], world: Retur
 
 function People() {
   const game = useStore((s) => s.game)!;
-  const world = useStore((s) => s.world)!;
-  const [open, setOpen] = useState<number | null>(null);
   const order = { explorer: 0, merchant: 1, governor: 2, courtier: 3 };
   const people = [...game.people].sort((a, b) => Number(b.alive) - Number(a.alive) || order[a.rank] - order[b.rank]);
+  const [sel, setSel] = useState<number | null>(people[0]?.id ?? null);
+  const p = people.find((x) => x.id === sel) ?? people[0];
   return (
-    <>
-      <p className="muted small">Commission courtiers as explorers, merchants or governors. An explorer comes with one free unit. Click a person for their options.</p>
-      <ul className="people">
-        {people.map((p) => (
-          <li key={p.id} className={`person ${p.alive ? '' : 'dead'} ${open === p.id ? 'open' : ''}`}>
-            <button className="person-head" onClick={() => setOpen(open === p.id ? null : p.id)} aria-expanded={open === p.id} disabled={!p.alive}>
-              <span className={`rank-badge ${p.rank}`}>{RANK_INFO[p.rank].name}</span>
-              <span className="person-name">{p.name}</span>
-              <span className="muted small">{p.alive ? `${ageOf(p, game.turn)} · ${TRAIT_INFO[p.trait].name}` : ''}</span>
-              <span className="person-status small">{status(game, world, p)}{p.unitType && p.alive ? ` · with ${UNIT_INFO[p.unitType].name.toLowerCase()}` : ''}</span>
-              <Skills p={p} />
-            </button>
-            {open === p.id && p.alive && <PersonActions p={p} />}
-          </li>
-        ))}
-      </ul>
-    </>
+    <div className="court-split">
+      <div className="courtiers">{people.map((x) => <CourtierCard key={x.id} p={x} selected={x.id === p?.id} onPick={() => setSel(x.id)} />)}</div>
+      {p && <PersonDetail key={p.id} p={p} />}
+    </div>
+  );
+}
+
+function PersonDetail({ p }: { p: Person }) {
+  const game = useStore((s) => s.game)!;
+  const world = useStore((s) => s.world)!;
+  return (
+    <aside className="courtier-detail detail-card">
+      <div className="who">
+        <Portrait p={p} turn={game.turn} size="large" />
+        <div>
+          <span className={`rank-ribbon tone-${RANK_TONE[p.rank]}`}>{RANK_INFO[p.rank].name}</span>
+          <h3>{p.name}</h3>
+          <div className="muted">{p.alive ? `${ageOf(p, game.turn)} years · ${TRAIT_INFO[p.trait].name} · ${Math.round(salary(p))} a season` : ''}</div>
+          <div className="status">{status(game, world, p)}{p.unitType && p.alive ? ` · with a ${UNIT_INFO[p.unitType].name.toLowerCase()}` : ''}</div>
+        </div>
+      </div>
+      <SkillBars p={p} />
+      <p className="trait"><b>{TRAIT_INFO[p.trait].name}.</b> {TRAIT_INFO[p.trait].blurb}</p>
+      {p.alive && <PersonActions p={p} />}
+    </aside>
   );
 }
 
@@ -95,64 +127,70 @@ function PersonActions({ p }: { p: Person }) {
   const selectFleet = useStore((s) => s.selectFleet);
   const atHome = p.fleet == null && p.city != null && !game.parties.some((x) => x.leader === p.id);
   const fleetsHere = game.fleets.filter((f) => f.at === p.city && f.leader == null);
+  const ungoverned = Object.values(game.cities).filter((c) => c.governor == null);
+  const [city, setCity] = useState(ungoverned[0]?.id ?? '');
   const units: UnitType[] = ['colonist', 'infantry', 'missionary'];
   return (
-    <div className="person-actions">
-      <div className="muted small">Trait: <b>{TRAIT_INFO[p.trait].name}</b>. {TRAIT_INFO[p.trait].blurb} Salary {Math.round(salary(p))} a season.</div>
+    <div className="commissions">
       {p.rank === 'courtier' && atHome && (
         <>
-          <div className="action-group">
-            <b>Explorer</b> · {RANK_INFO.explorer.cost} ducats, 2 seasons. Choose who sails with them:
-            <div className="row">
+          <div className="sec">Commission</div>
+          <div className="commission">
+            <div className="c-head"><Icon name="navigation" size={22} tone="ink" /><b>Explorer</b><span className="cost-tag">{fmt(RANK_INFO.explorer.cost)} · 2 seasons</span></div>
+            <div className="muted small">Leads a fleet into unknown waters, with one of these at their side:</div>
+            <div className="unit-choice">
               {units.map((u) => (
-                <button key={u} disabled={game.treasury < RANK_INFO.explorer.cost} title={UNIT_INFO[u].blurb}
+                <button key={u} className="offer-card mini" disabled={game.treasury < RANK_INFO.explorer.cost} title={UNIT_INFO[u].blurb}
                   onClick={() => void run({ kind: 'promote', person: p.id, rank: 'explorer', unit: u })}>
-                  <img src={`${import.meta.env.BASE_URL}sprites/${UNIT_INFO[u].sprite}.png`} alt="" height={26} /> {UNIT_INFO[u].name}
+                  <Art slot={`unit/${u}`} fallback={<img src={`${import.meta.env.BASE_URL}sprites/${UNIT_INFO[u].sprite}.png`} alt="" />} />
+                  <span>{UNIT_INFO[u].name}</span>
                 </button>
               ))}
             </div>
           </div>
-          <div className="action-group">
-            <b>Merchant</b> · {RANK_INFO.merchant.cost} ducats, 1 season. Leads trade fleets and runs trade routes.
-            <div className="row"><button disabled={game.treasury < RANK_INFO.merchant.cost} onClick={() => void run({ kind: 'promote', person: p.id, rank: 'merchant' })}>Make merchant</button></div>
+          <div className="commission">
+            <div className="c-head"><Icon name="commerce" size={22} tone="ink" /><b>Merchant</b><span className="cost-tag">{fmt(RANK_INFO.merchant.cost)} · 1 season</span></div>
+            <div className="muted small">Leads trade fleets and runs trade routes on their own.</div>
+            <button className="adm-gold-btn" disabled={game.treasury < RANK_INFO.merchant.cost} onClick={() => void run({ kind: 'promote', person: p.id, rank: 'merchant' })}>Make merchant</button>
           </div>
-          <div className="action-group">
-            <b>Governor</b> · free, at once. Construction {p.skills.construction}: projects {p.skills.construction * 5}% cheaper{p.skills.construction >= 2 ? `, ${Math.floor(p.skills.construction / 2)} season${p.skills.construction >= 4 ? 's' : ''} faster` : ''}.
-            <div className="row">
-              {Object.values(game.cities).map((c) => (
-                <button key={c.id} disabled={c.governor != null} title={c.governor != null ? 'Already governed' : ''}
-                  onClick={() => void run({ kind: 'promote', person: p.id, rank: 'governor', city: c.id })}>Govern {portById(world, c.id)?.name}</button>
-              ))}
-            </div>
+          <div className="commission">
+            <div className="c-head"><Icon name="construction" size={22} tone="ink" /><b>Governor</b><span className="cost-tag">free · at once</span></div>
+            <div className="muted small">Projects {p.skills.construction * 5}% cheaper{p.skills.construction >= 2 ? `, ${Math.floor(p.skills.construction / 2)} season${p.skills.construction >= 4 ? 's' : ''} faster` : ''} in the city they govern.</div>
+            {ungoverned.length ? (
+              <div className="row">
+                <select value={city} onChange={(e) => setCity(e.target.value)} aria-label="City to govern">
+                  {ungoverned.map((c) => <option key={c.id} value={c.id}>{portById(world, c.id)?.name}</option>)}
+                </select>
+                <button className="adm-gold-btn" onClick={() => void run({ kind: 'promote', person: p.id, rank: 'governor', city })}>Appoint</button>
+              </div>
+            ) : <span className="muted small">Every city has a governor.</span>}
           </div>
         </>
       )}
       {(p.rank === 'explorer' || p.rank === 'merchant') && atHome && p.ready === 0 && (
-        <div className="action-group">
-          <b>Give command</b> of a fleet in {portById(world, p.city!)?.name}:
+        <div className="commission">
+          <div className="c-head"><Icon name="fleets" size={22} tone="ink" /><b>Give command</b><span className="muted small">in {portById(world, p.city!)?.name}</span></div>
           <div className="row">
             {fleetsHere.length ? fleetsHere.map((f) => (
-              <button key={f.id} className="primary" onClick={async () => {
+              <button key={f.id} className="adm-gold-btn" onClick={async () => {
                 if (await run({ kind: 'assignLeader', person: p.id, fleet: f.id })) { selectFleet(f.id); set({ drawer: 'fleets' }); }
               }}>{f.name}</button>
             )) : <span className="muted small">No fleet without a leader is in port. Merge or build one.</span>}
           </div>
         </div>
       )}
-      {p.fleet != null && (
-        <div className="row">
+      <div className="row">
+        {p.fleet != null && (
           <button onClick={() => {
             const f = game.fleets.find((x) => x.id === p.fleet);
             if (!f) return;
             selectFleet(f.id);
-            set({ drawer: 'fleets' });
+            set({ drawer: null });
             setTimeout(() => getView()?.focusHex(f.map, f.hex), 0);
           }}>Show their fleet</button>
-        </div>
-      )}
-      {p.rank !== 'courtier' && p.fleet == null && (
-        <div className="row"><button onClick={() => void run({ kind: 'relieve', person: p.id })}>Return to court</button></div>
-      )}
+        )}
+        {p.rank !== 'courtier' && p.fleet == null && <button onClick={() => void run({ kind: 'relieve', person: p.id })}>Return to court</button>}
+      </div>
     </div>
   );
 }
@@ -160,29 +198,28 @@ function PersonActions({ p }: { p: Person }) {
 function Petitioners() {
   const game = useStore((s) => s.game)!;
   const run = useStore((s) => s.run);
+  const [sel, setSel] = useState<number | null>(game.petitioners[0]?.person.id ?? null);
   if (!game.petitioners.length) return <p className="muted">No one is asking for a place at court. New faces arrive each spring.</p>;
+  const pick = game.petitioners.find((x) => x.person.id === sel) ?? game.petitioners[0];
+  const p = pick.person;
   return (
-    <>
-      <p className="muted small">People asking for a place at court. They arrive each spring; some lose patience and leave.</p>
-      <ul className="people">
-        {game.petitioners.map(({ person: p, cost }) => (
-          <li key={p.id} className="person">
-            <div className="person-head static">
-              <span className="rank-badge courtier">Petitioner</span>
-              <span className="person-name">{p.name}</span>
-              <span className="muted small">{ageOf(p, game.turn)} · {TRAIT_INFO[p.trait].name}</span>
-              <span className="person-status small">asks {fmt(cost)} ducats</span>
-              <Skills p={p} />
-            </div>
-            <div className="person-actions">
-              <div className="muted small">{TRAIT_INFO[p.trait].blurb}</div>
-              <button disabled={game.treasury < cost} onClick={() => void run({ kind: 'hire', person: p.id })}>Welcome to court · {fmt(cost)}</button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <p className="muted small">A fair price for skills like these is about {fmt(hireCost(game.petitioners[0].person))} ducats.</p>
-    </>
+    <div className="court-split">
+      <div className="courtiers">{game.petitioners.map(({ person, cost }) => <CourtierCard key={person.id} p={person} selected={person.id === p.id} onPick={() => setSel(person.id)} note={`asks ${fmt(cost)}`} />)}</div>
+      <aside className="courtier-detail detail-card" key={p.id}>
+        <div className="who">
+          <Portrait p={p} turn={game.turn} size="large" />
+          <div>
+            <span className="rank-ribbon tone-court">Petitioner</span>
+            <h3>{p.name}</h3>
+            <div className="muted">{ageOf(p, game.turn)} years · {TRAIT_INFO[p.trait].name}</div>
+            <div className="status">A fair price for skills like these is about {fmt(hireCost(p))} ducats.</div>
+          </div>
+        </div>
+        <SkillBars p={p} />
+        <p className="trait"><b>{TRAIT_INFO[p.trait].name}.</b> {TRAIT_INFO[p.trait].blurb}</p>
+        <button className="adm-gold-btn" disabled={game.treasury < pick.cost} onClick={() => void run({ kind: 'hire', person: p.id })}>Welcome to court · {fmt(pick.cost)} ducats</button>
+      </aside>
+    </div>
   );
 }
 
@@ -205,9 +242,10 @@ export function Research() {
           The court yields {basePoints(game) + learned} points a season{learned ? ` (${learned} from learned courtiers)` : ''}. New coasts, peoples and lands charted by your explorers add more.
         </div>
       </div>
+      <div className="tech-columns">
       {(['navigation', 'commerce', 'state'] as Branch[]).map((b) => (
         <section key={b}>
-          <h3>{BRANCH_NAMES[b]}</h3>
+          <h3><Icon name={b === 'navigation' ? 'navigation' : b === 'commerce' ? 'commerce' : 'court'} size={22} tone="ink" />{BRANCH_NAMES[b]}</h3>
           <div className="techs">
             {TECHS.filter((t) => t.branch === b).map((t) => {
               const known = has(game, t.id);
@@ -227,6 +265,7 @@ export function Research() {
           </div>
         </section>
       ))}
+      </div>
     </div>
   );
 }
@@ -263,7 +302,7 @@ function Peoples() {
         Deal with each people your own way: trade and trading posts, missions, alliances, setting rivals against each other, or conquest. Your envoy is
         {e ? <> <b>{e.name}</b> ({SK.diplomacy.name.toLowerCase()} {e.skills.diplomacy})</> : ' nobody'}; a better diplomat makes gifts go further and treaties likelier.
       </p>
-      <ul className="people">
+      <ul className="realm-cards">
         {met.map((n) => {
           const st = game.natives[n.id];
           const mood = moodOf(st);
@@ -289,7 +328,7 @@ function Peoples() {
                   </>}
                   {st.relation === 'peace' && <button disabled={st.attitude < 50} title={st.attitude < 50 ? 'They must be friendly first' : ''} onClick={() => void run({ kind: 'ally', nation: n.id })}>Propose alliance</button>}
                   {st.relation === 'war' && <button disabled={game.treasury < 500} onClick={() => void run({ kind: 'peace', nation: n.id })}>Make peace · 500</button>}
-                  {st.converted >= 1 && st.relation !== 'subject' && <button className="primary" disabled={st.attitude < 40} onClick={() => void run({ kind: 'incorporate', nation: n.id })}>Invite them to join the Crown</button>}
+                  {st.converted >= 1 && st.relation !== 'subject' && <button className="primary" disabled={st.attitude < 40} onClick={() => void run({ kind: 'incorporate', nation: n.id })}>Invite them to join your realm</button>}
                 </div>
                 {rivals.length > 0 && (st.relation === 'allied' || st.attitude >= 30) && (
                   <div className="row small">
@@ -328,12 +367,12 @@ function Crowns() {
         <tbody>
           {rows.map((r, i) => (
             <tr key={r.id} className={r.mine ? 'me' : ''}>
-              <td>{i + 1}. {r.name}</td><td className="num"><b>{fmt(r.total)}</b></td><td className="num">{r.colonies}</td><td className="num">{r.pop}</td><td className="num">{r.territory}</td><td className="num">{r.posts}</td>
+              <td><span className="crown-flag" style={{ background: CROWN[r.id].css, borderColor: CROWN[r.id].css2 }} aria-hidden /> {i + 1}. {r.name}</td><td className="num"><b>{fmt(r.total)}</b></td><td className="num">{r.colonies}</td><td className="num">{r.pop}</td><td className="num">{r.territory}</td><td className="num">{r.posts}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <ul className="people">
+      <ul className="realm-cards">
         {rivalsOf(game.crown).map((r) => {
           const st = game.rivals[r.id];
           const war = st.relation === 'war';
@@ -343,7 +382,7 @@ function Crowns() {
             <li key={r.id} className="person nation">
               <div className="person-head static">
                 <span className={`rank-badge mood-${mood.split(' ')[0]}`}>{mood}</span>
-                <span className="person-name">{r.name}</span>
+                <span className="person-name"><span className="crown-flag" style={{ background: CROWN[r.id].css, borderColor: CROWN[r.id].css2 }} aria-hidden /> {r.name}</span>
                 <span className="muted small">{r.blurb}</span>
                 <div className="attitude" title={`Attitude ${Math.round(st.attitude)}`}><div className="att-mid" /><div className="att-dot" style={{ left: `${(st.attitude + 100) / 2}%` }} /></div>
               </div>

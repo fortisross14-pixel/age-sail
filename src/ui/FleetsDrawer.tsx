@@ -13,20 +13,22 @@ import { GoodIcon, ShipIcon } from './Icon';
 import { unitPrice } from '../sim/market';
 import { getView } from './MapCanvas';
 import { Pips } from './Drawers';
+import { Art } from './theme/Art';
 
 export function Fleets() {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const selected = useStore((s) => s.selectedFleet);
   const selectFleet = useStore((s) => s.selectFleet);
-  const fleet = game.fleets.find((f) => f.id === selected);
+  const fleet = game.fleets.find((f) => f.id === selected) ?? game.fleets[0];
   const groups: [string, Fleet[]][] = [
     ['Expeditions', game.fleets.filter((f) => leaderOf(game, f)?.rank === 'explorer')],
     ['Trade', game.fleets.filter((f) => leaderOf(game, f)?.rank === 'merchant')],
     ['Idle ships', game.fleets.filter((f) => f.leader == null)],
   ];
   return (
-    <>
+    <div className="split">
+      <div className="split-list">
       {groups.map(([title, fleets]) => (
         <section key={title} className="fleet-group">
           <h3>{title} <span className="muted small">{fleets.length || ''}</span></h3>
@@ -37,8 +39,8 @@ export function Fleets() {
                 const l = leaderOf(game, f);
                 return (
                   <li key={f.id}>
-                    <button className={`fleet-row ${f.id === selected ? 'sel' : ''}`} onClick={() => { selectFleet(f.id); setTimeout(() => getView()?.focusHex(f.map, f.hex), 0); }}>
-                      <ShipIcon type={f.ships[0].type} size={34} />
+                    <button className={`fleet-row ${f.id === fleet?.id ? 'sel' : ''}`} onClick={() => { selectFleet(f.id); setTimeout(() => getView()?.focusHex(f.map, f.hex), 0); }}>
+                      <span className="ship-art"><Art slot={`ship/${f.ships[0].type}`} fallback={<ShipIcon type={f.ships[0].type} size={46} />} /></span>
                       <span className="fleet-name">{f.name}<span className="muted small">{l ? ` · ${l.name}` : ` · ${f.ships.length} ship${f.ships.length > 1 ? 's' : ''}`}</span></span>
                       <span className="fleet-where">{where}{f.route?.active ? ' · on route' : f.moves > 0 && !f.at && !f.order ? ' · ready' : ''}</span>
                     </button>
@@ -65,8 +67,11 @@ export function Fleets() {
           </ul>
         </section>
       )}
-      {fleet && <FleetDetail fleet={fleet} />}
-    </>
+      </div>
+      <div className="split-detail detail-card">
+        {fleet ? <FleetDetail key={fleet.id} fleet={fleet} /> : <p className="muted">No fleets. Build a ship in a city with docks.</p>}
+      </div>
+    </div>
   );
 }
 

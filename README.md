@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.9
+## Now playing: v0.10
 
-M9, your realm: play Castile, Portugal, England, France or the Netherlands, in an Old World of 53 cities and 15 realms.
+M10, the Admiralty interface: navy lacquer and gold, screens that open over the map with motion and sound, a city screen with building places, a portrait court.
+
+From v0.9, your realm: play Castile, Portugal, England, France or the Netherlands, in an Old World of 53 cities and 15 realms.
 
 From v0.8: the long game: eras, colonial loyalty and independence, stories with choices, and an end date (1550,
 1650 or 1750) with final standings. From v0.7: rival crowns race you for coasts, trade and score; wars bring
