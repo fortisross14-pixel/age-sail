@@ -33,6 +33,8 @@ export interface MapCallbacks {
   onClick: (map: MapId, hex: number, fleetId: number | null, partyId: number | null) => void;
   onRightClick: (map: MapId, hex: number) => void;
   onHover: (map: MapId, hex: number) => void;
+  /** the part of the board in view, in board pixels, after every camera move */
+  onCamera?: (map: MapId, view: { x: number; y: number; w: number; h: number }) => void;
 }
 
 const MARGIN = 220;
@@ -1038,6 +1040,7 @@ export class MapView {
     sc.root.position.set(sc.cam.x, sc.cam.y);
     sc.root.scale.set(s);
     this.wake();
+    this.cb.onCamera?.(this.active, { x: -sc.cam.x / s, y: -sc.cam.y / s, w: vw / s, h: vh / s });
   }
 
   centerOn(x: number, y: number, scale = this.scene.cam.scale) {

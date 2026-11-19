@@ -26,15 +26,11 @@ export function Court() {
         ['petitioners', `Petitioners${game.petitioners.length ? ` (${game.petitioners.length})` : ''}`],
         ['peoples', `Peoples${Object.values(game.natives).filter((n) => n.met).length ? ` (${Object.values(game.natives).filter((n) => n.met).length})` : ''}`],
         ['crowns', 'Crowns'],
-        ['research', 'Research'],
-        ['chronicle', 'Chronicle'],
       ]} />
       {tab === 'people' && <People />}
       {tab === 'petitioners' && <Petitioners />}
       {tab === 'peoples' && <Peoples />}
       {tab === 'crowns' && <Crowns />}
-      {tab === 'research' && <Research />}
-      {tab === 'chronicle' && <Chronicle />}
     </>
   );
 }
@@ -190,7 +186,7 @@ function Petitioners() {
   );
 }
 
-function Research() {
+export function Research() {
   const game = useStore((s) => s.game)!;
   const run = useStore((s) => s.run);
   const r = game.research;
@@ -235,7 +231,7 @@ function Research() {
   );
 }
 
-function Chronicle() {
+export function Chronicle() {
   const game = useStore((s) => s.game)!;
   let lastTurn = -1;
   return (

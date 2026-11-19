@@ -1,5 +1,9 @@
-import { useState, type ReactNode } from 'react';
-import { useStore } from '../store';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useStore, type DrawerId } from '../store';
+import type { GameState } from '../sim/types';
+import { Frame } from './theme/Frame';
+import { Icon, type IconName } from './theme/icons';
+import { sfx } from './sound';
 import { GOOD_INFO, GOODS, type GoodId } from '../data/goods';
 import { unitPrice, buyCost, sellValue } from '../sim/market';
 import { cargoUsed, cargoCapacity, portById, allPorts, spreadFor } from '../sim/game';
@@ -7,35 +11,69 @@ import { fmt } from './format';
 import { GoodIcon } from './Icon';
 import { Sparkline } from './Sparkline';
 import { Fleets } from './FleetsDrawer';
-import { Cities } from './CitiesDrawer';
-import { Court } from './CourtDrawer';
+import { Cities } from './CityScreen';
+import { Court, Research, Chronicle } from './CourtDrawer';
 
+const HEADS: Record<Exclude<DrawerId, 'cities'>, { title: string; icon: IconName; sub: (g: GameState) => string }> = {
+  markets: { title: 'Markets', icon: 'markets', sub: () => 'Prices in every port you know' },
+  fleets: { title: 'Fleets', icon: 'fleets', sub: (g) => `${g.fleets.length} fleet${g.fleets.length === 1 ? '' : 's'} · ${g.parties.length} part${g.parties.length === 1 ? 'y' : 'ies'} ashore` },
+  court: { title: 'Court', icon: 'court', sub: (g) => `${g.people.filter((p) => p.alive).length} courtiers · ${g.petitioners.length} petitioner${g.petitioners.length === 1 ? '' : 's'} waiting` },
+  research: { title: 'Research', icon: 'research', sub: (g) => `${g.research.known.length} subject${g.research.known.length === 1 ? '' : 's'} mastered` },
+  chronicle: { title: 'Chronicle', icon: 'chronicle', sub: () => 'What has happened in your reign' },
+};
+
+/** The panel on the right: one at a time, sliding in on its runners and out again. */
 export function Drawer() {
   const drawer = useStore((s) => s.drawer);
+  const game = useStore((s) => s.game)!;
   const set = useStore((s) => s.set);
-  if (!drawer) return null;
-  const title = { cities: 'Cities', markets: 'Markets', fleets: 'Fleets', court: 'Court' }[drawer];
+  const [shown, setShown] = useState<DrawerId | null>(drawer);
+  const [leaving, setLeaving] = useState(false);
+  const [shine, setShine] = useState(0);
+  const [entering, setEntering] = useState(true);
+  useEffect(() => {
+    if (drawer && drawer !== shown) {
+      sfx(shown ? 'page' : 'open');
+      setEntering(!shown);
+      setShown(drawer); setLeaving(false);
+      const t = setTimeout(() => { setShine((n) => n + 1); setEntering(false); }, shown ? 60 : 560);
+      return () => clearTimeout(t);
+    }
+    if (!drawer && shown) {
+      sfx('close');
+      setLeaving(true);
+      const t = setTimeout(() => { setShown(null); setLeaving(false); }, 320);
+      return () => clearTimeout(t);
+    }
+  }, [drawer]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!shown) return null;
+  const head = shown === 'cities' ? null : HEADS[shown];
   return (
-    <aside className={`panel drawer drawer-${drawer}`} aria-label={title}>
-      <header className="drawer-head">
-        <h2>{title}</h2>
-        <button className="close" onClick={() => set({ drawer: null })} aria-label="Close">×</button>
-      </header>
-      <div className="drawer-body">
-        {drawer === 'fleets' && <Fleets />}
-        {drawer === 'markets' && <Markets />}
-        {drawer === 'cities' && <Cities />}
-        {drawer === 'court' && <Court />}
+    <Frame className={`panel drawer drawer-${shown} ${leaving ? 'leave' : entering ? 'enter' : ''} ${shine ? `shine-${shine % 2}` : ''}`} aria-label={head?.title ?? 'Cities'} role="complementary">
+      <button className="adm-medal adm-close" onClick={() => set({ drawer: null })} aria-label="Close" title="Close (Esc)"><Icon name="close" size={20} /></button>
+      {head && (
+        <header className="drawer-head">
+          <span className="adm-medal" aria-hidden><Icon name={head.icon} size={26} /></span>
+          <div><h2>{head.title}</h2><div className="sub">{head.sub(game)}</div></div>
+        </header>
+      )}
+      <div className="drawer-body" key={shown}>
+        {shown === 'fleets' && <Fleets />}
+        {shown === 'markets' && <Markets />}
+        {shown === 'cities' && <Cities />}
+        {shown === 'court' && <Court />}
+        {shown === 'research' && <Research />}
+        {shown === 'chronicle' && <Chronicle />}
       </div>
-    </aside>
+    </Frame>
   );
 }
 
 export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (t: T) => void; tabs: [T, ReactNode][] }) {
   return (
-    <div className="maps tabs" role="tablist">
+    <div className="tabs" role="tablist">
       {tabs.map(([id, label]) => (
-        <button key={id} role="tab" aria-selected={value === id} className={value === id ? 'on' : ''} onClick={() => onChange(id)}>{label}</button>
+        <button key={id} role="tab" aria-selected={value === id} className={value === id ? 'on' : ''} onClick={() => { if (id !== value) { sfx('tab'); onChange(id); } }}>{label}</button>
       ))}
     </div>
   );

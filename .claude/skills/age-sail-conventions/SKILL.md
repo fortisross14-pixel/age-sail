@@ -60,6 +60,16 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
 - Map text and colours come from `src/render/palette.ts`; game objects use crown colours and
   plates so they read apart from the printed map.
 
+## Interface (the Admiralty look)
+
+- Theme in `src/ui/theme/admiralty.css` (tokens on `:root`), loaded after `styles.css`. Lacquer and
+  gold outside, parchment and ink inside. Wrap panels and modals in `Frame`; use `Icon` (gold line
+  icons) and `Art` slots for painted pictures (`src/ui/theme/Art.tsx`, list in `art/PROMPTS.md`).
+- Sounds go through `sfx()` in `src/ui/sound.ts` (synthesized, no files). Game orders get their
+  sound in `store.run`; panels, tabs and pickers play their own.
+- Overlays opened from inside a sliding panel must portal to `.game`: the panel's transform traps
+  `position: fixed`.
+
 ## Balance
 
 - Tuning numbers belong in `src/data/` (goods, ships, tech, city, rivals, eras), not inline in

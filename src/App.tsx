@@ -3,14 +3,16 @@ import { useStore, type DrawerId } from './store';
 import { Menu } from './ui/Menu';
 import { MapCanvas, getView } from './ui/MapCanvas';
 import { Hud } from './ui/Hud';
-import { Dock } from './ui/Dock';
+import { Dock, Rail } from './ui/Dock';
+import { Minimap } from './ui/Minimap';
+import { GoldDefs } from './ui/theme/icons';
 import { Drawer } from './ui/Drawers';
 import { SelectionCard } from './ui/SelectionCard';
 import { NewsFeed } from './ui/NewsFeed';
 import { HoverInfo } from './ui/HoverInfo';
-import { EventCard, Help, Toast } from './ui/Overlays';
+import { EventCard, Help, Toast, Settings } from './ui/Overlays';
 
-const DRAWER_KEYS: Record<string, DrawerId> = { '1': 'cities', '2': 'markets', '3': 'fleets', '4': 'court' };
+const DRAWER_KEYS: Record<string, DrawerId> = { '1': 'cities', '2': 'markets', '3': 'fleets', '4': 'court', '5': 'research', '6': 'chronicle' };
 const PAN_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 
 function useKeys() {
@@ -33,7 +35,8 @@ function useKeys() {
         case 'enter': e.preventDefault(); void s.endTurn(); break;
         case ' ': e.preventDefault(); void s.confirmPreview(); break;
         case 'escape':
-          if (s.landing) s.set({ landing: null });
+          if (s.showSettings) s.set({ showSettings: false });
+          else if (s.landing) s.set({ landing: null });
           else if (s.preview) s.set({ preview: null });
           else if (s.drawer) s.set({ drawer: null });
           else { s.selectFleet(null); s.selectParty(null); }
@@ -67,14 +70,19 @@ function useKeys() {
 
 export function App() {
   const phase = useStore((s) => s.phase);
+  const drawer = useStore((s) => s.drawer);
   useKeys();
   if (phase !== 'playing') return <Menu />;
   return (
-    <div className="game">
+    <div className={`game ${drawer ? 'drawer-open' : ''}`}>
+      <GoldDefs />
       <MapCanvas />
       <Hud />
+      <Rail />
       <NewsFeed />
       <Dock />
+      <Minimap />
+      <Settings />
       <Drawer />
       <SelectionCard />
       <HoverInfo />

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as Comlink from 'comlink';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { DEFAULT_UNTIL } from './data/eras';
+import { sfx, type Sfx } from './ui/sound';
 import { SAVE_KEY, LEGACY_KEY, STALE_KEYS, wrap, fromLegacy, readSave, type LoadResult } from './save';
 import type { SimApi, Command } from './sim/worker';
 import type { CrownId } from './data/rivals';
@@ -12,7 +13,7 @@ const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.me
 
 export interface Preview extends MovePreview { fleet: number; dest: number; map: MapId; party?: number }
 
-export type DrawerId = 'cities' | 'markets' | 'fleets' | 'court';
+export type DrawerId = 'cities' | 'markets' | 'fleets' | 'court' | 'research' | 'chronicle';
 
 /** A chronicle entry's identity, stable across saves. */
 export const newsKey = (c: ChronicleEntry) => `${c.turn}|${c.text}`;
@@ -37,6 +38,7 @@ interface Store {
   showGrid: boolean;
   highlightAll: boolean;
   showHelp: boolean;
+  showSettings: boolean;
   drawer: DrawerId | null;
   courtTab: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'research' | 'chronicle';
   /** news the player has waved away */
@@ -61,6 +63,17 @@ interface Store {
 }
 
 let toastId = 0;
+
+/** The sound each kind of order makes when it succeeds. */
+function soundFor(c: Command): Sfx {
+  switch (c.kind) {
+    case 'buy': case 'sell': case 'gift': case 'provision': case 'repair': case 'colonyTransfer': return 'coins';
+    case 'project': return c.project.kind === 'building' || c.project.kind === 'ship' ? 'build' : 'train';
+    case 'found': case 'upgradeColony': case 'tradingPost': case 'mission': case 'charter': case 'promote': case 'hire': return 'build';
+    case 'move': case 'moveParty': case 'land': case 'cross': return 'select';
+    default: return 'select';
+  }
+}
 
 let saveWarned = false;
 async function save(game: GameState) {
@@ -108,7 +121,7 @@ export const useStore = create<Store>((set, get) => {
   };
   return {
     phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, selectedPort: null, selectedColony: null, preview: null,
-    hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false,
+    hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false, showSettings: false,
     drawer: null, courtTab: 'people', dismissed: [], toast: null, busy: false,
 
     set: (p) => set(p),
@@ -151,8 +164,8 @@ export const useStore = create<Store>((set, get) => {
       set({ game: state });
       follow(state);
       void save(state);
-      if (!result.ok) get().say(result.error, true);
-      else if (result.message) get().say(result.message);
+      if (!result.ok) { sfx('error'); get().say(result.error, true); }
+      else { sfx(soundFor(c)); if (result.message) get().say(result.message); }
       return result.ok;
     },
 
@@ -160,6 +173,7 @@ export const useStore = create<Store>((set, get) => {
       const g = get().game;
       if (!g || get().busy) return;
       set({ busy: true, preview: null });
+      sfx('season');
       let state: GameState;
       try { state = await sim.endTurn(); } catch (e) { await recover('while ending the season', e); return; }
       const sel = get().selectedFleet;

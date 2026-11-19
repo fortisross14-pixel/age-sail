@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { setCamera } from './Minimap';
 import { MapView } from '../render/MapView';
 import { loadAssets } from '../render/assets';
 import { useStore } from '../store';
@@ -92,6 +93,7 @@ export function MapCanvas() {
           if (useStore.getState().preview) await useStore.getState().confirmPreview();
         },
         onHover: (map, hex) => useStore.getState().set({ hover: hex >= 0 ? { map, hex } : null }),
+        onCamera: (map, v) => setCamera(map, v),
       });
       viewRef = view;
       if (import.meta.env.DEV) (window as unknown as { __view: MapView; __store: typeof useStore }).__view = view;

@@ -1,4 +1,8 @@
+import { useState } from 'react';
 import { useStore } from '../store';
+import { Frame } from './theme/Frame';
+import { Icon } from './theme/icons';
+import { sfx, setSound, soundOn, soundVolume } from './sound';
 import { spriteUrl } from '../render/assets';
 import { getView } from './MapCanvas';
 import { standings } from '../sim/empire';
@@ -101,4 +105,28 @@ export function Toast() {
   const toast = useStore((s) => s.toast);
   if (!toast) return null;
   return <div key={toast.id} className={`toast ${toast.bad ? 'bad' : ''}`} role="status">{toast.text}</div>;
+}
+
+/** Settings from the gear in the HUD: sound for now. */
+export function Settings() {
+  const show = useStore((s) => s.showSettings);
+  const set = useStore((s) => s.set);
+  const [on, setOn] = useState(soundOn());
+  const [vol, setVol] = useState(soundVolume());
+  if (!show) return null;
+  return (
+    <Frame className="settings-pop" role="dialog" aria-label="Settings">
+      <button className="adm-medal small adm-close" style={{ top: 10, right: 10 }} onClick={() => set({ showSettings: false })} aria-label="Close settings"><Icon name="close" size={16} /></button>
+      <h3 style={{ margin: 0 }}>Settings</h3>
+      <label>Sound
+        <button className={on ? 'on' : ''} aria-pressed={on} onClick={() => { const v = !on; setOn(v); setSound(v, vol); if (v) sfx('toast'); }}>
+          {on ? 'On' : 'Off'}
+        </button>
+      </label>
+      <label>Volume
+        <input type="range" min={0} max={1} step={0.05} value={vol} disabled={!on} onChange={(e) => { const v = Number(e.target.value); setVol(v); setSound(on, v); }} onPointerUp={() => sfx('select')} />
+      </label>
+      <button onClick={() => set({ showSettings: false, showHelp: true })}>How to play</button>
+    </Frame>
+  );
 }
