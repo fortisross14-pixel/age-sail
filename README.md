@@ -5,10 +5,16 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
+## Now playing: v0.2
+
+On top of the v0.1 slice below: a clean map-first HUD with four drawers, research at court, and a
+procedural African coast. Crossing the Mar Océano is near-hopeless until the court masters
+*Volta do mar* (long-distance navigation). See [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ## v0.1: the discovery slice
 
-- **Two boards.** The Old World (fixed: Iberia, France, Britain, the Low Countries, the
-  Mediterranean, North Africa) and the New World (procedural: continents, island arcs,
+- **Two boards.** The Old World (Europe and the Mediterranean fixed; the African coast south of
+  Morocco generated per game) and the New World (procedural: continents, island arcs,
   mid-ocean islands, rivers, biomes by latitude). Sail off the western edge of the Old World
   to reach the eastern ocean of the New World at the same latitude, and back.
 - **Turn-based movement.** Each season, ships get movement points. Wind sets the cost of each

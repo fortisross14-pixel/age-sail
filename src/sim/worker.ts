@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import * as Comlink from 'comlink';
 import type { GoodId } from '../data/goods';
+import type { TechId } from '../data/tech';
 import { generateWorld } from './mapgen';
 import * as G from './game';
 import type { GameState, World, ProjectKind } from './types';
@@ -18,6 +19,7 @@ export type Command =
   | { kind: 'merge'; from: number; into: number }
   | { kind: 'split'; fleet: number; ship: number }
   | { kind: 'rename'; fleet: number; name: string }
+  | { kind: 'research'; tech: TechId }
   | { kind: 'dismissEvent' };
 
 let world: World | null = null;
@@ -60,6 +62,7 @@ const api = {
       case 'merge': result = G.mergeFleets(state, c.from, c.into); break;
       case 'split': result = G.splitShip(state, c.fleet, c.ship); break;
       case 'rename': result = G.renameFleet(state, c.fleet, c.name); break;
+      case 'research': result = G.setResearch(state, c.tech); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
     return { result, state };

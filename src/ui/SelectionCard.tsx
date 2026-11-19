@@ -27,8 +27,8 @@ export function SelectionCard() {
           <span className="muted small">{explorer ? `led by ${explorer.name}` : 'no explorer'}{port ? ` · at ${port.name}` : ''}</span>
         </div>
         <div className="sel-stats">
-          <span title="Movement left this season">⛵ {fleet.moves}/{maxMoves(fleet)}</span>
-          <span title="Seasons of food and water" className={lowFood ? 'bad' : ''}>🍞 {fleet.supplies}/{provisionsMax(fleet)}</span>
+          <span title="Movement left this season">⛵ {fleet.moves}/{maxMoves(fleet, game)}</span>
+          <span title="Seasons of food and water" className={lowFood ? 'bad' : ''}>🍞 {fleet.supplies}/{provisionsMax(fleet, game)}</span>
           <span title="Crew">⚓ {fleet.crew}</span>
           <span title="Hold">▣ {cargoUsed(fleet)}/{cargoCapacity(fleet)}</span>
           <span title="Ships">{fleet.ships.length} ship{fleet.ships.length > 1 ? 's' : ''}</span>
@@ -39,6 +39,7 @@ export function SelectionCard() {
             <span className="muted"> · storm risk {Math.round(preview.risk * 100)}%{preview.provision ? ` · provisions ${fmt(preview.provision)}` : ''}</span>
             {preview.turns > fleet.supplies && !fleet.at && <span className="bad"> · food runs out on the way</span>}
             {preview.crossBlocked && <span className="bad"> · needs an explorer</span>}
+            {preview.deep > 0 && <span className="bad"> · open ocean: stores spoil twice as fast and storms are fiercer</span>}
           </div>
         ) : fleet.order ? (
           <div className="sel-plan muted">Under orders{fleet.order.cross ? ' to cross the ocean' : ''}: {fleet.order.path.length - 1} hexes to go.</div>
@@ -60,8 +61,8 @@ export function SelectionCard() {
           </button>
         )}
         {port && !preview && <button onClick={() => set({ drawer: 'markets', selectedPort: port.id })}>Trade</button>}
-        {port && !preview && provisionCost(world, fleet) > 0 && (
-          <button onClick={() => void run({ kind: 'provision', fleet: fleet.id })}>Provision · {fmt(provisionCost(world, fleet))}</button>
+        {port && !preview && provisionCost(world, fleet, game) > 0 && (
+          <button onClick={() => void run({ kind: 'provision', fleet: fleet.id })}>Provision · {fmt(provisionCost(world, fleet, game))}</button>
         )}
         {!preview && <button onClick={() => set({ drawer: 'fleets' })}>Details</button>}
       </div>

@@ -125,8 +125,8 @@ export class Grid {
   }
 }
 
-/** Western Europe, the Mediterranean and North Africa. Fixed. */
-export const OLD = new Grid({ id: 'old', W: 62, H: 72, latTop: 62, latPerRow: 0.5, lonLeft: -21, lonPerCol: 0.62 });
+/** Western Europe and the Mediterranean (fixed), and the African coast to the equator (procedural). */
+export const OLD = new Grid({ id: 'old', W: 56, H: 102, latTop: 62, latPerRow: 0.65, lonLeft: -26, lonPerCol: 0.8 });
 /** The western Mar Océano and the lands beyond. Procedural. */
 export const NEW = new Grid({ id: 'new', W: 88, H: 68, latTop: 62, latPerRow: 1.0, lonLeft: -108, lonPerCol: 1.0 });
 

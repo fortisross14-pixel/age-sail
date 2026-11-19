@@ -5,7 +5,7 @@ import type { SimApi, Command } from './sim/worker';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import type { MovePreview } from './sim/game';
 
-const SAVE_KEY = 'age-sail:save:v2';
+const SAVE_KEY = 'age-sail:save:v3';
 
 const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' }));
 
@@ -31,6 +31,7 @@ interface Store {
   highlightAll: boolean;
   showHelp: boolean;
   drawer: DrawerId | null;
+  courtTab: 'people' | 'research' | 'chronicle';
   /** news the player has waved away */
   dismissed: string[];
   toast: { text: string; bad?: boolean; id: number } | null;
@@ -69,7 +70,7 @@ export const useStore = create<Store>((set, get) => {
   return {
     phase: 'menu', hasSave: false, world: null, game: null, map: 'old', selectedFleet: null, selectedPort: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false,
-    drawer: null, dismissed: [], toast: null, busy: false,
+    drawer: null, courtTab: 'people', dismissed: [], toast: null, busy: false,
 
     set: (p) => set(p),
 

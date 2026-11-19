@@ -5,8 +5,9 @@ import { GOOD_INFO, GOODS, type GoodId } from '../data/goods';
 import { unitPrice, buyCost, sellValue } from '../sim/market';
 import {
   cargoUsed, cargoCapacity, crewNeeded, provisionCost, repairCost, portById, provisionsMax, maxMoves, explorerOf, isPortal, canCross,
-  allPorts, projectCost,
+  allPorts, projectCost, has, basePoints, techAvailable,
 } from '../sim/game';
+import { TECHS, BRANCH_NAMES, techById, type Branch } from '../data/tech';
 import { dateLabel, type ProjectKind } from '../sim/types';
 import { fmt } from './format';
 import { GoodIcon, ShipIcon } from './Icon';
@@ -108,8 +109,8 @@ function Fleets() {
             ))}
           </div>
           <dl className="facts">
-            <dt>Moves</dt><dd>{fleet.moves} / {maxMoves(fleet)} this season</dd>
-            <dt>Supplies</dt><dd className={fleet.supplies <= 2 ? 'bad' : ''}>{fleet.supplies} of {provisionsMax(fleet)} seasons</dd>
+            <dt>Moves</dt><dd>{fleet.moves} / {maxMoves(fleet, game)} this season</dd>
+            <dt>Supplies</dt><dd className={fleet.supplies <= 2 ? 'bad' : ''}>{fleet.supplies} of {provisionsMax(fleet, game)} seasons</dd>
             <dt>Crew</dt><dd className={fleet.crew < crewNeeded(fleet) * 0.6 ? 'bad' : ''}>{fleet.crew} / {crewNeeded(fleet)}</dd>
             <dt>Hold</dt><dd>{cargoUsed(fleet)} / {cargoCapacity(fleet)}</dd>
           </dl>
@@ -129,8 +130,8 @@ function Fleets() {
             )}
             {fleet.order && <button onClick={() => void run({ kind: 'cancelOrder', fleet: fleet.id })}>Cancel orders</button>}
             {fleet.at && (
-              <button disabled={provisionCost(world, fleet) <= 0} onClick={() => void run({ kind: 'provision', fleet: fleet.id })}>
-                Provision{provisionCost(world, fleet) > 0 ? ` · ${fmt(provisionCost(world, fleet))}` : ''}
+              <button disabled={provisionCost(world, fleet, game) <= 0} onClick={() => void run({ kind: 'provision', fleet: fleet.id })}>
+                Provision{provisionCost(world, fleet, game) > 0 ? ` · ${fmt(provisionCost(world, fleet, game))}` : ''}
               </button>
             )}
             {fleet.at && portById(world, fleet.at)?.kind !== 'native' && (
@@ -183,6 +184,7 @@ function PortMarket({ portId }: { portId: string }) {
   const book = game.markets[port.id] ?? {};
   const fleet = game.fleets.find((f) => f.id === selected && f.at === port.id) ?? game.fleets.find((f) => f.at === port.id);
   const free = fleet ? cargoCapacity(fleet) - cargoUsed(fleet) : 0;
+  const sp = has(game, 'bookkeeping') ? 0.04 : 0.08;
   const sub = port.kind === 'native' ? `Trading ground of the ${port.people}` : port.kind === 'home' ? 'Your city' : `Foreign market · ${port.nation}`;
   return (
     <div className="port-market">
@@ -207,16 +209,16 @@ function PortMarket({ portId }: { portId: string }) {
             return (
               <tr key={good} title={GOOD_INFO[good].blurb}>
                 <td className="good"><GoodIcon good={good} />{GOOD_INFO[good].name}</td>
-                <td className="num">{fmt(unitPrice(m) * 1.08)}</td>
-                <td className="num">{fmt(unitPrice(m) * 0.92)}</td>
+                <td className="num">{fmt(unitPrice(m) * (1 + sp))}</td>
+                <td className="num">{fmt(unitPrice(m) * (1 - sp))}</td>
                 <td className="num">{fmt(m.stock)}</td>
                 <td className={hist.length > 1 && hist[hist.length - 1] < hist[hist.length - 2] ? 'down' : 'up'}><Sparkline values={hist} /></td>
                 {fleet && (
                   <>
                     <td className="num">{have || '–'}</td>
                     <td className="trade">
-                      <button disabled={free <= 0 || m.stock < 1} title={`Buy ${buyQ} for ${fmt(buyCost(m, buyQ))}`} onClick={() => void run({ kind: 'buy', fleet: fleet.id, good, qty })}>Buy {buyQ}</button>
-                      <button disabled={!have} title={have ? `Sell ${sellQ} for ${fmt(sellValue(m, sellQ))}` : ''} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty })}>Sell {sellQ}</button>
+                      <button disabled={free <= 0 || m.stock < 1} title={`Buy ${buyQ} for ${fmt(buyCost(m, buyQ, sp))}`} onClick={() => void run({ kind: 'buy', fleet: fleet.id, good, qty })}>Buy {buyQ}</button>
+                      <button disabled={!have} title={have ? `Sell ${sellQ} for ${fmt(sellValue(m, sellQ, sp))}` : ''} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty })}>Sell {sellQ}</button>
                       <button disabled={!have} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty: have })}>All</button>
                     </td>
                   </>
@@ -340,14 +342,15 @@ function Court() {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const run = useStore((s) => s.run);
-  const [tab, setTab] = useState<'people' | 'chronicle'>('people');
+  const tab = useStore((s) => s.courtTab);
+  const setTab = (t: 'people' | 'research' | 'chronicle') => useStore.getState().set({ courtTab: t });
   const seville = game.cities.seville;
   const cost = projectCost({ kind: 'explorer' }, seville?.port ?? 1).cost;
   let lastTurn = -1;
   return (
     <>
-      <Tabs value={tab} onChange={setTab} tabs={[['people', 'People'], ['chronicle', 'Chronicle']]} />
-      {tab === 'people' ? (
+      <Tabs value={tab} onChange={setTab} tabs={[['people', 'People'], ['research', 'Research'], ['chronicle', 'Chronicle']]} />
+      {tab === 'research' ? <Research /> : tab === 'people' ? (
         <>
           <ul className="people">
             {game.explorers.map((e) => {
@@ -389,5 +392,47 @@ function Court() {
         </div>
       )}
     </>
+  );
+}
+
+function Research() {
+  const game = useStore((s) => s.game)!;
+  const run = useStore((s) => s.run);
+  const r = game.research;
+  const cur = r.current ? techById(r.current) : null;
+  return (
+    <div className="research">
+      <div className="research-now">
+        {cur ? (
+          <>
+            <div>Studying <b>{cur.name}</b>: {Math.floor(r.progress)} of {cur.cost}</div>
+            <div className="bar"><div style={{ width: `${Math.min(100, (r.progress / cur.cost) * 100)}%` }} /></div>
+          </>
+        ) : <div>The scholars are idle. Choose a subject below.</div>}
+        <div className="muted small">The court yields {basePoints(game)} points a season. New coasts, peoples and lands charted by your explorers add more.</div>
+      </div>
+      {(['navigation', 'commerce', 'state'] as Branch[]).map((b) => (
+        <section key={b}>
+          <h3>{BRANCH_NAMES[b]}</h3>
+          <div className="techs">
+            {TECHS.filter((t) => t.branch === b).map((t) => {
+              const known = has(game, t.id);
+              const open = techAvailable(game, t.id);
+              const now = r.current === t.id;
+              return (
+                <div key={t.id} className={`tech ${known ? 'known' : open ? 'open' : 'locked'} ${now ? 'now' : ''}`}>
+                  <div className="tech-head"><b>{t.name}</b><span className="muted small">{known ? 'known' : `${t.cost} points`}</span></div>
+                  <div className="small">{t.effect}</div>
+                  <div className="muted small"><i>{t.blurb}</i></div>
+                  {!known && t.requires.length > 0 && <div className="muted small">Needs {t.requires.map((x) => techById(x).name).join(' and ')}.</div>}
+                  {!known && open && !now && <button onClick={() => void run({ kind: 'research', tech: t.id })}>Study this</button>}
+                  {now && <div className="small"><b>Being studied</b></div>}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }

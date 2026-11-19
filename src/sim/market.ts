@@ -16,16 +16,16 @@ export function unitPrice(m: MarketGood, stock = m.stock): number {
 }
 
 /** Total cost to buy qty units, unit by unit (each purchase lowers the stock). */
-export function buyCost(m: MarketGood, qty: number): number {
+export function buyCost(m: MarketGood, qty: number, spread = 0.08): number {
   let t = 0;
-  for (let k = 0; k < qty; k++) t += Math.round(unitPrice(m, m.stock - k) * 1.08);
+  for (let k = 0; k < qty; k++) t += Math.round(unitPrice(m, m.stock - k) * (1 + spread));
   return t;
 }
 
 /** Total proceeds for selling qty units (each sale raises the stock). */
-export function sellValue(m: MarketGood, qty: number): number {
+export function sellValue(m: MarketGood, qty: number, spread = 0.08): number {
   let t = 0;
-  for (let k = 0; k < qty; k++) t += Math.round(unitPrice(m, m.stock + k) * 0.92);
+  for (let k = 0; k < qty; k++) t += Math.round(unitPrice(m, m.stock + k) * (1 - spread));
   return t;
 }
 

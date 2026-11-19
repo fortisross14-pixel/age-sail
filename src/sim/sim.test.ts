@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { generateWorld, generateOldWorld } from './mapgen';
 import {
   newGame, endTurn, buy, sell, moveFleet, previewMove, crossOcean, startProject, assignExplorer, portById, cargoUsed, maxMoves,
-  provision, provisionCost, splitShip, mergeFleets,
+  provision, provisionCost, splitShip, mergeFleets, setResearch, has,
 } from './game';
 import { makeMarket, unitPrice, buyCost, sellValue } from './market';
 import { planRoute } from './sailing';
 import { OLD, NEW } from './hex';
+import { FIXED_SOUTH } from '../data/europe';
 import { Fog } from './types';
 
 const SEEDS = [1492, 7, 42, 2024, 31337];
@@ -23,21 +24,31 @@ describe('hex grids', () => {
 });
 
 describe('the Old World board', () => {
-  it('is the same every game', () => {
-    expect(Buffer.from(generateOldWorld().terrain).equals(Buffer.from(generateOldWorld().terrain))).toBe(true);
+  it('keeps Europe fixed and generates the African coast per game', () => {
+    const a = generateOldWorld(1), b = generateOldWorld(2), a2 = generateOldWorld(1);
+    let northDiff = 0, southDiff = 0;
+    for (let i = 0; i < OLD.N; i++) {
+      if (a.terrain[i] !== a2.terrain[i]) throw new Error('not deterministic');
+      if (a.terrain[i] !== b.terrain[i]) OLD.lat(i) >= FIXED_SOUTH + 1 ? northDiff++ : southDiff++; // the seam itself may shift a little
+    }
+    expect(northDiff).toBe(0);
+    expect(southDiff).toBeGreaterThan(50);
   });
 
-  it('every European port can reach Sevilla and the western edge by sea', () => {
-    const m = generateOldWorld();
-    const ports = new Set(m.ports.map((p) => p.hex));
-    const fog = new Array(OLD.N).fill(Fog.Explored);
-    const o = { explorer: false, ports, fog, movesLeft: 12, movesMax: 12, windward: 0.5 };
-    const seville = m.ports.find((p) => p.id === 'seville')!;
-    for (const p of m.ports) {
-      if (p.id !== 'seville') expect(planRoute(OLD, m, 0, seville.hex, p.hex, o), p.name).not.toBeNull();
-      expect(planRoute(OLD, m, 0, p.hex, m.portals[30], o), `${p.name} to the west`).not.toBeNull();
-    }
-  });
+  for (const seed of SEEDS) {
+    it(`seed ${seed}: every port and coastal people can be reached from Sevilla, and so can the western edge`, () => {
+      const m = generateOldWorld(seed);
+      const ports = new Set(m.ports.map((p) => p.hex));
+      const fog = new Array(OLD.N).fill(Fog.Explored);
+      const o = { explorer: true, ports, fog, movesLeft: 12, movesMax: 12, windward: 0.5 };
+      const seville = m.ports.find((p) => p.id === 'seville')!;
+      expect(m.ports.filter((p) => p.kind === 'native').length).toBeGreaterThanOrEqual(6);
+      for (const p of m.ports) {
+        if (p.id !== 'seville') expect(planRoute(OLD, m, 0, seville.hex, p.hex, o), p.name).not.toBeNull();
+      }
+      expect(planRoute(OLD, m, 0, seville.hex, m.portals[40], o)).not.toBeNull();
+    });
+  }
 });
 
 describe('the New World board', () => {
@@ -89,7 +100,8 @@ describe('a voyage, turn by turn', () => {
     const f = state.fleets[0];
     expect(f.explorer).not.toBeNull();
     const start = f.hex;
-    const edge = world.old.portals[Math.floor(world.old.portals.length * 0.6)];
+    // a charted part of the western edge, off Iberia
+    const edge = world.old.portals.reduce((b, h) => (Math.abs(OLD.lat(h) - 40) < Math.abs(OLD.lat(b) - 40) ? h : b));
     const p = previewMove(world, state, f.id, edge)!;
     expect(p.cross).toBe(true);
     expect(p.turns).toBeGreaterThanOrEqual(2);
@@ -103,8 +115,9 @@ describe('a voyage, turn by turn', () => {
     state.fleets.pop();
   });
 
-  it('explorer sails west, finds land, meets a people, trades, and the toggle unlocks', () => {
+  it('with long-distance navigation, an explorer sails west, finds land, meets a people, trades', () => {
     const { world, state } = newGame(1492);
+    state.research.known.push('portolan', 'lateen', 'astrolabe', 'volta');
     const f = state.fleets[0];
     expect(buy(world, state, f.id, 'tools', 100).ok).toBe(true);
     const edge = world.old.portals.reduce((b, h) => (Math.abs(OLD.lat(h) - 30) < Math.abs(OLD.lat(b) - 30) ? h : b));
@@ -197,5 +210,48 @@ describe('M1 rules', () => {
       if (d > 0.35) big++;
     }
     expect(big / n).toBeLessThan(0.05); // only where one band turns into the next
+  });
+});
+
+describe('M2: near shore, deep ocean, research', () => {
+  it('Europe is known at the start, the coast beyond Cape Bojador is not', () => {
+    const { world, state } = newGame(1492);
+    const seville = portById(world, 'seville')!;
+    expect(state.fog.old[seville.hex]).toBe(Fog.Explored);
+    const natives = world.old.ports.filter((p) => p.kind === 'native');
+    expect(natives.every((p) => state.fog.old[p.hex] === Fog.Unknown)).toBe(true);
+  });
+
+  it('an explorer can sail south along the coast and meet a coastal people', () => {
+    const { world, state } = newGame(1492);
+    const f = state.fleets[0];
+    buy(world, state, f.id, 'tools', 60);
+    const site = world.old.ports.filter((p) => p.kind === 'native').sort((a, b) => OLD.lat(b.hex) - OLD.lat(a.hex))[0];
+    const turns = sailTo(world, state, f.id, site.hex, 10);
+    expect(turns).toBeLessThan(6);
+    expect(f.at).toBe(site.id);
+    expect(state.discovered).toContain(site.id);
+    expect(sell(world, state, f.id, 'tools', 60).ok).toBe(true);
+  });
+
+  it('the deep ocean spoils stores twice as fast until long-distance navigation', () => {
+    const { world, state } = newGame(1492);
+    const f = state.fleets[0];
+    const deep = [...Array(OLD.N).keys()].find((i) => world.old.deep[i] && OLD.lat(i) > 35 && OLD.lat(i) < 40)!;
+    f.hex = deep; f.at = null; f.order = null; f.supplies = 8;
+    endTurn(world, state);
+    expect(f.supplies).toBe(6);
+    state.research.known.push('volta');
+    endTurn(world, state);
+    expect(f.supplies).toBe(5);
+  });
+
+  it('research advances each season and needs its foundations', () => {
+    const { world, state } = newGame(1492);
+    expect(setResearch(state, 'volta').ok).toBe(false);
+    expect(state.research.current).toBe('portolan');
+    for (let k = 0; k < 8; k++) endTurn(world, state);
+    expect(has(state, 'portolan')).toBe(true);
+    expect(state.research.current).not.toBeNull();
   });
 });

@@ -24,7 +24,7 @@ export function Menu() {
           </button>
           <label className="seed">World seed <input value={seed} onChange={(e) => setSeed(e.target.value.replace(/\D/g, ''))} inputMode="numeric" /></label>
         </div>
-        <p className="muted small">Version 0.1 · one crown (Castile), a fixed Old World, a new New World every voyage.</p>
+        <p className="muted small">Version 0.2 · one crown (Castile): a fixed Europe, a new African coast and a new New World every voyage.</p>
       </div>
     </div>
   );

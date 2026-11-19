@@ -2,6 +2,7 @@ import { useStore } from '../store';
 import { TERRAIN_INFO } from '../data/terrain';
 import { GRIDS } from '../sim/hex';
 import { Fog, seasonOf } from '../sim/types';
+import { deepPeril } from '../sim/game';
 import { latLabel, lonLabel, windFrom, windStrength } from './format';
 
 /** One quiet line in the bottom-right corner about the hex under the pointer. */
@@ -22,6 +23,7 @@ export function HoverInfo() {
     parts.push(port ? port.name : TERRAIN_INFO[m.terrain[hex] as keyof typeof TERRAIN_INFO].name + (fog === Fog.Charted ? ' (seen from afar)' : ''));
     parts.push(`wind from the ${windFrom(wind.angle[hex])}, ${windStrength(wind.strength[hex])}`);
   }
+  if (fog !== Fog.Unknown && m.deep[hex]) parts.push(deepPeril(game) ? 'open ocean: no landmarks, stores spoil fast' : 'open ocean');
   if (m.portals.includes(hex)) parts.push(map === 'old' ? 'edge of the chart: the Mar Océano lies beyond' : 'edge of the chart: Europe lies beyond');
   return <div className="hover-line">{parts.join(' · ')}</div>;
 }

@@ -1,19 +1,49 @@
 import { GOODS, GOOD_INFO, type GoodId } from '../data/goods';
 import { SHIPS, SHIP_NAMES, PORT_UPGRADE, EXPLORER_COST, type ShipType } from '../data/ships';
-import { EUROPEAN_PORTS } from '../data/europe';
+import { EUROPEAN_PORTS, KNOWN_SOUTH, ATLANTIC_ISLANDS } from '../data/europe';
+import { TECHS, techById, type TechId } from '../data/tech';
 import { T, isWater } from '../data/terrain';
 import { GRIDS, type MapId } from './hex';
 import { generateWorld } from './mapgen';
 import { makeMarket, tickMarket, buyCost, sellValue, type MarketBook } from './market';
 import { mulberry32, hashSeed, int, type Rng } from './rng';
-import { maxMoves, crewNeeded, windwardOf, planRoute, stepCost, stormRisk, type RoutePlan } from './sailing';
+import { maxMoves as baseMoves, crewNeeded, windwardOf as baseWindward, planRoute, stepCost, stormRisk, type RoutePlan } from './sailing';
 import { explorerName } from './names';
 import {
   Fog, dateLabel, seasonOf, yearOf,
   type Fleet, type GameState, type World, type PortDef, type ChronicleEntry, type MapData, type ProjectKind, type GameEvent,
 } from './types';
 
-export { crewNeeded, maxMoves };
+export { crewNeeded };
+
+// ---------- research ----------
+
+export const has = (s: GameState, t: TechId) => s.research.known.includes(t);
+/** Research points the court produces each season, before discoveries. */
+export const basePoints = (s: GameState) => 4 + (has(s, 'chancery') ? 2 : 0);
+export const techAvailable = (s: GameState, t: TechId) => !has(s, t) && techById(t).requires.every((r) => has(s, r));
+
+export function setResearch(s: GameState, t: TechId): CommandResult {
+  if (!TECHS.some((x) => x.id === t)) return fail('No such subject.');
+  if (has(s, t)) return fail('Already known.');
+  if (!techAvailable(s, t)) return fail('Its foundations must be studied first.');
+  if (s.research.current !== t) {
+    s.research.current = t;
+    s.research.progress = 0;
+  }
+  return { ok: true, message: `The court’s scholars turn to ${techById(t).name.toLowerCase()}.` };
+}
+
+function addResearch(s: GameState, pts: number) {
+  s.research.pending += pts;
+}
+
+/** Movement points a fleet gets each season, with the Crown's knowledge. */
+export const maxMoves = (f: Fleet, s?: GameState) => baseMoves(f) + (s && has(s, 'astrolabe') ? 2 : 0);
+export const windwardOf = (f: Fleet, s?: GameState) => Math.min(1, baseWindward(f) + (s && has(s, 'lateen') ? 0.15 : 0));
+/** Without long-distance navigation the open ocean is a death trap. */
+export const deepPeril = (s: GameState) => !has(s, 'volta');
+const spread = (s: GameState) => (has(s, 'bookkeeping') ? 0.04 : 0.08);
 /** The Crown's charge for v0.1: a treasury target by a deadline. */
 export const GOAL = { treasury: 20000, turn: 4 * 10 } as const;
 
@@ -32,18 +62,18 @@ export function cargoUsed(f: Fleet): number {
 export function cargoCapacity(f: Fleet): number {
   return f.ships.reduce((t, s) => t + SHIPS[s.type].cargo, 0);
 }
-export function provisionsMax(f: Fleet): number {
-  return Math.min(...f.ships.map((s) => SHIPS[s.type].provisions));
+export function provisionsMax(f: Fleet, s?: GameState): number {
+  return Math.min(...f.ships.map((x) => SHIPS[x.type].provisions)) + (s && has(s, 'volta') ? 2 : 0);
 }
 /** Away from home, ships can only take on about half their full stores. */
-export const provisionsAbroad = (f: Fleet) => Math.floor(provisionsMax(f) / 2);
+export const provisionsAbroad = (f: Fleet, s?: GameState) => Math.floor(provisionsMax(f, s) / 2);
 /** How full the stores can be filled where the fleet is docked. */
-export function provisionCap(world: World, f: Fleet): number {
+export function provisionCap(world: World, f: Fleet, s?: GameState): number {
   const port = f.at ? portById(world, f.at) : undefined;
-  return port?.kind === 'home' ? provisionsMax(f) : provisionsAbroad(f);
+  return port?.kind === 'home' ? provisionsMax(f, s) : provisionsAbroad(f, s);
 }
-export function fleetSight(f: Fleet): number {
-  return Math.max(...f.ships.map((s) => SHIPS[s.type].sight)) + (f.explorer != null ? 2 : 0);
+export function fleetSight(f: Fleet, s?: GameState): number {
+  return Math.max(...f.ships.map((x) => SHIPS[x.type].sight)) + (f.explorer != null ? 2 : 0) + (s && has(s, 'portolan') ? 1 : 0);
 }
 export const isPortal = (w: World, f: Fleet) => w[f.map].portals.includes(f.hex);
 
@@ -54,11 +84,11 @@ export function canCross(s: GameState, f: Fleet) {
 }
 
 /** Cost to fill supplies (and, in a home port, sign on missing crew). */
-export function provisionCost(world: World, f: Fleet): number {
+export function provisionCost(world: World, f: Fleet, s?: GameState): number {
   const port = f.at ? portById(world, f.at) : undefined;
   if (!port) return 0;
   const perSeason = Math.max(4, f.crew / 2) * (port.kind === 'native' ? 1.6 : 1);
-  let cost = Math.ceil(Math.max(0, provisionCap(world, f) - f.supplies) * perSeason);
+  let cost = Math.ceil(Math.max(0, provisionCap(world, f, s) - f.supplies) * perSeason);
   if (port.kind === 'home') cost += Math.max(0, crewNeeded(f) - f.crew) * 10;
   return cost;
 }
@@ -79,18 +109,26 @@ function event(s: GameState, e: GameEvent) {
 }
 
 function nativeMarket(world: World, port: PortDef, rng: Rng): MarketBook {
-  const g = GRIDS.new;
+  const g = GRIDS[port.map];
   const lat = g.lat(port.hex);
   const book: MarketBook = { tools: makeMarket(55, 20, 6, 0, int(rng, 2, 8)) };
   const add = (good: GoodId, base: number, prod: number) => {
     book[good] = makeMarket(base, prod * 2.5, prod * 0.6, prod, prod * 2.5);
   };
+  const t = world[port.map].terrain;
+  const nearHills = g.within(port.hex, 3).some((h) => t[h] === T.Hills || t[h] === T.Mountains);
+  if (port.map === 'old') {
+    // the coast of Guinea: gold from the interior, pepper, dyes
+    if (lat >= 17) { add('dyes', 26, 7); if (rng() < 0.6) book.gold = makeMarket(80, 10, 1, 3, 8); }
+    else if (lat >= 7) { add('spices', 28, 12); if (rng() < 0.5) add('dyes', 24, 8); }
+    else { book.gold = makeMarket(65, 14, 1, 4, 12); add('spices', 30, 8); }
+    if (nearHills && !book.gold) book.gold = makeMarket(75, 10, 1, 3, 8);
+    return book;
+  }
   if (lat >= 42) add('furs', 22, 14);
   else if (lat >= 30) { add('furs', 26, 6); add('tobacco', 14, 12); }
   else if (lat >= 18) { add('tobacco', 12, 14); add('dyes', 24, 8); }
   else { add('cacao', 16, 14); add('dyes', 22, 10); }
-  const t = world.new.terrain;
-  const nearHills = g.within(port.hex, 3).some((h) => t[h] === T.Hills || t[h] === T.Mountains);
   if (nearHills || (lat < 25 && rng() < 0.3)) book.gold = makeMarket(70, 10, 1, 3, 8);
   return book;
 }
@@ -105,15 +143,32 @@ function newShip(s: GameState, type: ShipType, rng: Rng) {
 function makeFleet(s: GameState, name: string, ships: Fleet['ships'], port: PortDef): Fleet {
   const f: Fleet = {
     id: s.nextId++, name, ships, map: port.map, hex: port.hex, at: port.id, cargo: {}, crew: 0, supplies: 0,
-    moves: 0, order: null, explorer: null, trail: [], movedThisTurn: false,
+    moves: 0, order: null, explorer: null, trail: [], movedThisTurn: false, deepThisTurn: false,
   };
   f.crew = crewNeeded(f);
-  f.supplies = provisionsMax(f);
-  f.moves = maxMoves(f);
+  f.supplies = provisionsMax(f, s);
+  f.moves = maxMoves(f, s);
   return f;
 }
 
 // ---------- new game ----------
+
+/** In 1492 Iberian pilots know Europe, the Mediterranean and the African coast to about Cape Bojador. */
+function initialOldFog(world: World): number[] {
+  const g = GRIDS.old;
+  const fog = new Array<number>(g.N).fill(Fog.Unknown);
+  for (let i = 0; i < g.N; i++) {
+    const lat = g.lat(i), lon = g.lon(i);
+    // the known sea narrows toward the African coast: open to the west off Iberia, hugging the shore further south
+    const west = -19 - 7 * Math.min(1, Math.max(0, (lat - KNOWN_SOUTH) / 13)) + 0.8 * Math.sin(lat * 0.9);
+    const south = KNOWN_SOUTH + 0.6 * Math.sin(lon * 0.7);
+    if (lat >= south && lon > west) fog[i] = Fog.Explored;
+    else if (lat >= south - 2 && lon > west - 2) fog[i] = Fog.Charted;
+  }
+  for (const [, lat, lon] of ATLANTIC_ISLANDS) for (const h of g.within(g.hexAt(lat, lon), 2)) fog[h] = Fog.Explored;
+  void world;
+  return fog;
+}
 
 export function newGame(seed: number): { world: World; state: GameState } {
   const world = generateWorld(seed);
@@ -131,16 +186,17 @@ export function newGame(seed: number): { world: World; state: GameState } {
     }
     markets[p.id] = book;
   }
-  for (const p of world.new.ports) markets[p.id] = nativeMarket(world, p, rng);
+  for (const p of allPorts(world)) if (p.kind === 'native') markets[p.id] = nativeMarket(world, p, rng);
   const cities: GameState['cities'] = {};
   for (const p of EUROPEAN_PORTS) if (p.kind === 'home') cities[p.id] = { id: p.id, port: p.port ?? 1, project: null };
 
   const state: GameState = {
     seed, turn: 0, treasury: 5000, prestige: 0,
-    fog: { old: new Array(GRIDS.old.N).fill(Fog.Explored), new: new Array(GRIDS.new.N).fill(Fog.Unknown) },
+    fog: { old: initialOldFog(world), new: new Array(GRIDS.new.N).fill(Fog.Unknown) },
     fleets: [], explorers: [], cities, markets, discovered: [],
-    adoption: { furs: 1, dyes: 1, gold: 1, tools: 1, tobacco: 0.05, cacao: 0.1 },
+    adoption: { furs: 1, dyes: 1, gold: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1 },
     chronicle: [], events: [], nextId: 1, newWorldFound: false,
+    research: { known: [], current: 'portolan', progress: 0, pending: 0 },
   };
   const seville = portById(world, 'seville')!;
   const fleet = makeFleet(state, 'First Expedition', [newShip(state, 'caravel', rng), newShip(state, 'carrack', rng)], seville);
@@ -148,7 +204,7 @@ export function newGame(seed: number): { world: World; state: GameState } {
   fleet.explorer = explorer.id;
   state.explorers.push(explorer);
   state.fleets.push(fleet);
-  log(state, 'court', `The Crown of Castile grants ${explorer.name} a charter to sail west across the Mar Océano with two ships. Find new lands, open trade, and fill the treasury.`);
+  log(state, 'court', `The Crown of Castile grants ${explorer.name} two ships and a charter: chart the coasts beyond Cape Bojador, open trade with the peoples there, and fill the treasury. Pilots say no ship that sails far into the open Mar Océano comes back.`);
   log(state, 'court', `The Crown asks for ${GOAL.treasury.toLocaleString('en')} ducats in the treasury by ${dateLabel(GOAL.turn)}.`);
   return { world, state };
 }
@@ -172,9 +228,9 @@ export function buy(world: World, s: GameState, fleetId: number, g: GoodId, qty:
   if ('error' in r) return fail(r.error!);
   const m = r.m!;
   qty = Math.min(qty, Math.floor(m.stock), cargoCapacity(f) - cargoUsed(f));
-  while (qty > 0 && buyCost(m, qty) > s.treasury) qty--;
+  while (qty > 0 && buyCost(m, qty, spread(s)) > s.treasury) qty--;
   if (qty <= 0) return fail('Nothing to buy: no stock, no hold space, or no money.');
-  const cost = buyCost(m, qty);
+  const cost = buyCost(m, qty, spread(s));
   s.treasury -= cost;
   m.stock -= qty;
   f.cargo[g] = (f.cargo[g] ?? 0) + qty;
@@ -189,7 +245,7 @@ export function sell(world: World, s: GameState, fleetId: number, g: GoodId, qty
   const m = r.m!;
   qty = Math.min(qty, f.cargo[g] ?? 0);
   if (qty <= 0) return fail('Nothing to sell.');
-  const value = sellValue(m, qty);
+  const value = sellValue(m, qty, spread(s));
   s.treasury += value;
   m.stock += qty;
   f.cargo[g] = (f.cargo[g] ?? 0) - qty;
@@ -205,11 +261,11 @@ export function sell(world: World, s: GameState, fleetId: number, g: GoodId, qty
 export function provision(world: World, s: GameState, fleetId: number): CommandResult {
   const f = fleetById(s, fleetId);
   if (!f || !f.at) return fail('The fleet must be in port.');
-  const cost = provisionCost(world, f);
+  const cost = provisionCost(world, f, s);
   if (cost <= 0) return { ok: true };
   if (cost > s.treasury) return fail(`Provisions cost ${cost} ducats. The treasury cannot pay.`);
   s.treasury -= cost;
-  f.supplies = Math.max(f.supplies, provisionCap(world, f));
+  f.supplies = Math.max(f.supplies, provisionCap(world, f, s));
   if (portById(world, f.at)!.kind === 'home') f.crew = Math.max(f.crew, crewNeeded(f));
   return { ok: true, message: `Provisioned for ${cost} ducats.` };
 }
@@ -295,7 +351,7 @@ export function splitShip(s: GameState, fleetId: number, shipId: number): Comman
   f.crew -= crew;
   const nf: Fleet = {
     id: s.nextId++, name: `The ${ship.name}`, ships: [ship], map: f.map, hex: f.hex, at: f.at, cargo: {}, crew,
-    supplies: f.supplies, moves: f.moves, order: null, explorer: null, trail: [], movedThisTurn: f.movedThisTurn,
+    supplies: f.supplies, moves: f.moves, order: null, explorer: null, trail: [], movedThisTurn: f.movedThisTurn, deepThisTurn: f.deepThisTurn,
   };
   let over = cargoUsed(f) - cargoCapacity(f);
   for (const g of GOODS) {
@@ -324,12 +380,14 @@ function planFor(world: World, s: GameState, f: Fleet, dest: number) {
   const m = world[f.map];
   return planRoute(g, m, seasonOf(s.turn), f.hex, dest, {
     explorer: canExplore(f), ports: new Set(m.ports.map((p) => p.hex)), fog: s.fog[f.map],
-    movesLeft: f.moves, movesMax: maxMoves(f), windward: windwardOf(f),
+    movesLeft: f.moves, movesMax: maxMoves(f, s), windward: windwardOf(f, s),
   });
 }
 
 export interface MovePreview extends RoutePlan {
   provision: number;
+  /** hexes of deep ocean on the way, while it is still deadly */
+  deep: number;
   /** ends on a portal: the fleet will cross to the other board */
   cross: boolean;
   crossBlocked: boolean;
@@ -341,7 +399,8 @@ export function previewMove(world: World, s: GameState, fleetId: number, dest: n
   const plan = f.hex === dest ? { path: [f.hex], cost: 0, turns: 1, risk: 0, turnEnds: [] } : planFor(world, s, f, dest);
   if (!plan) return null;
   const cross = world[f.map].portals.includes(dest);
-  return { ...plan, provision: f.at ? provisionCost(world, f) : 0, cross, crossBlocked: cross && !canCross(s, f) };
+  const deep = deepPeril(s) ? plan.path.filter((h) => world[f.map].deep[h]).length + (cross ? 4 : 0) : 0;
+  return { ...plan, provision: f.at ? provisionCost(world, f, s) : 0, cross, crossBlocked: cross && !canCross(s, f), deep };
 }
 
 export interface MoveResult { result: CommandResult; trail: number[] }
@@ -353,7 +412,7 @@ export function moveFleet(world: World, s: GameState, fleetId: number, dest: num
   const p = previewMove(world, s, fleetId, dest);
   if (!p) return fail(canExplore(f) ? 'No sea route there.' : 'No charted route there. Only a fleet led by an explorer may sail into unknown waters.');
   if (p.crossBlocked) return fail('No captain will sail into the unknown west without an explorer to lead the way.');
-  if (f.at && provisionCost(world, f) > 0) provision(world, s, fleetId);
+  if (f.at && provisionCost(world, f, s) > 0) provision(world, s, fleetId);
   f.order = { path: p.path, cross: p.cross };
   f.trail = [f.hex];
   advance(world, s, f);
@@ -384,6 +443,7 @@ export function crossOcean(world: World, s: GameState, fleetId: number): Command
   f.moves = 0;
   f.trail = [];
   f.movedThisTurn = true;
+  f.deepThisTurn = true;
   reveal(world, s, f);
   log(s, 'voyage', to === 'new'
     ? `${f.name} leaves the last known waters behind and sails west into the Mar Océano.`
@@ -396,13 +456,9 @@ export function crossOcean(world: World, s: GameState, fleetId: number): Command
 function reveal(world: World, s: GameState, f: Fleet) {
   const g = GRIDS[f.map];
   const fog = s.fog[f.map];
-  const sight = fleetSight(f);
+  const m = world[f.map];
+  const sight = fleetSight(f, s);
   for (const h of g.within(f.hex, sight + 2)) if (fog[h] < Fog.Charted) fog[h] = Fog.Charted;
-  if (f.map !== 'new') {
-    for (const h of g.within(f.hex, sight)) fog[h] = Fog.Explored;
-    return;
-  }
-  const m = world.new;
   const explorer = explorerOf(s, f);
   let newLand = 0;
   let mainland = false;
@@ -414,38 +470,43 @@ function reveal(world: World, s: GameState, f: Fleet) {
       if (m.mainland[h]) mainland = true;
     }
   }
-  if (!newLand) return;
-  s.prestige += newLand * 0.25;
-  if (explorer) explorer.discoveries += newLand;
-  const who = explorer ? `${explorer.name} and the crews of ${f.ships.map((x) => `the ${x.name}`).join(' and ')}` : `The crews of ${f.name}`;
-  if (!s.newWorldFound) {
-    s.newWorldFound = true;
-    s.prestige += 30;
-    const where = mainland ? 'a long coast with no end in sight' : 'an island, unknown to any chart';
-    log(s, 'discovery', `¡Tierra! ${who} sight ${where}, far to the west across the Mar Océano.`);
-    event(s, {
-      kind: 'landfall', title: '¡Tierra!', map: 'new', hex: f.hex,
-      text: `${who} have sighted ${where}. No European chart shows it. A New World lies across the Mar Océano, and ${dateLabel(s.turn).toLowerCase()} will be remembered.`,
-    });
+  if (newLand) {
+    s.prestige += newLand * 0.25;
+    addResearch(s, newLand * 0.1);
+    if (explorer) explorer.discoveries += newLand;
   }
-  if (mainland && !s.chronicle.some((c) => c.text.includes('coast that runs north and south'))) {
-    if (s.chronicle.some((c) => c.text.startsWith('¡Tierra!') && c.text.includes('island'))) {
-      s.prestige += 20;
-      log(s, 'discovery', `${who} reach a coast that runs north and south beyond sight. This is no island: it is a continent.`);
-    } else {
-      log(s, 'discovery', `The coast that runs north and south beyond sight is surely a continent.`);
+  const who = explorer ? `${explorer.name} and the crews of ${f.ships.map((x) => `the ${x.name}`).join(' and ')}` : `The crews of ${f.name}`;
+  if (newLand && f.map === 'new') {
+    if (!s.newWorldFound) {
+      s.newWorldFound = true;
+      s.prestige += 30;
+      addResearch(s, 10);
+      const where = mainland ? 'a long coast with no end in sight' : 'an island, unknown to any chart';
+      log(s, 'discovery', `¡Tierra! ${who} sight ${where}, far to the west across the Mar Océano.`);
+      event(s, {
+        kind: 'landfall', title: '¡Tierra!', map: 'new', hex: f.hex,
+        text: `${who} have sighted ${where}. No European chart shows it. A New World lies across the Mar Océano, and ${dateLabel(s.turn).toLowerCase()} will be remembered.`,
+      });
+    }
+    if (mainland && !s.chronicle.some((c) => c.text.includes('coast that runs north and south'))) {
+      if (s.chronicle.some((c) => c.text.startsWith('¡Tierra!') && c.text.includes('island'))) {
+        s.prestige += 20;
+        log(s, 'discovery', `${who} reach a coast that runs north and south beyond sight. This is no island: it is a continent.`);
+      } else {
+        log(s, 'discovery', 'The coast that runs north and south beyond sight is surely a continent.');
+      }
     }
   }
   for (const p of m.ports) {
-    if (!s.discovered.includes(p.id) && s.fog.new[p.hex] === Fog.Explored) {
-      s.discovered.push(p.id);
-      s.prestige += 15;
-      if (explorer) explorer.discoveries += 10;
-      const goods = Object.keys(s.markets[p.id] ?? {}).filter((g) => g !== 'tools').map((g) => GOOD_INFO[g as GoodId].name.toLowerCase());
-      const text = `${explorer ? explorer.name : f.name} meets the ${p.people} at ${p.name}. They offer ${goods.join(' and ')}, and ask for iron tools.`;
-      log(s, 'discovery', text);
-      if (s.discovered.length === 1) event(s, { kind: 'people', title: `The ${p.people}`, text, map: 'new', hex: p.hex });
-    }
+    if (p.kind !== 'native' || s.discovered.includes(p.id) || fog[p.hex] !== Fog.Explored) continue;
+    s.discovered.push(p.id);
+    s.prestige += 15;
+    addResearch(s, 4);
+    if (explorer) explorer.discoveries += 10;
+    const goods = Object.keys(s.markets[p.id] ?? {}).filter((g) => g !== 'tools').map((g) => GOOD_INFO[g as GoodId].name.toLowerCase());
+    const text = `${explorer ? explorer.name : f.name} meets the ${p.people} at ${p.name}. They offer ${goods.join(' and ')}, and ask for iron tools.`;
+    log(s, 'discovery', text);
+    if (s.discovered.length === 1) event(s, { kind: 'people', title: `The ${p.people}`, text, map: p.map, hex: p.hex });
   }
 }
 
@@ -495,7 +556,7 @@ function advance(world: World, s: GameState, f: Fleet) {
   const g = GRIDS[f.map];
   const m = world[f.map];
   const season = seasonOf(s.turn);
-  const full = maxMoves(f);
+  const full = maxMoves(f, s);
   const rng = mulberry32(hashSeed(s.seed, s.turn, f.id, f.hex, f.moves * 2));
   while (o.path.length > 1 && s.fleets.includes(f)) {
     const next = o.path[1];
@@ -513,7 +574,7 @@ function advance(world: World, s: GameState, f: Fleet) {
       o.path = again.path;
       continue;
     }
-    const cost = stepCost(g, m, season, f.hex, next, windwardOf(f));
+    const cost = stepCost(g, m, season, f.hex, next, windwardOf(f, s));
     if (f.moves < cost && f.moves < full) break;
     f.moves = Math.max(0, f.moves - cost);
     if (f.at) f.at = null;
@@ -522,7 +583,9 @@ function advance(world: World, s: GameState, f: Fleet) {
     o.path.shift();
     f.trail.push(next);
     reveal(world, s, f);
-    if (rng() < stormRisk(g, m, season, next)) {
+    const deep = m.deep[next] && deepPeril(s);
+    if (deep) f.deepThisTurn = true;
+    if (rng() < stormRisk(g, m, season, next) * (deep ? 3 : 1)) {
       storm(s, f, rng);
       if (!s.fleets.includes(f)) return;
     }
@@ -549,18 +612,25 @@ export function endTurn(world: World, s: GameState): void {
   for (const f of [...s.fleets]) {
     if (f.at) continue;
     const g = GRIDS[f.map];
-    f.supplies -= 1;
+    const deep = deepPeril(s) && (f.deepThisTurn || world[f.map].deep[f.hex]);
+    f.supplies -= deep ? 2 : 1;
+    if (deep && f.supplies <= 2 && f.supplies >= 0) log(s, 'peril', `Far out in the open ocean, the stores of ${f.name} rot and the water turns foul.`);
     const shore = g.neighbors(f.hex).some((j) => {
       const t = world[f.map].terrain[j];
       return !isWater(t) && t !== T.Desert && t !== T.Tundra;
     });
-    if (!f.movedThisTurn && shore && f.supplies < provisionsAbroad(f)) {
-      f.supplies = Math.min(provisionsAbroad(f), f.supplies + 2);
+    if (!f.movedThisTurn && shore && f.supplies < provisionsAbroad(f, s)) {
+      f.supplies = Math.min(provisionsAbroad(f, s), f.supplies + 2);
       log(s, 'voyage', `${f.name} lies at anchor off the coast. Boats go ashore for fresh water, fruit and game.`);
     }
     if (f.supplies < 0) {
       f.supplies = 0;
-      const lost = Math.max(1, Math.ceil(f.crew * 0.25));
+      // starving in the open ocean, far from any landmark, is usually the end
+      if (deep && rng() < 0.3) {
+        loseFleet(s, f, `${f.name} sailed into the open ocean with empty stores and was never seen again.`);
+        continue;
+      }
+      const lost = Math.max(1, Math.ceil(f.crew * (deep ? 0.45 : 0.25)));
       f.crew -= lost;
       if (f.crew <= 0) {
         loseFleet(s, f, `Hunger and scurvy finish the last of the crew of ${f.name}. The ships drift on, empty.`);
@@ -572,7 +642,8 @@ export function endTurn(world: World, s: GameState): void {
   // repairs come free in no port; idle storms at sea
   for (const f of [...s.fleets]) {
     if (f.at || f.movedThisTurn) continue;
-    if (rng() < stormRisk(GRIDS[f.map], world[f.map], seasonOf(s.turn), f.hex) * 4) storm(s, f, rng);
+    const deep = deepPeril(s) && world[f.map].deep[f.hex] ? 3 : 1;
+    if (rng() < stormRisk(GRIDS[f.map], world[f.map], seasonOf(s.turn), f.hex) * 4 * deep) storm(s, f, rng);
   }
 
   // city projects
@@ -601,10 +672,35 @@ export function endTurn(world: World, s: GameState): void {
 
   // markets
   for (const [id, book] of Object.entries(s.markets)) {
-    const european = portById(world, id)?.map === 'old';
+    const port = portById(world, id);
+    const european = port?.kind !== 'native';
+    const boost = !european && has(s, 'factors') && s.discovered.includes(id) ? 1.5 : 1;
     for (const g of GOODS) {
       const m = book[g];
-      if (m) tickMarket(m, european ? s.adoption[g] ?? 1 : 1);
+      if (!m) continue;
+      const prod = m.production;
+      m.production = prod * boost;
+      tickMarket(m, european ? s.adoption[g] ?? 1 : 1);
+      m.production = prod;
+    }
+  }
+
+  // research: the court's scholars, plus what explorers brought back
+  const r = s.research;
+  const pts = basePoints(s) + r.pending;
+  r.pending = 0;
+  if (r.current) {
+    r.progress += pts;
+    const t = techById(r.current);
+    if (r.progress >= t.cost) {
+      r.known.push(t.id);
+      r.progress = 0;
+      r.current = TECHS.find((x) => techAvailable(s, x.id))?.id ?? null;
+      log(s, 'court', `The court’s scholars master ${t.name.toLowerCase()}. ${t.effect}`);
+      if (t.id === 'volta') {
+        event(s, { kind: 'tech', title: 'Volta do mar', map: 'old', hex: portById(world, 'seville')!.hex,
+          text: 'Pilots have learned to sail wide into the open ocean and find the winds that bring them home. The Mar Océano is still dangerous, but it can be crossed.' });
+      }
     }
   }
 
@@ -629,8 +725,9 @@ export function endTurn(world: World, s: GameState): void {
 
   // a new season: fresh movement, standing orders carry on
   for (const f of s.fleets) {
-    f.moves = maxMoves(f);
+    f.moves = maxMoves(f, s);
     f.movedThisTurn = false;
+    f.deepThisTurn = false;
     f.trail = [f.hex];
   }
   for (const f of [...s.fleets]) {

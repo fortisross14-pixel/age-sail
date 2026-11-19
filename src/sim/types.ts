@@ -1,5 +1,6 @@
 import type { GoodId } from '../data/goods';
 import type { ShipType } from '../data/ships';
+import type { TechId } from '../data/tech';
 import type { MapId } from './hex';
 
 export type { MapId };
@@ -44,6 +45,8 @@ export interface MapData {
   portals: number[];
   /** 1 where a hex belongs to a large landmass (not a small island) */
   mainland: Uint8Array;
+  /** 1 for open ocean far from any land, where ships without long-distance navigation suffer */
+  deep: Uint8Array;
 }
 
 export interface World {
@@ -105,6 +108,8 @@ export interface Fleet {
   /** hexes moved through most recently, for animation */
   trail: number[];
   movedThisTurn: boolean;
+  /** sailed through deep ocean this season */
+  deepThisTurn: boolean;
 }
 
 export type ProjectKind = { kind: 'ship'; ship: ShipType } | { kind: 'port' } | { kind: 'explorer' };
@@ -124,7 +129,7 @@ export interface ChronicleEntry {
 
 /** A big moment shown as a card: the first landfall, meeting a people. */
 export interface GameEvent {
-  kind: 'landfall' | 'people' | 'lost';
+  kind: 'landfall' | 'people' | 'lost' | 'tech';
   title: string;
   text: string;
   map: MapId;
@@ -150,6 +155,14 @@ export interface GameState {
   nextId: number;
   /** true once anyone has sighted New World land */
   newWorldFound: boolean;
+  research: {
+    known: TechId[];
+    current: TechId | null;
+    /** points put into the current subject */
+    progress: number;
+    /** points earned from discoveries this season, added at the end of the turn */
+    pending: number;
+  };
 }
 
 export const seasonOf = (turn: number) => turn % 4;

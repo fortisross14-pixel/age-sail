@@ -93,7 +93,7 @@ export function drawWash(g: Grid, m: MapData, fd: DistanceField, seed: number): 
   const px = img.data;
   const noise = createNoise2D(mulberry32(hashSeed(seed, 78)));
   const colors = Object.fromEntries(Object.entries(TERRAIN_INFO).map(([k, v]) => [k, hexRgb(v.wash)]));
-  const sea = hexRgb('#97aeb5'), shore = hexRgb('#b4c6c0');
+  const sea = hexRgb('#97aeb5'), shore = hexRgb('#b4c6c0'), abyss = hexRgb('#7d97a3');
   const sigma2 = 2 * (0.5 * HEX_W) ** 2;
   for (let py = 0; py < h; py++) {
     for (let pxi = 0; pxi < w; pxi++) {
@@ -123,9 +123,17 @@ export function drawWash(g: Grid, m: MapData, fd: DistanceField, seed: number): 
         a = (0.62 + 0.2 * rim + mottle * 0.12) * smooth(-1.5, 1.5, d);
       } else {
         const t = smooth(-2, -26, d);
-        r = shore[0] + (sea[0] - shore[0]) * t;
-        gr = shore[1] + (sea[1] - shore[1]) * t;
-        b = shore[2] + (sea[2] - shore[2]) * t;
+        // the open ocean reads a shade darker, blended across neighbouring hexes
+        const hh = g.atPixel(x, y);
+        let dp = 0;
+        if (hh >= 0) {
+          const ns = g.neighbors(hh);
+          dp = (m.deep[hh] * 2 + ns.reduce((a, j) => a + m.deep[j], 0)) / (2 + ns.length);
+        }
+        const base = [sea[0] + (abyss[0] - sea[0]) * dp, sea[1] + (abyss[1] - sea[1]) * dp, sea[2] + (abyss[2] - sea[2]) * dp];
+        r = shore[0] + (base[0] - shore[0]) * t;
+        gr = shore[1] + (base[1] - shore[1]) * t;
+        b = shore[2] + (base[2] - shore[2]) * t;
         a = 0.5 + mottle * 0.12 + 0.06 * t;
       }
       px[o] = r; px[o + 1] = gr; px[o + 2] = b; px[o + 3] = Math.max(0, Math.min(1, a)) * 255;

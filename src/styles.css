@@ -346,3 +346,19 @@ button.on { background: linear-gradient(#e9c45c, #cf9f2c); border-color: #8a6516
   .dock-btn { width: 66px; height: 62px; font-size: 13px; }
   .dock-btn img { height: 30px; }
 }
+
+/* research */
+.research-chip { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 10px; font: 14px var(--sans); max-width: 260px; }
+.research-chip > span:nth-child(2) { display: grid; gap: 3px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.research-bar { display: block; height: 4px; width: 120px; background: rgba(90, 61, 34, 0.18); border-radius: 2px; overflow: hidden; }
+.research-bar > span { display: block; height: 100%; background: var(--sea); }
+.research-now { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 250, 236, 0.6); margin-bottom: 6px; }
+.research-now .bar > div { background: var(--sea); }
+.techs { display: grid; gap: 6px; }
+.tech { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 250, 236, 0.5); }
+.tech-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.tech.known { background: rgba(61, 107, 56, 0.1); border-color: rgba(61, 107, 56, 0.45); }
+.tech.locked { opacity: 0.6; }
+.tech.now { border-color: var(--sea); box-shadow: inset 4px 0 0 var(--sea); }
+.tech button { margin-top: 5px; min-height: 28px; padding: 3px 10px; }
+@media (max-width: 1250px) { .research-chip { display: none; } }

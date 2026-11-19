@@ -1,6 +1,6 @@
 import { createNoise2D } from 'simplex-noise';
 import { T, isWater } from '../data/terrain';
-import { OLD_WORLD, ATLANTIC_ISLANDS, STRAITS, EUROPEAN_PORTS, DECOR_CITIES } from '../data/europe';
+import { OLD_WORLD, ATLANTIC_ISLANDS, STRAITS, EUROPEAN_PORTS, DECOR_CITIES, AFRICA_OUTLINE, FIXED_SOUTH } from '../data/europe';
 import { OLD, NEW, type Grid } from './hex';
 import { mulberry32, hashSeed, range, int, shuffle, type Rng } from './rng';
 import type { World, MapData, PortDef, WindField } from './types';
@@ -33,6 +33,9 @@ function biomeFor(lat: number, elev: number, moist: number, oldWorld: boolean): 
   if (elev > 0.62) return T.Hills;
   const a = Math.abs(lat);
   if (oldWorld) {
+    if (lat < 7) return moist > 0.3 ? T.Jungle : T.Savanna;
+    if (lat < 13) return moist > 0.6 ? T.Jungle : moist > 0.3 ? T.Savanna : T.Plains;
+    if (lat < 17) return moist > 0.55 ? T.Savanna : T.Plains;
     if (lat < 31) return moist > 0.8 ? T.Savanna : T.Desert;
     if (lat > 57) return T.Taiga;
     if (lat < 40) return moist > 0.55 ? T.Forest : T.Plains;
@@ -101,7 +104,74 @@ function shapeTerrain(g: Grid, land: Uint8Array, seed: number, oldWorld: boolean
     comps.push(comp);
     if (comp.length >= 40) for (const c of comp) mainland[c] = 1;
   }
-  return { terrain, elevation, toSea, mainland, comps };
+  // open ocean: more than DEEP hexes from any land
+  const toLand = new Int32Array(g.N).fill(-1);
+  let front: number[] = [];
+  for (let i = 0; i < g.N; i++) if (land[i]) { toLand[i] = 0; front.push(i); }
+  while (front.length) {
+    const next: number[] = [];
+    for (const i of front) for (const j of g.neighbors(i)) if (toLand[j] < 0) { toLand[j] = toLand[i] + 1; next.push(j); }
+    front = next;
+  }
+  const deep = new Uint8Array(g.N);
+  for (let i = 0; i < g.N; i++) if (toLand[i] < 0 || toLand[i] > DEEP) deep[i] = 1;
+  return { terrain, elevation, toSea, mainland, comps, deep };
+}
+
+/** Water more than this many hexes from land is the deep ocean. */
+export const DEEP = 5;
+
+/** Rivers: walk downhill toward the sea from inland hexes. */
+function makeRivers(g: Grid, terrain: Uint8Array, elevation: Float32Array, toSea: Int32Array, rng: Rng, where: (i: number) => boolean, max: number) {
+  const rivers: number[][] = [];
+  const used = new Uint8Array(g.N);
+  const candidates = shuffle(rng, [...Array(g.N).keys()].filter((i) => where(i) && !isWater(terrain[i]) && toSea[i] >= 6));
+  for (const src of candidates) {
+    if (rivers.length >= max) break;
+    if (used[src]) continue;
+    const path = [src];
+    let cur = src;
+    while (toSea[cur] > 0 && path.length < 60) {
+      const opts = g.neighbors(cur).filter((j) => toSea[j] < toSea[cur]);
+      if (!opts.length) break;
+      opts.sort((a, b) => elevation[a] - elevation[b]);
+      cur = rng() < 0.7 ? opts[0] : opts[opts.length - 1];
+      path.push(cur);
+      if (used[cur]) break;
+    }
+    if (path.length >= 6 && path.every((p, k) => k === path.length - 1 || !isWater(terrain[p]))) {
+      for (const p of path) { used[p] = 1; for (const q of g.neighbors(p)) used[q] = 1; }
+      rivers.push(path);
+      for (const p of path) if (terrain[p] === T.Desert) terrain[p] = T.Plains;
+    }
+  }
+  return rivers;
+}
+
+/** Spread trading grounds of native peoples along coasts, a few per latitude band. */
+function placeSites(g: Grid, terrain: Uint8Array, rng: Rng, map: 'old' | 'new', bands: [number, number, number][], ok: (i: number) => boolean): PortDef[] {
+  const coast = shuffle(rng, [...Array(g.N).keys()].filter((i) => coastal(g, terrain, i) && ok(i)));
+  coast.sort((a, b) => (map === 'new' ? g.lon(b) - g.lon(a) : g.lon(a) - g.lon(b))); // shores facing the ocean first
+  const sites: number[] = [];
+  for (const [lo, hi, n] of bands) {
+    let placed = 0;
+    for (const i of coast) {
+      if (placed >= n) break;
+      if (g.lat(i) < lo || g.lat(i) >= hi) continue;
+      if (sites.some((x) => g.distance(x, i) < 7)) continue;
+      // only shores that face open water, so ships can reach them
+      if (!g.neighbors(i).some((j) => isWater(terrain[j]) && g.neighbors(j).filter((k) => isWater(terrain[k])).length >= 3)) continue;
+      sites.push(i);
+      placed++;
+    }
+  }
+  return sites.map((hex) => {
+    const people = nativeWord(rng);
+    return {
+      id: `site-${map}-${hex}`, name: nativeWord(rng), map, hex, kind: 'native' as const, people,
+      blurb: `A trading ground of the ${people} people, who meet strangers here to barter.`,
+    };
+  });
 }
 
 function coastal(g: Grid, terrain: Uint8Array, i: number) {
@@ -123,31 +193,92 @@ const edgePortals = (g: Grid, terrain: Uint8Array, col: number) =>
 
 // ---------------- Old World ----------------
 
-export function generateOldWorld(): MapData {
+/**
+ * The African coast south of FIXED_SOUTH: the outline jittered, warped by noise, and decorated with
+ * capes, bays and island groups. Different every game.
+ */
+function africaLand(seed: number): (lat: number, lon: number) => boolean {
+  const rng = mulberry32(hashSeed(seed, 21));
+  const nx = createNoise2D(mulberry32(hashSeed(seed, 22)));
+  const ny = createNoise2D(mulberry32(hashSeed(seed, 23)));
+  const ring = AFRICA_OUTLINE.map(([lon, lat, j]) => [lon + range(rng, -j, j), lat + range(rng, -j * 0.4, j * 0.4)] as [number, number]);
+  const blobs: (Blob & { sea: boolean })[] = [];
+  // capes and bays along the coast
+  const coastPts = ring.slice(2, -3);
+  for (let k = 0; k < 7; k++) {
+    const [lon, lat] = coastPts[int(rng, 0, coastPts.length - 1)];
+    const sea = k % 2 === 1;
+    blobs.push({ lat: lat + range(rng, -1.5, 1.5), lon: lon + (sea ? range(rng, 0.3, 1.2) : range(rng, -1.8, -0.6)), r: range(rng, 0.9, 1.8), w: 1, sea });
+  }
+  // a Cape Verde-like archipelago, Canary-like islets near the known coast, Gulf islands, and strays
+  const group = (lat: number, lon: number, n: number, spread: number, r: [number, number]) => {
+    for (let k = 0; k < n; k++) blobs.push({ lat: lat + range(rng, -spread, spread), lon: lon + range(rng, -spread, spread), r: range(rng, r[0], r[1]), w: 1, sea: false });
+  };
+  if (rng() < 0.85) group(range(rng, 13, 18), range(rng, -25, -21.5), int(rng, 4, 7), 1.8, [0.4, 0.8]);
+  group(range(rng, 27.6, 29), range(rng, -18, -15), int(rng, 3, 5), 1.4, [0.35, 0.6]);
+  if (rng() < 0.8) group(range(rng, -1.5, 3.5), range(rng, 5, 8), int(rng, 2, 3), 1.2, [0.4, 0.7]);
+  group(range(rng, 2, 25), range(rng, -25, -20), int(rng, 1, 3), 4, [0.4, 0.9]);
+  return (lat, lon) => {
+    const fade = Math.min(1, Math.max(0, (FIXED_SOUTH - lat) / 3)); // no warp at the seam with fixed Morocco
+    const w = 1.7 * fade;
+    const wl = lon + fbm(nx, lon * 0.16, lat * 0.16) * w;
+    const wa = lat + fbm(ny, lon * 0.16 + 9, lat * 0.16) * w;
+    let land = pointInRing(wl, wa, ring);
+    for (const b of blobs) {
+      const d2 = ((lat - b.lat) ** 2 + (lon - b.lon) ** 2) / (b.r * b.r);
+      if (d2 < 1) land = !b.sea;
+    }
+    return land;
+  };
+}
+
+export function generateOldWorld(seed: number): MapData {
   const g = OLD;
+  const africa = africaLand(seed);
   const land = new Uint8Array(g.N);
-  for (let i = 0; i < g.N; i++) land[i] = OLD_WORLD.some((ring) => pointInRing(g.lon(i), g.lat(i), ring)) ? 1 : 0;
+  for (let i = 0; i < g.N; i++) {
+    const lat = g.lat(i), lon = g.lon(i);
+    land[i] = (lat >= FIXED_SOUTH ? OLD_WORLD.some((ring) => pointInRing(lon, lat, ring)) : africa(lat, lon)) ? 1 : 0;
+  }
   for (const [, lat, lon] of ATLANTIC_ISLANDS) land[g.hexAt(lat, lon)] = 1;
   for (const [lat, lon] of STRAITS) land[g.hexAt(lat, lon)] = 0;
-  const { terrain, elevation, mainland } = shapeTerrain(g, land, OLD_WORLD_SEED, true);
+  // Europe is shaped with a fixed seed so it looks the same every game; the south with the game's seed
+  const north = shapeTerrain(g, land.slice(), OLD_WORLD_SEED, true);
+  const south = shapeTerrain(g, land.slice(), seed, true);
+  const isNorth = (i: number) => g.lat(i) >= FIXED_SOUTH;
+  const terrain = new Uint8Array(g.N), elevation = new Float32Array(g.N);
+  for (let i = 0; i < g.N; i++) {
+    const src = isNorth(i) ? north : south;
+    terrain[i] = src.terrain[i];
+    elevation[i] = src.elevation[i];
+  }
   for (const [lat, lon] of [[46.3, 8.0], [46.5, 9.5], [46.6, 11.0], [46.8, 12.5], [42.7, 1.5], [42.7, 0.2], [42.8, -1.2], [37.1, -3.3]] as const) {
     const h = g.hexAt(lat, lon);
     if (!isWater(terrain[h])) { terrain[h] = T.Mountains; elevation[h] = 0.9; }
   }
+  const rng = mulberry32(hashSeed(seed, 24));
+  const rivers = makeRivers(g, terrain, elevation, south.toSea, rng, (i) => g.lat(i) < FIXED_SOUTH - 2, 5);
+
   const taken = new Set<number>();
   const ports: PortDef[] = EUROPEAN_PORTS.map((p) => {
     const hex = nearestCoastal(g, terrain, g.hexAt(p.lat, p.lon), taken);
     taken.add(hex);
     return { id: p.id, name: p.name, map: 'old', hex, kind: p.kind, nation: p.nation, blurb: p.blurb };
   });
+  const coastalPeoples = placeSites(g, terrain, rng, 'old', [[20, 27.5, 2], [13, 20, 2], [7, 13, 2], [2, 7, 2], [-4, 2, 1]], (i) => g.lat(i) < 27.5 && !taken.has(i));
+  for (const p of coastalPeoples) p.blurb = `A trading ground of the ${p.people}, who have heard rumours of strangers in ships from the north.`;
+  ports.push(...coastalPeoples);
   const decorCities = DECOR_CITIES.map(([name, lat, lon]) => {
     const h = g.hexAt(lat, lon);
     return { name, hex: isWater(terrain[h]) ? nearestCoastal(g, terrain, h, taken) : h };
   });
-  const wind = [0, 1, 2, 3].map((s) => windField(g, OLD_WORLD_SEED, s, terrain));
+  const islandNames = south.comps
+    .filter((c) => c.length >= 2 && c.length < 40 && g.lat(c[0]) < FIXED_SOUTH - 1)
+    .map((c) => ({ name: islandName(rng), hex: [...c].sort((a, b) => south.toSea[b] - south.toSea[a])[0] }));
+  const wind = [0, 1, 2, 3].map((sn) => windField(g, OLD_WORLD_SEED, sn, terrain));
   return {
-    id: 'old', terrain, elevation, rivers: [], wind, ports, decorCities, islandNames: [], monsters: [],
-    portals: edgePortals(g, terrain, 0), mainland,
+    id: 'old', terrain, elevation, rivers, wind, ports, decorCities, islandNames, monsters: [],
+    portals: edgePortals(g, terrain, 0), mainland: south.mainland, deep: south.deep,
   };
 }
 
@@ -227,57 +358,12 @@ export function generateNewWorld(seed: number): MapData {
     land[i] = v > 0 ? 1 : 0;
   }
   const ridge = (lat: number, lon: number) => Math.max(0, 1 - Math.abs(lon + 100 + lat * 0.25) / 7) * 0.26;
-  const { terrain, elevation, toSea, comps } = shapeTerrain(g, land, seed, false, ridge);
+  const { terrain, elevation, toSea, comps, deep } = shapeTerrain(g, land, seed, false, ridge);
   const mainland = new Uint8Array(g.N);
   for (const c of comps) if (c.length >= 40) for (const h of c) mainland[h] = 1;
 
-  // rivers: walk downhill toward the sea from inland hexes
-  const rivers: number[][] = [];
-  const used = new Uint8Array(g.N);
-  const candidates = shuffle(rng, [...Array(g.N).keys()].filter((i) => !isWater(terrain[i]) && toSea[i] >= 6));
-  for (const src of candidates) {
-    if (rivers.length >= 10) break;
-    if (used[src]) continue;
-    const path = [src];
-    let cur = src;
-    while (toSea[cur] > 0 && path.length < 60) {
-      const opts = g.neighbors(cur).filter((j) => toSea[j] < toSea[cur]);
-      if (!opts.length) break;
-      opts.sort((a, b) => elevation[a] - elevation[b]);
-      cur = rng() < 0.7 ? opts[0] : opts[opts.length - 1];
-      path.push(cur);
-      if (used[cur]) break;
-    }
-    if (path.length >= 6 && path.every((p, k) => k === path.length - 1 || !isWater(terrain[p]))) {
-      for (const p of path) { used[p] = 1; for (const q of g.neighbors(p)) used[q] = 1; }
-      rivers.push(path);
-      for (const p of path) if (terrain[p] === T.Desert) terrain[p] = T.Plains;
-    }
-  }
-
-  // native trading sites spread along mainland and island coasts, by latitude band
-  const coast = shuffle(rng, [...Array(g.N).keys()].filter((i) => coastal(g, terrain, i) && g.lon(i) < -45));
-  coast.sort((a, b) => g.lon(b) - g.lon(a)); // prefer eastern (reachable) shores first
-  const sites: number[] = [];
-  for (const [lo, hi] of [[44, 62], [33, 44], [22, 33], [10, 22], [-6, 10]]) {
-    let placed = 0;
-    for (const i of coast) {
-      if (placed >= 2) break;
-      if (g.lat(i) < lo || g.lat(i) >= hi) continue;
-      if (sites.some((s) => g.distance(s, i) < 7)) continue;
-      // only shores that face open water, so ships can reach them
-      if (!g.neighbors(i).some((j) => isWater(terrain[j]) && g.neighbors(j).filter((k) => isWater(terrain[k])).length >= 3)) continue;
-      sites.push(i);
-      placed++;
-    }
-  }
-  const ports: PortDef[] = sites.map((hex) => {
-    const people = nativeWord(rng);
-    return {
-      id: `site-${hex}`, name: nativeWord(rng), map: 'new', hex, kind: 'native', people,
-      blurb: `A trading ground of the ${people} people, who meet strangers here to barter.`,
-    };
-  });
+  const rivers = makeRivers(g, terrain, elevation, toSea, rng, () => true, 10);
+  const ports = placeSites(g, terrain, rng, 'new', [[44, 62, 2], [33, 44, 2], [22, 33, 2], [10, 22, 2], [-6, 10, 2]], (i) => g.lon(i) < -45);
 
   const islandNames = comps
     .filter((c) => c.length >= 3 && c.length < 40)
@@ -295,7 +381,7 @@ export function generateNewWorld(seed: number): MapData {
   const wind = [0, 1, 2, 3].map((s) => windField(g, seed, s, terrain));
   return {
     id: 'new', terrain, elevation, rivers, wind, ports, decorCities: [], islandNames, monsters,
-    portals: edgePortals(g, terrain, g.W - 1), mainland,
+    portals: edgePortals(g, terrain, g.W - 1), mainland, deep,
   };
 }
 
@@ -335,5 +421,5 @@ export function windField(g: Grid, seed: number, season: number, terrain: Uint8A
 }
 
 export function generateWorld(seed: number): World {
-  return { seed, old: generateOldWorld(), new: generateNewWorld(seed) };
+  return { seed, old: generateOldWorld(seed), new: generateNewWorld(seed) };
 }

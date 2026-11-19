@@ -1,6 +1,7 @@
 import { useStore, newWorldOpen } from '../store';
 import { dateLabel, seasonOf, SEASONS } from '../sim/types';
-import { GOAL } from '../sim/game';
+import { GOAL, basePoints } from '../sim/game';
+import { techById } from '../data/tech';
 import { fmt } from './format';
 import { spriteUrl } from '../render/assets';
 
@@ -35,6 +36,16 @@ export function Hud() {
         <div className="goal-text">{turnsLeft > 0 ? <>Crown’s charge: {fmt(GOAL.treasury)} by {dateLabel(GOAL.turn)}</> : <>The Crown’s deadline has passed</>}</div>
         <div className="goal-bar"><div style={{ width: `${goalPct}%` }} /></div>
       </div>
+      <button className="research-chip" onClick={() => set({ drawer: 'court', courtTab: 'research' })} title="Research (opens the court)">
+        <span aria-hidden>📜</span>
+        {game.research.current ? (
+          <span>
+            {techById(game.research.current).name}
+            <span className="research-bar"><span style={{ width: `${Math.min(100, (game.research.progress / techById(game.research.current).cost) * 100)}%` }} /></span>
+          </span>
+        ) : <span>Choose research</span>}
+        <span className="muted small">+{basePoints(game)}</span>
+      </button>
       <div className="spacer" />
       <div className="maps" role="tablist" aria-label="Map">
         <button role="tab" aria-selected={map === 'old'} className={map === 'old' ? 'on' : ''} onClick={() => setMap('old')} title="The Old World (M)">Old World</button>
