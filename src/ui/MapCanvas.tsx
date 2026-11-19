@@ -37,7 +37,7 @@ export function MapCanvas() {
             if (fleet && fleet.hex !== hex) {
               if (again) void s.confirmPreview();
               else { s.set({ selectedPort: port.id }); void s.planTo(hex); }
-            } else s.selectPort(port.id);
+            } else s.set({ selectedPort: port.id, preview: null, drawer: port.kind === 'home' && !fleet ? 'cities' : 'markets' });
             return;
           }
           const known = g.fog[map][hex] >= Fog.Charted;
@@ -46,7 +46,7 @@ export function MapCanvas() {
             else void s.planTo(hex);
             return;
           }
-          s.set({ preview: null, selectedPort: null });
+          s.set({ preview: null });
         },
         onRightClick: async (map, hex) => {
           const s = useStore.getState();

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateWorld, generateOldWorld } from './mapgen';
 import {
   newGame, endTurn, buy, sell, moveFleet, previewMove, crossOcean, startProject, assignExplorer, portById, cargoUsed, maxMoves,
+  provision, provisionCost, splitShip, mergeFleets,
 } from './game';
 import { makeMarket, unitPrice, buyCost, sellValue } from './market';
 import { planRoute } from './sailing';
@@ -156,5 +157,45 @@ describe('a voyage, turn by turn', () => {
     const crew = f.crew;
     endTurn(world, state);
     expect(f.crew).toBeLessThan(crew);
+  });
+});
+
+describe('M1 rules', () => {
+  it('foraging and foreign ports refill stores only to half; home fills them', () => {
+    const { world, state } = newGame(1492);
+    const f = state.fleets[0];
+    f.supplies = 1;
+    f.at = 'lisbon';
+    expect(provisionCost(world, f)).toBeGreaterThan(0);
+    provision(world, state, f.id);
+    expect(f.supplies).toBe(4);
+    f.at = 'seville';
+    provision(world, state, f.id);
+    expect(f.supplies).toBe(8);
+  });
+
+  it('splits a ship into its own fleet and merges it back', () => {
+    const { state } = newGame(1492);
+    const f = state.fleets[0];
+    expect(splitShip(state, f.id, f.ships[1].id).ok).toBe(true);
+    expect(state.fleets.length).toBe(2);
+    expect(f.ships.length).toBe(1);
+    const nf = state.fleets[1];
+    expect(f.crew + nf.crew).toBe(74);
+    expect(mergeFleets(state, nf.id, f.id).ok).toBe(true);
+    expect(state.fleets.length).toBe(1);
+    expect(f.ships.length).toBe(2);
+  });
+
+  it('winds are steady: neighbouring hexes rarely differ by much', () => {
+    const w = generateWorld(1492).new;
+    let big = 0, n = 0;
+    for (let i = 0; i < NEW.N; i += 7) for (const j of NEW.neighbors(i)) {
+      let d = Math.abs(w.wind[0].angle[i] - w.wind[0].angle[j]);
+      if (d > Math.PI) d = 2 * Math.PI - d;
+      n++;
+      if (d > 0.35) big++;
+    }
+    expect(big / n).toBeLessThan(0.05); // only where one band turns into the next
   });
 });

@@ -2,7 +2,6 @@ import { useStore } from '../store';
 import { dateLabel } from '../sim/types';
 import { GOAL } from '../sim/game';
 import { fmt } from './format';
-import { KIND_MARK } from './Chronicle';
 import { spriteUrl } from '../render/assets';
 import { getView } from './MapCanvas';
 
@@ -16,7 +15,7 @@ export function EventCard() {
   const close = async (look: boolean) => {
     await run({ kind: 'dismissEvent' });
     if (look) {
-      set({ map: ev.map, dispatch: null });
+      set({ map: ev.map });
       setTimeout(() => getView()?.focusHex(ev.map, ev.hex), 50);
     }
   };
@@ -35,26 +34,6 @@ export function EventCard() {
   );
 }
 
-export function Dispatch() {
-  const dispatch = useStore((s) => s.dispatch);
-  const hasEvent = useStore((s) => !!s.game?.events.length);
-  const game = useStore((s) => s.game)!;
-  const set = useStore((s) => s.set);
-  if (!dispatch || hasEvent) return null;
-  return (
-    <div className="modal-back" onClick={() => set({ dispatch: null })}>
-      <div className="modal dispatch" role="dialog" aria-label="Dispatch" onClick={(e) => e.stopPropagation()}>
-        <h2>Dispatch</h2>
-        <div className="muted">News reaching the court, {dateLabel(game.turn)}</div>
-        {dispatch.map((c, i) => (
-          <p key={i} className={`entry ${c.kind}`}><span className="mark" aria-hidden>{KIND_MARK[c.kind]}</span>{c.text}</p>
-        ))}
-        <button className="primary" autoFocus onClick={() => set({ dispatch: null })}>Continue</button>
-      </div>
-    </div>
-  );
-}
-
 export function Help() {
   const show = useStore((s) => s.showHelp);
   const game = useStore((s) => s.game);
@@ -68,17 +47,17 @@ export function Help() {
         <p>It is 1492. The Crown of Castile has given {explorer} two ships in Sevilla and a little gold. West of the known world lies the open Mar Océano and, perhaps, new lands. No chart shows what is there.</p>
         <ol>
           <li><b>Load cargo.</b> Iron tools are cheap in Europe, and peoples across the sea may prize them.</li>
-          <li><b>Sail west.</b> Click the sea to plan a voyage: numbered markers show where each season’s sailing ends. Click again or press <kbd>S</kbd>. Sail to the western edge of the chart to cross into the Mar Océano.</li>
-          <li><b>Mind wind and food.</b> Trade winds blow west in the south, westerlies blow east in the north (<kbd>W</kbd> shows them). Ships carry food for about 8 seasons; then scurvy kills the crew. Anchoring a whole season off a green coast lets boats go ashore for water and game.</li>
+          <li><b>Sail west.</b> Click the sea to plan a voyage: numbered markers show where each season’s sailing ends. Click again or press <kbd>Space</kbd>. Sail to the western edge of the chart to cross into the Mar Océano.</li>
+          <li><b>Mind wind and food.</b> Trade winds blow west in the south, westerlies blow east in the north (<kbd>V</kbd> shows them). Ships carry food for about 8 seasons; then scurvy kills the crew. Away from home, stores refill only to half: in foreign ports, from native traders, or by anchoring a whole season off a green coast.</li>
           <li><b>Find, meet, trade.</b> Only a fleet led by an explorer may enter uncharted waters. Trade tools with the peoples you meet for furs, tobacco, cacao, dyes and gold, and sell them in Europe while they are rare.</li>
-          <li><b>Build at home.</b> Sevilla and Cádiz can build ships, enlarge their ports and recruit explorers. Each project takes some seasons.</li>
+          <li><b>Build at home.</b> Open <b>Cities</b> to build ships and enlarge ports, <b>Court</b> to recruit explorers, <b>Fleets</b> to merge, split and give command. Each project takes some seasons.</li>
         </ol>
         <p>The Crown asks for <b>{fmt(GOAL.treasury)} ducats</b> by {dateLabel(GOAL.turn)}. Ships cost upkeep every season.</p>
         <h3>Controls</h3>
         <ul className="keys">
-          <li><kbd>Drag</kbd> pan · <kbd>Wheel</kbd>/<kbd>Pinch</kbd> zoom · <kbd>M</kbd> switch map</li>
-          <li><kbd>Enter</kbd> end season · <kbd>Tab</kbd> next fleet · <kbd>Esc</kbd> cancel</li>
-          <li><kbd>W</kbd> winds · <kbd>G</kbd> hex grid · <kbd>C</kbd> chronicle · hold <kbd>Alt</kbd> to highlight everything you can click</li>
+          <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows, drag, or rest the pointer at the screen edge to pan · <kbd>Wheel</kbd>/<kbd>Pinch</kbd> zoom</li>
+          <li><kbd>Space</kbd> sail · <kbd>Enter</kbd> end season · <kbd>Tab</kbd> next fleet · <kbd>Esc</kbd> cancel or close · <kbd>M</kbd> switch map</li>
+          <li><kbd>1</kbd> Cities · <kbd>2</kbd> Markets · <kbd>3</kbd> Fleets · <kbd>4</kbd> Court · <kbd>V</kbd> winds · <kbd>G</kbd> hex grid · hold <kbd>Alt</kbd> to highlight everything you can click</li>
         </ul>
         <button className="primary" autoFocus onClick={() => set({ showHelp: false })}>Set out</button>
       </div>

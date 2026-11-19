@@ -16,6 +16,8 @@ export type Command =
   | { kind: 'project'; city: string; project: ProjectKind }
   | { kind: 'assignExplorer'; explorer: number; fleet: number }
   | { kind: 'merge'; from: number; into: number }
+  | { kind: 'split'; fleet: number; ship: number }
+  | { kind: 'rename'; fleet: number; name: string }
   | { kind: 'dismissEvent' };
 
 let world: World | null = null;
@@ -56,6 +58,8 @@ const api = {
       case 'project': result = G.startProject(state, c.city, c.project); break;
       case 'assignExplorer': result = G.assignExplorer(state, c.explorer, c.fleet); break;
       case 'merge': result = G.mergeFleets(state, c.from, c.into); break;
+      case 'split': result = G.splitShip(state, c.fleet, c.ship); break;
+      case 'rename': result = G.renameFleet(state, c.fleet, c.name); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
     return { result, state };

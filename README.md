@@ -36,9 +36,13 @@ npm test           # simulation tests (Vitest)
 npm run build      # production build in dist/
 ```
 
-Controls: drag to pan, wheel or pinch to zoom, click the sea or a port to plan, click again
-or press `S` to sail, right-click to sail at once. `Enter` ends the season, `M` switches map,
-`W` shows winds, `Tab` cycles fleets, hold `Alt` to highlight everything you can click.
+Controls: WASD, the arrow keys, dragging, or resting the pointer at a screen edge pans; wheel or
+pinch zooms. Click the sea or a port to plan, click again or press `Space` to sail, right-click to
+sail at once. `Enter` ends the season, `1`–`4` open Cities, Markets, Fleets and Court, `M`
+switches map, `V` shows winds, `Tab` cycles fleets, `Esc` closes, hold `Alt` to highlight
+everything you can click.
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the agreed design and the milestones.
 
 ## How it is built
 

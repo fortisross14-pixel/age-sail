@@ -35,6 +35,13 @@ export function cargoCapacity(f: Fleet): number {
 export function provisionsMax(f: Fleet): number {
   return Math.min(...f.ships.map((s) => SHIPS[s.type].provisions));
 }
+/** Away from home, ships can only take on about half their full stores. */
+export const provisionsAbroad = (f: Fleet) => Math.floor(provisionsMax(f) / 2);
+/** How full the stores can be filled where the fleet is docked. */
+export function provisionCap(world: World, f: Fleet): number {
+  const port = f.at ? portById(world, f.at) : undefined;
+  return port?.kind === 'home' ? provisionsMax(f) : provisionsAbroad(f);
+}
 export function fleetSight(f: Fleet): number {
   return Math.max(...f.ships.map((s) => SHIPS[s.type].sight)) + (f.explorer != null ? 2 : 0);
 }
@@ -51,7 +58,7 @@ export function provisionCost(world: World, f: Fleet): number {
   const port = f.at ? portById(world, f.at) : undefined;
   if (!port) return 0;
   const perSeason = Math.max(4, f.crew / 2) * (port.kind === 'native' ? 1.6 : 1);
-  let cost = Math.ceil(Math.max(0, provisionsMax(f) - f.supplies) * perSeason);
+  let cost = Math.ceil(Math.max(0, provisionCap(world, f) - f.supplies) * perSeason);
   if (port.kind === 'home') cost += Math.max(0, crewNeeded(f) - f.crew) * 10;
   return cost;
 }
@@ -202,7 +209,7 @@ export function provision(world: World, s: GameState, fleetId: number): CommandR
   if (cost <= 0) return { ok: true };
   if (cost > s.treasury) return fail(`Provisions cost ${cost} ducats. The treasury cannot pay.`);
   s.treasury -= cost;
-  f.supplies = provisionsMax(f);
+  f.supplies = Math.max(f.supplies, provisionCap(world, f));
   if (portById(world, f.at)!.kind === 'home') f.crew = Math.max(f.crew, crewNeeded(f));
   return { ok: true, message: `Provisioned for ${cost} ducats.` };
 }
@@ -274,6 +281,42 @@ export function mergeFleets(s: GameState, fromId: number, intoId: number): Comma
   }
   s.fleets = s.fleets.filter((f) => f !== a);
   return { ok: true, message: `${a.name} joins ${b.name}.` };
+}
+
+/** Detach one ship into a new fleet in the same place. Cargo that no longer fits goes with it. */
+export function splitShip(s: GameState, fleetId: number, shipId: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  if (!f) return fail('No such fleet.');
+  if (f.ships.length < 2) return fail('A fleet of one ship cannot be split.');
+  const ship = f.ships.find((x) => x.id === shipId);
+  if (!ship) return fail('No such ship.');
+  f.ships = f.ships.filter((x) => x !== ship);
+  const crew = Math.min(f.crew, Math.round((f.crew * SHIPS[ship.type].crew) / (crewNeeded(f) + SHIPS[ship.type].crew)));
+  f.crew -= crew;
+  const nf: Fleet = {
+    id: s.nextId++, name: `The ${ship.name}`, ships: [ship], map: f.map, hex: f.hex, at: f.at, cargo: {}, crew,
+    supplies: f.supplies, moves: f.moves, order: null, explorer: null, trail: [], movedThisTurn: f.movedThisTurn,
+  };
+  let over = cargoUsed(f) - cargoCapacity(f);
+  for (const g of GOODS) {
+    if (over <= 0) break;
+    const k = Math.min(over, f.cargo[g] ?? 0);
+    if (!k) continue;
+    f.cargo[g] = (f.cargo[g] ?? 0) - k;
+    if (!f.cargo[g]) delete f.cargo[g];
+    nf.cargo[g] = k;
+    over -= k;
+  }
+  s.fleets.push(nf);
+  return { ok: true, message: `The ${ship.name} sails as her own fleet.` };
+}
+
+export function renameFleet(s: GameState, fleetId: number, name: string): CommandResult {
+  const f = fleetById(s, fleetId);
+  const n = name.trim().slice(0, 40);
+  if (!f || !n) return fail('A fleet needs a name.');
+  f.name = n;
+  return { ok: true };
 }
 
 function planFor(world: World, s: GameState, f: Fleet, dest: number) {
@@ -511,8 +554,8 @@ export function endTurn(world: World, s: GameState): void {
       const t = world[f.map].terrain[j];
       return !isWater(t) && t !== T.Desert && t !== T.Tundra;
     });
-    if (!f.movedThisTurn && shore && f.supplies < provisionsMax(f)) {
-      f.supplies = Math.min(provisionsMax(f), f.supplies + 2);
+    if (!f.movedThisTurn && shore && f.supplies < provisionsAbroad(f)) {
+      f.supplies = Math.min(provisionsAbroad(f), f.supplies + 2);
       log(s, 'voyage', `${f.name} lies at anchor off the coast. Boats go ashore for fresh water, fruit and game.`);
     }
     if (f.supplies < 0) {

@@ -1,43 +1,54 @@
 import { useEffect } from 'react';
-import { useStore } from './store';
+import { useStore, type DrawerId } from './store';
 import { Menu } from './ui/Menu';
 import { MapCanvas, getView } from './ui/MapCanvas';
-import { TopBar } from './ui/TopBar';
-import { FleetPanel } from './ui/FleetPanel';
-import { PortPanel } from './ui/PortPanel';
-import { Chronicle } from './ui/Chronicle';
+import { Hud } from './ui/Hud';
+import { Dock } from './ui/Dock';
+import { Drawer } from './ui/Drawers';
+import { SelectionCard } from './ui/SelectionCard';
+import { NewsFeed } from './ui/NewsFeed';
 import { HoverInfo } from './ui/HoverInfo';
-import { Dispatch, EventCard, Help, Toast } from './ui/Overlays';
+import { EventCard, Help, Toast } from './ui/Overlays';
+
+const DRAWER_KEYS: Record<string, DrawerId> = { '1': 'cities', '2': 'markets', '3': 'fleets', '4': 'court' };
+const PAN_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 
 function useKeys() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       const s = useStore.getState();
       if (s.phase !== 'playing' || !s.game) return;
+      const k = e.key.toLowerCase();
+      if (PAN_KEYS.has(k)) return; // the map view pans on these
       if (e.key === 'Alt') { e.preventDefault(); s.set({ highlightAll: true }); return; }
       if (s.game.events.length) return;
-      if (s.dispatch || s.showHelp) {
-        if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); s.set({ dispatch: null, showHelp: false }); }
+      if (s.showHelp) {
+        if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); s.set({ showHelp: false }); }
         return;
       }
-      switch (e.key) {
-        case 'Enter': e.preventDefault(); void s.endTurn(); break;
-        case 'Escape': s.set(s.preview ? { preview: null } : { selectedPort: null }); break;
-        case 'w': case 'W': s.set({ showWind: !s.showWind }); break;
-        case 'g': case 'G': s.set({ showGrid: !s.showGrid }); break;
-        case 'c': case 'C': s.set({ showChronicle: !s.showChronicle }); break;
-        case 'm': case 'M': s.setMap(s.map === 'old' ? 'new' : 'old'); break;
-        case 'h': case 'H': case '?': s.set({ showHelp: true }); break;
-        case 's': case 'S': void s.confirmPreview(); break;
+      if (DRAWER_KEYS[k]) { s.set({ drawer: s.drawer === DRAWER_KEYS[k] ? null : DRAWER_KEYS[k] }); return; }
+      switch (k) {
+        case 'enter': e.preventDefault(); void s.endTurn(); break;
+        case ' ': e.preventDefault(); void s.confirmPreview(); break;
+        case 'escape':
+          if (s.preview) s.set({ preview: null });
+          else if (s.drawer) s.set({ drawer: null });
+          else s.selectFleet(null);
+          break;
+        case 'v': s.set({ showWind: !s.showWind }); break;
+        case 'g': s.set({ showGrid: !s.showGrid }); break;
+        case 'm': s.setMap(s.map === 'old' ? 'new' : 'old'); break;
+        case 'h': case '?': s.set({ showHelp: true }); break;
         case '+': case '=': getView()?.zoomBy(1.2); break;
         case '-': getView()?.zoomBy(1 / 1.2); break;
-        case 'Tab': {
+        case 'tab': {
           e.preventDefault();
           const fl = s.game.fleets;
           if (!fl.length) break;
-          const k = fl.findIndex((f) => f.id === s.selectedFleet);
-          const next = fl[(k + 1) % fl.length];
+          const i = fl.findIndex((f) => f.id === s.selectedFleet);
+          const next = fl[(i + 1) % fl.length];
           s.selectFleet(next.id);
           setTimeout(() => getView()?.focusHex(next.map, next.hex), 0);
           break;
@@ -55,19 +66,18 @@ function useKeys() {
 
 export function App() {
   const phase = useStore((s) => s.phase);
-  const showChronicle = useStore((s) => s.showChronicle);
   useKeys();
   if (phase !== 'playing') return <Menu />;
   return (
     <div className="game">
       <MapCanvas />
-      <TopBar />
-      {showChronicle && <Chronicle />}
-      <FleetPanel />
-      <PortPanel />
+      <Hud />
+      <NewsFeed />
+      <Dock />
+      <Drawer />
+      <SelectionCard />
       <HoverInfo />
       <Toast />
-      <Dispatch />
       <EventCard />
       <Help />
     </div>

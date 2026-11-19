@@ -108,6 +108,8 @@ class Scene {
   fleets = new Container();
   labels = new Container();
   monsters = new Container();
+  plateLayer = new Container();
+  portPlates = new Map<string, Container>();
   plates: Container[] = [];
   fleetSprites = new Map<number, FleetSprite>();
   portSprites = new Map<string, Container>();
@@ -174,7 +176,7 @@ class Scene {
     this.root.addChild(this.grid);
     this.root.addChild(this.portalBand());
     this.buildMonsters();
-    this.root.addChild(this.monsters, this.windG, this.labels, this.routes, this.turnMarks, this.highlight, this.ports, this.fleets, this.hover, this.previewLabel);
+    this.root.addChild(this.monsters, this.windG, this.labels, this.routes, this.turnMarks, this.highlight, this.ports, this.fleets, this.plateLayer, this.hover, this.previewLabel);
     this.buildLabels();
     this.buildPorts();
   }
@@ -320,11 +322,16 @@ class Scene {
       // home ports carry the crown's colours; foreign ports a muted plate; native sites earth tones
       const color = p.kind === 'home' ? CROWN.spain.primary : p.kind === 'native' ? NATIVE.plate : 0x8d8472;
       const plate = this.plate(p.name, color, p.kind === 'native' ? p.people : p.kind === 'foreign' ? p.nation : undefined);
-      plate.position.set(0, HEX_R * 0.75);
+      // when two ports sit side by side, put the second name above its icon
+      const crowded = m.ports.some((q) => q !== p && g.distance(q.hex, p.hex) <= 2 && m.ports.indexOf(q) < m.ports.indexOf(p));
+      plate.position.set(g.cx(p.hex), g.cy(p.hex) + (crowded ? -HEX_R * 1.55 : HEX_R * 0.75));
       this.plates.push(plate);
-      node.addChild(icon, plate);
+      this.plateLayer.addChild(plate);
+      this.portPlates.set(p.id, plate);
+      node.addChild(icon);
       node.position.set(g.cx(p.hex), g.cy(p.hex));
       node.visible = p.kind !== 'native';
+      plate.visible = node.visible;
       this.ports.addChild(node);
       this.portSprites.set(p.id, node);
     }
@@ -366,7 +373,12 @@ class Scene {
       for (const mo of this.monsterSprites) mo.node.visible = fog[mo.hex] === Fog.Unknown;
       for (const d of this.decorLabels) d.node.visible = fog[d.hex] >= Fog.Charted;
       for (const d of this.islandLabels) d.node.visible = fog[d.hex] >= Fog.Explored;
-      for (const p of this.m.ports) if (p.kind === 'native') this.portSprites.get(p.id)!.visible = state.discovered.includes(p.id);
+      for (const p of this.m.ports) {
+        if (p.kind !== 'native') continue;
+        const seen = state.discovered.includes(p.id);
+        this.portSprites.get(p.id)!.visible = seen;
+        this.portPlates.get(p.id)!.visible = seen;
+      }
       this.lastSeason = -1;
     }
     const season = seasonOf(state.turn);
@@ -591,7 +603,10 @@ export class MapView {
       this.scenes[id] = sc;
     }
     this.bindInput();
-    this.app.ticker.add(() => this.scene.tick(this.scene.cam.scale));
+    this.app.ticker.add((t) => {
+      this.scrollTick(t.deltaMS / 1000);
+      this.scene.tick(this.scene.cam.scale);
+    });
     this.show('old');
   }
 
@@ -687,8 +702,61 @@ export class MapView {
     return [(sx - c.x) / c.scale, (sy - c.y) / c.scale];
   }
 
+  // ---------- keyboard and edge scrolling ----------
+
+  private held = new Set<string>();
+  private edge = { x: 0, y: 0, since: 0 };
+  /** the HUD covers the top of the canvas; the edge zone starts below it */
+  topInset = 64;
+
+  private scrollTick(dt: number) {
+    let dx = 0, dy = 0;
+    const h = this.held;
+    if (h.has('a') || h.has('arrowleft')) dx += 1;
+    if (h.has('d') || h.has('arrowright')) dx -= 1;
+    if (h.has('w') || h.has('arrowup')) dy += 1;
+    if (h.has('s') || h.has('arrowdown')) dy -= 1;
+    let speed = 620;
+    if (!dx && !dy && (this.edge.x || this.edge.y) && performance.now() - this.edge.since > 250) {
+      dx = this.edge.x;
+      dy = this.edge.y;
+      speed = 260; // gentle, so resting the pointer near an edge does not fling the map
+    }
+    if (!dx && !dy) return;
+    const n = Math.hypot(dx, dy);
+    this.scene.cam.x += (dx / n) * speed * dt;
+    this.scene.cam.y += (dy / n) * speed * dt;
+    this.apply();
+  }
+
   private bindInput() {
     const cv = this.app.canvas;
+    const typing = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey;
+    };
+    const keyDown = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (typing(e) || !['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) return;
+      e.preventDefault();
+      this.held.add(k);
+    };
+    const keyUp = (e: KeyboardEvent) => this.held.delete(e.key.toLowerCase());
+    const clearKeys = () => this.held.clear();
+    window.addEventListener('keydown', keyDown);
+    window.addEventListener('keyup', keyUp);
+    window.addEventListener('blur', clearKeys);
+    this.cleanup.push(() => {
+      window.removeEventListener('keydown', keyDown);
+      window.removeEventListener('keyup', keyUp);
+      window.removeEventListener('blur', clearKeys);
+    });
+    const setEdge = (sx: number, sy: number) => {
+      const w = this.el.clientWidth, hgt = this.el.clientHeight, m = 14;
+      const ex = sx < m ? 1 : sx > w - m ? -1 : 0;
+      const ey = sy < this.topInset + m ? 1 : sy > hgt - m ? -1 : 0;
+      if (ex !== this.edge.x || ey !== this.edge.y) this.edge = { x: ex, y: ey, since: performance.now() };
+    };
     cv.style.touchAction = 'none';
     const pointers = new Map<number, { x: number; y: number }>();
     let down: { x: number; y: number; camX: number; camY: number; moved: boolean; button: number } | null = null;
@@ -710,6 +778,7 @@ export class MapView {
     const onMove = (e: PointerEvent) => {
       const r = rect();
       const sx = e.clientX - r.left, sy = e.clientY - r.top;
+      if (e.pointerType === 'mouse' && !down) setEdge(sx, sy);
       if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: sx, y: sy });
       if (pinch && pointers.size === 2) {
         const [a, b] = [...pointers.values()];
@@ -762,7 +831,12 @@ export class MapView {
       this.zoomBy(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
     };
     const onCtx = (e: Event) => e.preventDefault();
-    const onLeave = () => { this.scene.hover.clear(); this.hoverHex = -1; this.cb.onHover(this.active, -1); };
+    const onLeave = () => {
+      this.scene.hover.clear();
+      this.hoverHex = -1;
+      this.edge = { x: 0, y: 0, since: 0 };
+      this.cb.onHover(this.active, -1);
+    };
     const onResize = () => this.apply();
     cv.addEventListener('pointerdown', onDown);
     cv.addEventListener('pointermove', onMove);

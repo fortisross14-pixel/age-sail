@@ -308,17 +308,27 @@ export function windField(g: Grid, seed: number, season: number, terrain: Uint8A
   const shift = [0, 4, 1, -4][season];
   const angle = new Float32Array(g.N);
   const strength = new Float32Array(g.N);
+  // steady bands with smooth edges: a pilot can learn them and rely on them
+  const band = (L: number): [number, number] => {
+    if (L >= 37) return [-0.2, 0.9]; // westerlies blow toward the east
+    if (L >= 30) return [Math.PI * 0.75, 0.4]; // horse latitudes: light northerlies drifting southwest
+    if (L >= 7) return [Math.PI + 0.32, 1]; // NE trade winds blow toward the west-southwest
+    return [Math.PI * 0.6, 0.25]; // doldrums: light and slow
+  };
   for (let i = 0; i < g.N; i++) {
     const L = g.lat(i) - shift;
-    const lon = g.lon(i);
-    const n = noise(lon * 0.05, L * 0.05);
-    let a: number, s: number;
-    if (L >= 37) { a = -0.2; s = 0.9; } // westerlies blow toward the east
-    else if (L >= 30) { a = n * 2.5; s = 0.35; } // horse latitudes: weak and variable
-    else if (L >= 7) { a = Math.PI + 0.32; s = 1; } // NE trade winds blow toward the west-southwest
-    else { a = Math.PI / 2 + n * 2; s = 0.22; } // doldrums
-    angle[i] = a + n * 0.35;
-    strength[i] = Math.max(0.12, Math.min(1, s + n * 0.12));
+    const n = noise(g.lon(i) * 0.03, L * 0.03);
+    // blend across band edges over about 6 degrees of latitude, as vectors
+    let vx = 0, vy = 0, st = 0;
+    for (let k = -3; k <= 3; k++) {
+      const [ba, bs] = band(L + k);
+      vx += Math.cos(ba) * bs;
+      vy += Math.sin(ba) * bs;
+      st += bs / 7;
+    }
+    const a = Math.atan2(vy, vx);
+    angle[i] = a + n * 0.12;
+    strength[i] = Math.max(0.15, Math.min(1, st + n * 0.04));
     if (!isWater(terrain[i])) strength[i] *= 0.5;
   }
   return { angle, strength };
