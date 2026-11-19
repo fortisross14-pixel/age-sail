@@ -54,7 +54,11 @@ other. Later: wars with rival crowns for space, and independence wars against in
 - Without *Volta do mar*, about 1 in 5 attempted crossings reaches the New World and none come back
   (`tools/crossing.ts` simulates 20 seeds). With it, every test crossing succeeds: trained crossings
   should get harder in a later tuning pass (storms, mutiny, the leader's navigation skill).
-- The court alone researches *Volta do mar* by about 1500; exploring the coast brings it a few years earlier.
+- The court alone researches *Volta do mar* by about 1498; exploring the coast brings it earlier.
+- M3: with the court's best navigator in command, about 4 in 20 untrained crossings come back; without one, almost
+  none. Food rationing (navigation) does not work in the open ocean before *Volta do mar*.
+- M3: European home waters (charted, not open ocean, north of Cape Bojador) cost half movement, so Sevilla to
+  Antwerpen is about two seasons each way. Patrician-style routes work, but seasonal turns make them slow.
 
 ## Milestones
 
@@ -63,8 +67,8 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | v0.1 | Two boards, turn-based sailing, explorers, landfall, trade, home cities | done |
 | M1 | HUD and controls: clean map, top HUD, 4 drawers (Cities, Markets, Fleets, Court), dismissible news, WASD and edge scrolling, steady winds, half-stores away from home, fleet merge/split/rename, price comparison | done |
 | M2 | Near shore and research: procedural African coast and islands south of 30.5°N with coastal peoples (gold, pepper, dyes), sugar and pepper as goods, a deadly open ocean (stores spoil twice as fast, storms three times as likely, starving crews vanish), a first research tree of 7 subjects where *Volta do mar* opens the crossing | done |
-| M3 | The court: people who age and die, five skills, ranks with a free unit, leaders on fleets, merchant trade routes | next |
-| M4 | Units ashore: city-built units, unit slots on ships, landing, exploring on foot, hidden resources and rumours inland | |
+| M3 | The court: 9 courtiers with ages, traits and five skills; petitioners each spring; ranks (explorer with a free colonist, infantry or missionary; merchant; governor) that take seasons to prepare; leaders command fleets; unit places on ships; aging and death; salaries; skill effects (navigation: moves, rationing, open-ocean storms; commerce and diplomacy: prices; construction: city projects); merchant trade routes; fleets grouped as expeditions, trade, idle; known European waters cost half movement | done |
+| M4 | Units ashore and city buildings: barracks, docks, university, market; city-built units; landing and exploring on foot; hidden resources and rumours inland. Cities can specialise (a military city, a trading and navigation port) or do everything | next |
 | M5 | Colonies (first playable): building materials, colonists' needs, founding and growth, production shipped home | |
 | M6 | Native peoples: trading posts, missions, alliances, numbers-based combat, diplomacy | |
 | M7 | Rival crowns: AI rivals racing for land, wars, later independence | |

@@ -70,6 +70,8 @@ export interface PlanOpts {
   movesLeft: number;
   movesMax: number;
   windward: number;
+  /** multiplier on a hex's cost (well-known home waters are cheaper) */
+  scale?: (i: number) => number;
 }
 
 /**
@@ -85,7 +87,8 @@ export function planRoute(g: Grid, m: MapData, season: number, from: number, to:
     return isWater(m.terrain[i]) || (i === to && o.ports.has(i));
   };
   if (!passable(to)) return null;
-  const costOf = (a: number, b: number) => (known(b) ? stepCost(g, m, season, a, b, o.windward) : 1.5);
+  const costOf = (a: number, b: number) => (known(b) ? stepCost(g, m, season, a, b, o.windward) * (o.scale ? o.scale(b) : 1) : 1.5);
+  const minScale = o.scale ? 0.5 : 1; // keeps the distance estimate admissible
   const gScore = new Float64Array(g.N).fill(Infinity);
   const prev = new Int32Array(g.N).fill(-1);
   const closed = new Uint8Array(g.N);
@@ -119,7 +122,7 @@ export function planRoute(g: Grid, m: MapData, season: number, from: number, to:
     return top;
   };
   gScore[from] = 0;
-  push(g.distance(from, to), from);
+  push(g.distance(from, to) * minScale, from);
   while (heap.length) {
     const [, i] = pop();
     if (closed[i]) continue;
@@ -131,7 +134,7 @@ export function planRoute(g: Grid, m: MapData, season: number, from: number, to:
       if (ng < gScore[j]) {
         gScore[j] = ng;
         prev[j] = i;
-        push(ng + g.distance(j, to), j);
+        push(ng + g.distance(j, to) * minScale, j);
       }
     }
   }

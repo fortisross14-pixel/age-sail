@@ -1,5 +1,5 @@
 // Can a fleet cross the Mar Océano without long-distance navigation? Try many seeds, both ways.
-import { newGame, endTurn, moveFleet, crossOcean } from '../src/sim/game';
+import { newGame, endTurn, moveFleet, crossOcean, mergeFleets, promote, assignLeader } from '../src/sim/game';
 import { OLD, NEW } from '../src/sim/hex';
 for (const volta of [false, true]) {
   let reached = 0, died = 0, back = 0;
@@ -7,7 +7,10 @@ for (const volta of [false, true]) {
   for (let seed = 1; seed <= N; seed++) {
     const { world, state } = newGame(seed);
     if (volta) state.research.known.push('portolan', 'lateen', 'astrolabe', 'volta');
+    mergeFleets(state, state.fleets[0].id, state.fleets[1].id);
     const f = state.fleets[0];
+    const nav = [...state.people].sort((x, y) => y.skills.navigation - x.skills.navigation)[0];
+    promote(state, nav.id, 'explorer', { unit: 'infantry' }); endTurn(world, state); endTurn(world, state); assignLeader(state, nav.id, f.id);
     const edge = world.old.portals.reduce((b, h) => (Math.abs(OLD.lat(h) - 36) < Math.abs(OLD.lat(b) - 36) ? h : b));
     moveFleet(world, state, f.id, edge);
     let landed = false;

@@ -36,22 +36,21 @@ export function EventCard() {
 
 export function Help() {
   const show = useStore((s) => s.showHelp);
-  const game = useStore((s) => s.game);
   const set = useStore((s) => s.set);
   if (!show) return null;
-  const explorer = game?.explorers[0]?.name ?? 'your explorer';
   return (
     <div className="modal-back" onClick={() => set({ showHelp: false })}>
       <div className="modal help" role="dialog" aria-label="How to play" onClick={(e) => e.stopPropagation()}>
         <h2>Your charter</h2>
-        <p>It is 1492. The Crown of Castile has given {explorer} two ships in Sevilla and a little gold. South lies the African coast beyond Cape Bojador, uncharted and different every voyage. West lies the open Mar Océano: pilots say no ship that sails far into it comes back.</p>
+        <p>It is 1492. The Crown of Castile has given you two ships in Sevilla, a court of nine, and a little gold. South lies the African coast beyond Cape Bojador, uncharted and different every voyage. West lies the open Mar Océano: pilots say no ship that sails far into it comes back.</p>
         <ol>
+          <li><b>Form an expedition.</b> In <b>Fleets</b>, join the two ships. In <b>Court</b>, make your best navigator an explorer and choose who sails with them (colonists, infantry or missionaries). After two seasons, give them command of the fleet.</li>
           <li><b>Load cargo.</b> Iron tools are cheap in Europe, and the peoples of the coast may prize them.</li>
           <li><b>Sail south.</b> Click the sea to plan a voyage: numbered markers show where each season’s sailing ends. Click again or press <kbd>Space</kbd>. The trade winds carry you down the coast; coming home is harder.</li>
           <li><b>Research.</b> Your court studies one subject at a time (the scroll at the top). <i>Volta do mar</i>, long-distance navigation, makes the open ocean survivable. Before it, the darker open sea spoils food twice as fast. You can try the western crossing, but few come back.</li>
           <li><b>Mind wind and food.</b> Trade winds blow west in the south, westerlies blow east in the north (<kbd>V</kbd> shows them). Ships carry food for about 8 seasons; then scurvy kills the crew. Away from home, stores refill only to half: in foreign ports, from native traders, or by anchoring a whole season off a green coast.</li>
           <li><b>Find, meet, trade.</b> Only a fleet led by an explorer may enter uncharted waters. Trade tools with the peoples you meet for furs, tobacco, cacao, dyes and gold, and sell them in Europe while they are rare.</li>
-          <li><b>Build at home.</b> Open <b>Cities</b> to build ships and enlarge ports, <b>Court</b> to recruit explorers, <b>Fleets</b> to merge, split and give command. Each project takes some seasons.</li>
+          <li><b>Build and trade at home.</b> <b>Cities</b> build ships and enlarge ports; a governor with construction skill speeds them up. A merchant can run a fleet on a trade route between European ports by itself. People age, and new petitioners come to court each spring.</li>
         </ol>
         <p>The Crown asks for <b>{fmt(GOAL.treasury)} ducats</b> by {dateLabel(GOAL.turn)}. Ships cost upkeep every season.</p>
         <h3>Controls</h3>

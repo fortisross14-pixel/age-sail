@@ -5,7 +5,7 @@ import type { SimApi, Command } from './sim/worker';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import type { MovePreview } from './sim/game';
 
-const SAVE_KEY = 'age-sail:save:v3';
+const SAVE_KEY = 'age-sail:save:v4';
 
 const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' }));
 
@@ -31,7 +31,7 @@ interface Store {
   highlightAll: boolean;
   showHelp: boolean;
   drawer: DrawerId | null;
-  courtTab: 'people' | 'research' | 'chronicle';
+  courtTab: 'people' | 'petitioners' | 'research' | 'chronicle';
   /** news the player has waved away */
   dismissed: string[];
   toast: { text: string; bad?: boolean; id: number } | null;
@@ -82,7 +82,7 @@ export const useStore = create<Store>((set, get) => {
       set({ phase: 'loading' });
       const { world, state } = await sim.newGame(seed);
       await save(state);
-      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: state.fleets[0]?.id ?? null, selectedPort: 'seville', preview: null, drawer: null, dismissed: [], showHelp: true });
+      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: [], showHelp: true });
     },
 
     async continueGame() {
@@ -90,8 +90,7 @@ export const useStore = create<Store>((set, get) => {
       if (!saved) return;
       set({ phase: 'loading' });
       const { world, state } = await sim.load(saved);
-      const f = state.fleets[0];
-      set({ world, game: state, phase: 'playing', map: f?.map ?? 'old', selectedFleet: f?.id ?? null, selectedPort: f?.at ?? null, preview: null, drawer: null, dismissed: state.chronicle.filter((c) => c.turn < state.turn - 1).map(newsKey) });
+      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: state.chronicle.filter((c) => c.turn < state.turn - 1).map(newsKey) });
     },
 
     quitToMenu() {
@@ -118,7 +117,7 @@ export const useStore = create<Store>((set, get) => {
       const keep = sel != null && state.fleets.some((f) => f.id === sel);
       // news older than last season fades from the feed by itself
       const old = state.chronicle.filter((c) => c.turn < state.turn - 1).map(newsKey);
-      set({ game: state, busy: false, selectedFleet: keep ? sel : state.fleets[0]?.id ?? null, dismissed: [...new Set([...get().dismissed.slice(-200), ...old])] });
+      set({ game: state, busy: false, selectedFleet: keep ? sel : null, dismissed: [...new Set([...get().dismissed.slice(-200), ...old])] });
       follow(state);
       void save(state);
     },
@@ -147,7 +146,7 @@ export const useStore = create<Store>((set, get) => {
       const p = await sim.preview(fleet, hex);
       if (!p) {
         set({ preview: null });
-        get().say(f.explorer != null ? 'No sea route there.' : 'No charted route there. Only a fleet led by an explorer may sail into unknown waters.', true);
+        get().say(f.leader != null ? 'No sea route there.' : 'No charted route there. Only a fleet led by an explorer may sail into unknown waters.', true);
         return;
       }
       if (p.crossBlocked) get().say('No captain will sail into the unknown west without an explorer to lead the way.', true);

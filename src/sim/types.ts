@@ -72,14 +72,56 @@ export interface Ship {
   hull: number;
 }
 
-export interface Explorer {
+export type Skill = 'navigation' | 'military' | 'commerce' | 'construction' | 'diplomacy';
+export const SKILLS: Skill[] = ['navigation', 'military', 'commerce', 'construction', 'diplomacy'];
+export type Rank = 'courtier' | 'explorer' | 'merchant' | 'governor';
+export type UnitType = 'colonist' | 'infantry' | 'missionary';
+export type TraitId = 'learned' | 'hardy' | 'bold' | 'shrewd' | 'pious' | 'ambitious';
+
+/** A member of the court. */
+export interface Person {
   id: number;
   name: string;
-  /** fleet they lead, or the home port where they wait */
+  born: number;
+  /** 0..5 each */
+  skills: Record<Skill, number>;
+  trait: TraitId;
+  rank: Rank;
+  /** seasons until a new rank takes effect (0 = ready) */
+  ready: number;
+  /** the unit that came with an explorer's rank */
+  unitType: UnitType | null;
+  /** fleet they lead */
   fleet: number | null;
-  waitingAt: string | null;
+  /** home city where they are when not at sea (or the city they govern) */
+  city: string | null;
   alive: boolean;
+  died?: number;
+  /** hexes of new land charted, people met */
   discoveries: number;
+}
+
+export interface Unit {
+  id: number;
+  type: UnitType;
+  /** aboard this fleet, or waiting in this home city */
+  fleet: number | null;
+  city: string | null;
+}
+
+export interface TradeStop {
+  port: string;
+  /** goods to sell here, all of them */
+  sell: GoodId[];
+  /** goods to buy here, up to qty, never above maxPrice */
+  buy: { good: GoodId; qty: number; maxPrice: number | null }[];
+}
+
+export interface TradeRoute {
+  stops: TradeStop[];
+  /** index of the stop the fleet is heading for */
+  next: number;
+  active: boolean;
 }
 
 export interface Order {
@@ -104,7 +146,9 @@ export interface Fleet {
   /** movement points left this turn */
   moves: number;
   order: Order | null;
-  explorer: number | null;
+  /** the courtier in command */
+  leader: number | null;
+  route: TradeRoute | null;
   /** hexes moved through most recently, for animation */
   trail: number[];
   movedThisTurn: boolean;
@@ -112,13 +156,14 @@ export interface Fleet {
   deepThisTurn: boolean;
 }
 
-export type ProjectKind = { kind: 'ship'; ship: ShipType } | { kind: 'port' } | { kind: 'explorer' };
+export type ProjectKind = { kind: 'ship'; ship: ShipType } | { kind: 'port' };
 export type Project = ProjectKind & { turnsLeft: number; total: number };
 
 export interface City {
   id: string;
   port: number;
   project: Project | null;
+  governor: number | null;
 }
 
 export interface ChronicleEntry {
@@ -143,7 +188,10 @@ export interface GameState {
   prestige: number;
   fog: Record<MapId, number[]>;
   fleets: Fleet[];
-  explorers: Explorer[];
+  people: Person[];
+  /** people asking for a place at court, and what they ask */
+  petitioners: { person: Person; cost: number }[];
+  units: Unit[];
   cities: Record<string, City>;
   markets: Record<string, Partial<Record<GoodId, MarketGood>>>;
   /** native trading sites found so far */

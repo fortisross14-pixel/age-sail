@@ -17,10 +17,10 @@ export function Dock() {
     cities: Object.values(game.cities).filter((c) => !c.project).length,
     markets: 0,
     fleets: game.fleets.filter((f) => f.moves > 0 && !f.order && !f.at).length,
-    court: game.explorers.filter((e) => e.alive && e.waitingAt).length,
+    court: game.people.filter((p) => p.alive && p.ready === 0 && p.fleet == null && (p.rank === 'explorer' || p.rank === 'merchant')).length,
   };
   const why: Record<DrawerId, string> = {
-    cities: 'idle yards', markets: '', fleets: 'fleets at sea without orders', court: 'people waiting for a command',
+    cities: 'idle yards', markets: '', fleets: 'fleets at sea without orders', court: 'leaders ready, waiting for a fleet',
   };
   return (
     <nav className="dock" aria-label="Panels">

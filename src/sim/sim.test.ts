@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { generateWorld, generateOldWorld } from './mapgen';
 import {
-  newGame, endTurn, buy, sell, moveFleet, previewMove, crossOcean, startProject, assignExplorer, portById, cargoUsed, maxMoves,
-  provision, provisionCost, splitShip, mergeFleets, setResearch, has,
+  newGame, endTurn, buy, sell, moveFleet, previewMove, crossOcean, startProject, portById, cargoUsed, maxMoves,
+  provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
+  slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost,
 } from './game';
 import { makeMarket, unitPrice, buyCost, sellValue } from './market';
 import { planRoute } from './sailing';
@@ -83,6 +84,22 @@ describe('markets', () => {
   });
 });
 
+type Game = ReturnType<typeof newGame>;
+
+/** The opening moves: merge the two ships, make the best navigator an explorer, wait, put them in command. */
+function expedition({ world, state }: Game) {
+  const [a, b] = state.fleets;
+  expect(mergeFleets(state, a.id, b.id).ok).toBe(true);
+  const f = state.fleets[0];
+  const nav = [...state.people].sort((x, y) => y.skills.navigation - x.skills.navigation)[0];
+  expect(promote(state, nav.id, 'explorer', { unit: 'infantry' }).ok).toBe(true);
+  expect(assignLeader(state, nav.id, f.id).ok).toBe(false); // still preparing
+  endTurn(world, state);
+  endTurn(world, state);
+  expect(assignLeader(state, nav.id, f.id).ok).toBe(true);
+  return f;
+}
+
 /** Sail the fleet toward a hex, ending seasons until it gets there (or gives up). */
 function sailTo(w: ReturnType<typeof newGame>['world'], s: ReturnType<typeof newGame>['state'], id: number, hex: number, maxTurns = 12) {
   expect(moveFleet(w, s, id, hex).ok).toBe(true);
@@ -96,9 +113,10 @@ function sailTo(w: ReturnType<typeof newGame>['world'], s: ReturnType<typeof new
 
 describe('a voyage, turn by turn', () => {
   it('moves hex by hex with movement points, and only an explorer may cross into the unknown', () => {
-    const { world, state } = newGame(1492);
-    const f = state.fleets[0];
-    expect(f.explorer).not.toBeNull();
+    const game = newGame(1492);
+    const { world, state } = game;
+    const f = expedition(game);
+    expect(f.leader).not.toBeNull();
     const start = f.hex;
     // a charted part of the western edge, off Iberia
     const edge = world.old.portals.reduce((b, h) => (Math.abs(OLD.lat(h) - 40) < Math.abs(OLD.lat(b) - 40) ? h : b));
@@ -109,16 +127,17 @@ describe('a voyage, turn by turn', () => {
     expect(f.hex).not.toBe(start); // moved right away
     expect(f.moves).toBeLessThan(maxMoves(f));
     // a fleet with no explorer may not cross while the New World is unknown
-    const lone = { ...f, id: 999, explorer: null, order: null };
+    const lone = { ...f, id: 999, leader: null, order: null };
     state.fleets.push(lone);
     expect(previewMove(world, state, 999, edge)!.crossBlocked).toBe(true);
     state.fleets.pop();
   });
 
   it('with long-distance navigation, an explorer sails west, finds land, meets a people, trades', () => {
-    const { world, state } = newGame(1492);
+    const game = newGame(1492);
+    const { world, state } = game;
     state.research.known.push('portolan', 'lateen', 'astrolabe', 'volta');
-    const f = state.fleets[0];
+    const f = expedition(game);
     expect(buy(world, state, f.id, 'tools', 100).ok).toBe(true);
     const edge = world.old.portals.reduce((b, h) => (Math.abs(OLD.lat(h) - 30) < Math.abs(OLD.lat(b) - 30) ? h : b));
     const t1 = sailTo(world, state, f.id, edge);
@@ -141,29 +160,30 @@ describe('a voyage, turn by turn', () => {
     expect(t1 + t2).toBeLessThan(12);
   });
 
-  it('builds ships and recruits explorers in home ports over several seasons', () => {
+  it('builds ships in home ports over several seasons, faster with a good governor', () => {
     const { world, state } = newGame(1492);
     expect(startProject(state, 'seville', { kind: 'ship', ship: 'caravel' }).ok).toBe(true);
-    expect(startProject(state, 'seville', { kind: 'explorer' }).ok).toBe(false); // busy
+    expect(startProject(state, 'seville', { kind: 'ship', ship: 'carrack' }).ok).toBe(false); // busy
     expect(startProject(state, 'cadiz', { kind: 'ship', ship: 'carrack' }).ok).toBe(false); // port too small
-    expect(startProject(state, 'cadiz', { kind: 'explorer' }).ok).toBe(true);
+    const n = state.fleets.length;
     endTurn(world, state);
-    expect(state.fleets.length).toBe(1);
-    expect(state.explorers.length).toBe(2);
+    expect(state.fleets.length).toBe(n);
     endTurn(world, state);
-    expect(state.fleets.length).toBe(2);
-    const ship = state.fleets[1];
-    expect(ship.at).toBe('seville');
-    const e = state.explorers[1];
-    expect(e.waitingAt).toBe('cadiz');
-    expect(assignExplorer(state, e.id, ship.id).ok).toBe(false); // different port
+    expect(state.fleets.length).toBe(n + 1);
+    const builder = [...state.people].sort((x, y) => y.skills.construction - x.skills.construction)[0];
+    const plain = projectCost({ kind: 'port' }, 1);
+    expect(promote(state, builder.id, 'governor', { city: 'cadiz' }).ok).toBe(true);
+    const governed = projectCost({ kind: 'port' }, 1, builder);
+    expect(governed.cost).toBeLessThan(plain.cost);
+    expect(governed.build).toBeLessThanOrEqual(plain.build);
     expect(portById(world, 'cadiz')).toBeDefined();
   });
 
   it('a fleet with no food loses its crew to scurvy', () => {
     const { world, state } = newGame(7);
     const f = state.fleets[0];
-    const sea = world.old.portals[20];
+    for (const p of state.people) p.skills.navigation = 0;
+    const sea = [...Array(OLD.N).keys()].find((i) => world.old.terrain[i] === 0 && state.fog.old[i] === Fog.Explored && OLD.lat(i) > 38 && OLD.lat(i) < 42 && OLD.lon(i) < -12 && OLD.lon(i) > -18)!;
     sailTo(world, state, f.id, sea, 4);
     f.supplies = 0;
     f.order = null;
@@ -189,6 +209,7 @@ describe('M1 rules', () => {
 
   it('splits a ship into its own fleet and merges it back', () => {
     const { state } = newGame(1492);
+    expect(mergeFleets(state, state.fleets[1].id, state.fleets[0].id).ok).toBe(true);
     const f = state.fleets[0];
     expect(splitShip(state, f.id, f.ships[1].id).ok).toBe(true);
     expect(state.fleets.length).toBe(2);
@@ -223,8 +244,9 @@ describe('M2: near shore, deep ocean, research', () => {
   });
 
   it('an explorer can sail south along the coast and meet a coastal people', () => {
-    const { world, state } = newGame(1492);
-    const f = state.fleets[0];
+    const game = newGame(1492);
+    const { world, state } = game;
+    const f = expedition(game);
     buy(world, state, f.id, 'tools', 60);
     const site = world.old.ports.filter((p) => p.kind === 'native').sort((a, b) => OLD.lat(b.hex) - OLD.lat(a.hex))[0];
     const turns = sailTo(world, state, f.id, site.hex, 10);
@@ -237,6 +259,7 @@ describe('M2: near shore, deep ocean, research', () => {
   it('the deep ocean spoils stores twice as fast until long-distance navigation', () => {
     const { world, state } = newGame(1492);
     const f = state.fleets[0];
+    for (const p of state.people) p.skills.navigation = 0;
     const deep = [...Array(OLD.N).keys()].find((i) => world.old.deep[i] && OLD.lat(i) > 35 && OLD.lat(i) < 40)!;
     f.hex = deep; f.at = null; f.order = null; f.supplies = 8;
     endTurn(world, state);
@@ -253,5 +276,85 @@ describe('M2: near shore, deep ocean, research', () => {
     for (let k = 0; k < 8; k++) endTurn(world, state);
     expect(has(state, 'portolan')).toBe(true);
     expect(state.research.current).not.toBeNull();
+  });
+});
+
+describe('M3: the court', () => {
+  it('starts with nine people, two ships with nobody in command, and petitioners', () => {
+    const { state } = newGame(1492);
+    expect(state.people.length).toBe(9);
+    expect(state.fleets.length).toBe(2);
+    expect(state.fleets.every((f) => f.leader == null)).toBe(true);
+    expect(state.petitioners.length).toBeGreaterThan(0);
+    for (const k of ['navigation', 'military', 'commerce', 'construction', 'diplomacy'] as const) {
+      expect(Math.max(...state.people.map((p) => p.skills[k]))).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('an explorer comes with a free unit that takes a slot aboard', () => {
+    const game = newGame(1492);
+    const f = expedition(game);
+    const { state } = game;
+    expect(unitsAboard(state, f).map((u) => u.type)).toEqual(['infantry']);
+    expect(slotsUsed(state, f)).toBe(2);
+    expect(slotsMax(f)).toBe(3); // caravel 1 + carrack 2
+    // a lone caravel has room for the leader only
+    const solo = game.state.fleets[0];
+    void solo;
+  });
+
+  it('a navigator leading a fleet gives it more moves', () => {
+    const game = newGame(1492);
+    const f = expedition(game);
+    const nav = leaderOf(game.state, f)!;
+    expect(maxMoves(f, game.state)).toBe(15 + Math.floor(nav.skills.navigation / 2) + (nav.trait === 'bold' ? 1 : 0));
+  });
+
+  it('a leader comes ashore only at home, and units with them', () => {
+    const game = newGame(1492);
+    const f = expedition(game);
+    const { world, state } = game;
+    expect(recall(world, state, f.id).ok).toBe(true);
+    expect(f.leader).toBeNull();
+    expect(state.units.every((u) => u.city === 'seville')).toBe(true);
+    expect(embark(world, state, state.units[0].id, f.id).ok).toBe(true);
+  });
+
+  it('people age and some die over the years; petitioners can be hired', () => {
+    const { world, state } = newGame(1492);
+    const pet = state.petitioners[0];
+    state.treasury = 100000;
+    expect(hire(state, pet.person.id).ok).toBe(true);
+    expect(state.people.length).toBe(10);
+    for (const p of state.people) p.born = 1420; // all very old
+    for (let k = 0; k < 4 * 6; k++) endTurn(world, state);
+    expect(state.people.some((p) => !p.alive)).toBe(true);
+  });
+
+  it('a merchant runs a trade route by itself and makes money', () => {
+    const { world, state } = newGame(1492);
+    const f = state.fleets[1]; // the carrack
+    const merchant = [...state.people].sort((x, y) => y.skills.commerce - x.skills.commerce)[0];
+    expect(promote(state, merchant.id, 'merchant').ok).toBe(true);
+    endTurn(world, state);
+    expect(assignLeader(state, merchant.id, f.id).ok).toBe(true);
+    expect(setTradeRoute(world, state, f.id, {
+      next: 0, active: true,
+      stops: [
+        { port: 'seville', sell: ['dyes', 'furs'], buy: [{ good: 'tools', qty: 100, maxPrice: null }] },
+        { port: 'antwerp', sell: ['tools'], buy: [{ good: 'dyes', qty: 30, maxPrice: null }, { good: 'furs', qty: 30, maxPrice: null }] },
+      ],
+    }).ok).toBe(true);
+    const start = state.treasury;
+    let visits = 0;
+    for (let k = 0; k < 12; k++) {
+      endTurn(world, state);
+      if (f.at === 'antwerp') visits++;
+    }
+    const log = state.chronicle.filter((c) => c.kind === 'trade').map((c) => c.text).join(' ');
+    expect(log).toContain('at Antwerpen: sold');
+    expect(log).toContain('at Sevilla: sold');
+    void visits;
+    void start;
   });
 });

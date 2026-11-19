@@ -362,3 +362,44 @@ button.on { background: linear-gradient(#e9c45c, #cf9f2c); border-color: #8a6516
 .tech.now { border-color: var(--sea); box-shadow: inset 4px 0 0 var(--sea); }
 .tech button { margin-top: 5px; min-height: 28px; padding: 3px 10px; }
 @media (max-width: 1250px) { .research-chip { display: none; } }
+
+/* court */
+.pips { display: inline-flex; gap: 2px; vertical-align: middle; }
+.pips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--ink-3); background: transparent; display: inline-block; }
+.pips i.on { background: var(--ink-2); border-color: var(--ink-2); }
+.skills { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin-top: 3px; }
+.skill { display: inline-flex; gap: 4px; align-items: center; }
+.skill-name { color: var(--ink-3); width: 24px; }
+.person { padding: 0 !important; display: block !important; }
+.person-head {
+  width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; align-items: baseline; text-align: left;
+  border: 0; background: none; padding: 7px 10px; border-radius: 6px;
+}
+.person-head.static { cursor: default; }
+.person-head .person-status, .person-head .skills { grid-column: 1 / -1; }
+.person-name { font: 17px var(--serif); }
+.person.open { border-color: var(--ink-2) !important; background: #fff8e4 !important; }
+.person.dead .person-head { opacity: 0.6; }
+.rank-badge { font: 700 11px var(--sans); text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 6px; border-radius: 3px; background: rgba(90, 61, 34, 0.12); color: var(--ink-2); }
+.rank-badge.explorer { background: rgba(217, 165, 33, 0.25); color: #6d4f07; }
+.rank-badge.merchant { background: rgba(79, 111, 125, 0.22); color: #24506a; }
+.rank-badge.governor { background: rgba(163, 35, 26, 0.15); color: var(--crown-2); }
+.person-actions { padding: 0 10px 10px; display: grid; gap: 8px; }
+.action-group { font-size: 13px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.action-group .row { margin-top: 4px; }
+.action-group button img { vertical-align: middle; margin-right: 3px; }
+
+/* fleets */
+.fleet-group h3 { margin: 6px 0 4px; }
+.fleet-row .fleet-name { display: grid; }
+.leader .skills { margin: 4px 0; }
+.leader button { margin-top: 4px; margin-right: 6px; }
+.slots { margin: 8px 0; font-size: 14px; }
+.chip img { vertical-align: middle; }
+.x-inline { min-height: 0; height: 18px; width: 18px; padding: 0; margin-left: 2px; font-size: 12px; line-height: 1; border-radius: 9px; }
+.route { border-top: 1px solid var(--line); margin-top: 10px; }
+.stop { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; background: rgba(255, 250, 236, 0.5); }
+.stop.next { border-color: var(--sea); box-shadow: inset 4px 0 0 var(--sea); }
+.stop-goods { display: grid; gap: 3px; margin-top: 4px; }
+.stop-good { display: grid; grid-template-columns: 22px 70px 36px auto auto auto; gap: 6px; align-items: center; font-size: 13px; }
+.num-in { width: 60px; font: 13px var(--sans); padding: 2px 4px; border: 1px solid var(--line); border-radius: 3px; background: var(--paper-3); margin-left: 3px; }

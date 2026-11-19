@@ -4,7 +4,7 @@ import type { GoodId } from '../data/goods';
 import type { TechId } from '../data/tech';
 import { generateWorld } from './mapgen';
 import * as G from './game';
-import type { GameState, World, ProjectKind } from './types';
+import type { GameState, World, ProjectKind, Rank, UnitType, TradeRoute } from './types';
 
 export type Command =
   | { kind: 'buy'; fleet: number; good: GoodId; qty: number }
@@ -15,7 +15,14 @@ export type Command =
   | { kind: 'cross'; fleet: number }
   | { kind: 'cancelOrder'; fleet: number }
   | { kind: 'project'; city: string; project: ProjectKind }
-  | { kind: 'assignExplorer'; explorer: number; fleet: number }
+  | { kind: 'assignLeader'; person: number; fleet: number }
+  | { kind: 'recall'; fleet: number }
+  | { kind: 'promote'; person: number; rank: Rank; unit?: UnitType; city?: string }
+  | { kind: 'relieve'; person: number }
+  | { kind: 'hire'; person: number }
+  | { kind: 'embark'; unit: number; fleet: number }
+  | { kind: 'disembark'; unit: number }
+  | { kind: 'tradeRoute'; fleet: number; route: TradeRoute | null }
   | { kind: 'merge'; from: number; into: number }
   | { kind: 'split'; fleet: number; ship: number }
   | { kind: 'rename'; fleet: number; name: string }
@@ -58,7 +65,14 @@ const api = {
       case 'cross': result = G.crossOcean(world, state, c.fleet); break;
       case 'cancelOrder': result = G.cancelOrder(state, c.fleet); break;
       case 'project': result = G.startProject(state, c.city, c.project); break;
-      case 'assignExplorer': result = G.assignExplorer(state, c.explorer, c.fleet); break;
+      case 'assignLeader': result = G.assignLeader(state, c.person, c.fleet); break;
+      case 'recall': result = G.recall(world, state, c.fleet); break;
+      case 'promote': result = G.promote(state, c.person, c.rank, { unit: c.unit, city: c.city }); break;
+      case 'relieve': result = G.relieve(state, c.person); break;
+      case 'hire': result = G.hire(state, c.person); break;
+      case 'embark': result = G.embark(world, state, c.unit, c.fleet); break;
+      case 'disembark': result = G.disembark(world, state, c.unit); break;
+      case 'tradeRoute': result = G.setTradeRoute(world, state, c.fleet, c.route); break;
       case 'merge': result = G.mergeFleets(state, c.from, c.into); break;
       case 'split': result = G.splitShip(state, c.fleet, c.ship); break;
       case 'rename': result = G.renameFleet(state, c.fleet, c.name); break;

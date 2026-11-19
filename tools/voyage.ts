@@ -1,7 +1,10 @@
-import { newGame, endTurn, buy, moveFleet, crossOcean } from '../src/sim/game';
+import { newGame, endTurn, buy, moveFleet, crossOcean, mergeFleets, promote, assignLeader } from '../src/sim/game';
 import { OLD, NEW } from '../src/sim/hex';
 const { world, state } = newGame(Number(process.argv[2] ?? 1492));
+mergeFleets(state, state.fleets[0].id, state.fleets[1].id);
 const f = state.fleets[0];
+const nav = [...state.people].sort((x, y) => y.skills.navigation - x.skills.navigation)[0];
+promote(state, nav.id, 'explorer', { unit: 'infantry' }); endTurn(world, state); endTurn(world, state); assignLeader(state, nav.id, f.id);
 buy(world, state, f.id, 'tools', 100);
 const edge = world.old.portals.reduce((b, h) => (Math.abs(OLD.lat(h) - 30) < Math.abs(OLD.lat(b) - 30) ? h : b));
 console.log('edge lat', OLD.lat(edge), 'move ok', moveFleet(world, state, f.id, edge));

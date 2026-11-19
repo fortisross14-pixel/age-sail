@@ -17,21 +17,23 @@ export interface ShipSpec {
   port: number;
   upkeep: number;
   sight: number;
+  /** people and units it can carry; a fleet's leader takes one */
+  slots: number;
   blurb: string;
 }
 
 export const SHIPS: Record<ShipType, ShipSpec> = {
   caravel: {
     name: 'Caravel', moves: 18, windward: 0.65, cargo: 40, crew: 24, provisions: 8, cost: 1500, build: 2, port: 1,
-    upkeep: 40, sight: 3, blurb: 'Small, fast and handy into the wind. The explorer’s ship.',
+    upkeep: 40, sight: 3, slots: 1, blurb: 'Small, fast and handy into the wind. The explorer’s ship.',
   },
   carrack: {
     name: 'Carrack', moves: 15, windward: 0.35, cargo: 100, crew: 50, provisions: 8, cost: 3200, build: 3, port: 2,
-    upkeep: 85, sight: 2, blurb: 'A roomy merchant ship. Slow against the wind.',
+    upkeep: 85, sight: 2, slots: 2, blurb: 'A roomy merchant ship. Slow against the wind.',
   },
   galleon: {
     name: 'Galleon', moves: 14, windward: 0.3, cargo: 160, crew: 80, provisions: 9, cost: 6000, build: 4, port: 3,
-    upkeep: 140, sight: 2, blurb: 'Big hold, strong hull. Built to carry the riches of the Indies.',
+    upkeep: 140, sight: 2, slots: 4, blurb: 'Big hold, strong hull. Built to carry the riches of the Indies.',
   },
 };
 
@@ -48,4 +50,4 @@ export const PORT_UPGRADE = [
   { cost: 5000, build: 4, blurb: 'A great harbour with a royal arsenal. Lets you build galleons.' },
 ] as const;
 
-export const EXPLORER_COST = { cost: 600, build: 1 };
+
