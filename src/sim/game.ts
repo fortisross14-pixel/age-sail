@@ -1,3 +1,4 @@
+import { DEFAULT_UNTIL } from '../data/eras';
 import { GOODS, GOOD_INFO, type GoodId } from '../data/goods';
 import { SHIPS, SHIP_NAMES, type ShipType } from '../data/ships';
 import { BUILDINGS, BUILDING_ORDER, CITY_SPACE, UNIT_SPECS, type BuildingId } from '../data/city';
@@ -213,7 +214,7 @@ function initialOldFog(world: World): number[] {
   return fog;
 }
 
-export function newGame(seed: number, until = 1750): { world: World; state: GameState } {
+export function newGame(seed: number, until: number = DEFAULT_UNTIL): { world: World; state: GameState } {
   const world = generateWorld(seed);
   const rng = mulberry32(hashSeed(seed, 99));
   const markets: GameState['markets'] = {};

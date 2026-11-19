@@ -6,6 +6,7 @@ import type { CrownId } from '../data/rivals';
 import { generateWorld } from './mapgen';
 import { previewParty } from './land';
 import * as G from './game';
+import { DEFAULT_UNTIL } from '../data/eras';
 import type { GameState, World, ProjectKind, Rank, UnitType, TradeRoute } from './types';
 
 export type Command =
@@ -64,7 +65,7 @@ function need() {
 }
 
 const api = {
-  newGame(seed: number, until = 1750) {
+  newGame(seed: number, until: number = DEFAULT_UNTIL) {
     const g = G.newGame(seed, until);
     world = g.world;
     state = g.state;

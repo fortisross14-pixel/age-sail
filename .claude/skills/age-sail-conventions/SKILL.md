@@ -36,7 +36,10 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
 
 ## Saves
 
-- Saved to IndexedDB through `idb-keyval` (`src/store.ts`), the whole `GameState` as plain data.
+- Saved to IndexedDB through `idb-keyval` (`src/store.ts`), wrapped by `src/save.ts` as
+  `{ saveVersion, genVersion, state }`. Shape change: bump `SAVE_VERSION` and add a migration.
+  Map generation change: bump `GEN_VERSION` in `src/sim/version.ts` and the pinned digest in
+  `src/sim/determinism.test.ts`.
 - Changing the shape of `GameState` or the output of map generation requires a save version
   bump and, where cheap, a migration. Players must be told when a save can't be loaded.
 - Never put class instances, functions or typed arrays that cannot survive structured clone in

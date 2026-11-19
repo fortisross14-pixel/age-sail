@@ -16,3 +16,6 @@ export const GAME_LENGTHS = [
   { id: 'standard', name: 'Standard', until: 1650, blurb: 'Through the plantations to the golden age of trade. About 630 seasons.' },
   { id: 'full', name: 'Full', until: 1750, blurb: 'The whole age of sail. About 1,030 seasons.' },
 ] as const;
+
+/** The standard game, used wherever no length is chosen. */
+export const DEFAULT_UNTIL = 1650;

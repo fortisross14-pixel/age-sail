@@ -765,6 +765,12 @@ class Scene {
     h.stroke({ width: 3, color: 0xffffff, alpha: 0.9 }).stroke({ width: 1.5, color: CROWN.spain.secondary });
   }
 
+  /** true while any fleet is still sailing along its last move */
+  get animating() {
+    for (const fs of this.fleetSprites.values()) if (fs.anim) return true;
+    return false;
+  }
+
   tick(scale: number) {
     const now = performance.now();
     for (const fs of this.fleetSprites.values()) {
@@ -814,6 +820,18 @@ export class MapView {
   private hoverHex = -1;
   private destroyed = false;
   private cleanup: (() => void)[] = [];
+  /**
+   * The map renders on demand: the ticker runs while something moves (a fleet animation, a held
+   * scroll key, the pointer resting at an edge) or briefly after any change, then stops, so an
+   * idle turn costs no GPU time.
+   */
+  private awakeUntil = 0;
+
+  /** Keep rendering for at least `ms` more. */
+  wake(ms = 200) {
+    this.awakeUntil = Math.max(this.awakeUntil, performance.now() + ms);
+    if (!this.destroyed && this.app.ticker && !this.app.ticker.started) this.app.ticker.start();
+  }
 
   constructor(private el: HTMLElement, private world: World, private assets: Assets, private cb: MapCallbacks) {}
 
@@ -824,20 +842,21 @@ export class MapView {
     });
     if (this.destroyed) return;
     this.el.appendChild(this.app.canvas);
-    for (const id of ['old', 'new'] as MapId[]) {
-      const sc = new Scene(GRIDS[id], this.world[id], this.world.seed, this.assets);
-      await sc.build((m) => onProgress?.(`${id === 'old' ? 'Old World' : 'Mar Océano'}: ${m}`));
-      if (this.destroyed) return;
-      sc.root.visible = false;
-      this.app.stage.addChild(sc.root);
-      this.scenes[id] = sc;
-    }
+    this.progress = onProgress ?? null;
+    // Only the Old World is drawn at the start: the New World's art (about half the texture
+    // memory) waits until someone first looks west.
+    await this.buildScene('old');
+    if (this.destroyed) return;
     this.bindInput();
     this.app.ticker.add((t) => {
       this.scrollTick(t.deltaMS / 1000);
       this.scene.tick(this.scene.cam.scale);
+      const moving = this.scene.animating || this.held.size > 0 || this.edge.x !== 0 || this.edge.y !== 0;
+      // stopping here still lets this frame render: the renderer runs after this listener
+      if (!moving && performance.now() > this.awakeUntil) t.stop();
     });
     this.show('old');
+    this.wake();
   }
 
   destroy() {
@@ -848,8 +867,28 @@ export class MapView {
 
   private get scene() { return this.scenes[this.active]; }
 
+  private progress: ((msg: string) => void) | null = null;
+  private building: Partial<Record<MapId, Promise<void>>> = {};
+
+  /** Draw a board's art once; later calls wait for the same build. */
+  private buildScene(id: MapId): Promise<void> {
+    return (this.building[id] ??= (async () => {
+      const sc = new Scene(GRIDS[id], this.world[id], this.world.seed, this.assets);
+      await sc.build((m) => this.progress?.(`${id === 'old' ? 'Old World' : 'Mar Océano'}: ${m}`));
+      if (this.destroyed) { sc.root.destroy({ children: true, texture: true }); return; }
+      sc.root.visible = false;
+      this.app.stage.addChild(sc.root);
+      this.scenes[id] = sc;
+      if (this.state && this.ui) sc.update(this.state, this.ui, false);
+      this.progress?.('');
+    })());
+  }
+
   show(map: MapId) {
-    if (!this.scenes[map]) return;
+    if (!this.scenes[map]) {
+      void this.buildScene(map).then(() => { if (!this.destroyed && this.ui?.map === map) this.show(map); });
+      return;
+    }
     this.active = map;
     for (const [id, sc] of Object.entries(this.scenes)) sc.root.visible = id === map;
     if (!this.scene.cam.set) this.home();
@@ -864,6 +903,7 @@ export class MapView {
     for (const sc of Object.values(this.scenes)) sc.update(state, ui, true);
     void animate;
     this.lastTurn = state.turn;
+    this.wake();
   }
 
   /** Opening view of each board. */
@@ -901,6 +941,7 @@ export class MapView {
     sc.cam.y = minY > maxY ? (vh - g.pxH * s) / 2 : Math.min(maxY, Math.max(minY, sc.cam.y));
     sc.root.position.set(sc.cam.x, sc.cam.y);
     sc.root.scale.set(s);
+    this.wake();
   }
 
   centerOn(x: number, y: number, scale = this.scene.cam.scale) {
@@ -970,6 +1011,7 @@ export class MapView {
       if (typing(e) || !['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) return;
       e.preventDefault();
       this.held.add(k);
+      this.wake();
     };
     const keyUp = (e: KeyboardEvent) => this.held.delete(e.key.toLowerCase());
     const clearKeys = () => this.held.clear();
@@ -994,6 +1036,7 @@ export class MapView {
     const rect = () => cv.getBoundingClientRect();
 
     const onDown = (e: PointerEvent) => {
+      this.wake();
       const r = rect();
       pointers.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
       cv.setPointerCapture(e.pointerId);
@@ -1006,6 +1049,7 @@ export class MapView {
       down = { x: e.clientX, y: e.clientY, camX: this.scene.cam.x, camY: this.scene.cam.y, moved: false, button: e.button };
     };
     const onMove = (e: PointerEvent) => {
+      this.wake();
       const r = rect();
       const sx = e.clientX - r.left, sy = e.clientY - r.top;
       if (e.pointerType === 'mouse' && !down) setEdge(sx, sy);
@@ -1041,6 +1085,7 @@ export class MapView {
       }
     };
     const onUp = (e: PointerEvent) => {
+      this.wake();
       pointers.delete(e.pointerId);
       if (pointers.size < 2) pinch = null;
       cv.style.cursor = 'default';
@@ -1059,12 +1104,14 @@ export class MapView {
       }
     };
     const onWheel = (e: WheelEvent) => {
+      this.wake();
       e.preventDefault();
       const r = rect();
       this.zoomBy(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
     };
     const onCtx = (e: Event) => e.preventDefault();
     const onLeave = () => {
+      this.wake();
       this.scene.hover.clear();
       this.hoverHex = -1;
       this.edge = { x: 0, y: 0, since: 0 };

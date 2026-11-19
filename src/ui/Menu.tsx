@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useStore, clearSave } from '../store';
 import { spriteUrl } from '../render/assets';
-import { GAME_LENGTHS } from '../data/eras';
+import { GAME_LENGTHS, DEFAULT_UNTIL } from '../data/eras';
 
 export function Menu() {
   const hasSave = useStore((s) => s.hasSave);
+  const saveProblem = useStore((s) => s.saveProblem);
   const phase = useStore((s) => s.phase);
   const newGame = useStore((s) => s.newGame);
   const continueGame = useStore((s) => s.continueGame);
   const checkSave = useStore((s) => s.checkSave);
   const [seed, setSeed] = useState(() => String(Math.floor(Math.random() * 1e6)));
-  const [until, setUntil] = useState(1650);
+  const [until, setUntil] = useState<number>(DEFAULT_UNTIL);
   useEffect(() => { void checkSave(); }, [checkSave]);
   const loading = phase === 'loading';
   return (
@@ -20,6 +21,7 @@ export function Menu() {
         <h1>Age of Sail</h1>
         <p className="tagline">Chart the unknown. Trade across the ocean. Fill the Crown’s treasury.</p>
         <div className="menu-actions">
+          {saveProblem && <p className="save-problem" role="status">{saveProblem}</p>}
           {hasSave && <button className="primary" disabled={loading} onClick={() => void continueGame()}>Continue voyage</button>}
           <button className={hasSave ? '' : 'primary'} disabled={loading} onClick={async () => { await clearSave(); await newGame(Number(seed) || 1492, until); }}>
             {loading ? 'Preparing the charter…' : 'New voyage'}

@@ -220,6 +220,7 @@ button.on { background: linear-gradient(#e9c45c, #cf9f2c); border-color: #8a6516
 .tagline { font: italic 20px var(--serif); color: var(--ink-2); margin: 4px 0 22px; }
 .menu-actions { display: grid; gap: 10px; justify-items: center; }
 .menu-actions button { min-width: 240px; padding: 12px 20px; font-size: 17px; }
+.save-problem { max-width: 360px; margin: 0 0 4px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: rgba(140, 40, 30, 0.08); color: var(--ink); font-size: 15px; }
 .seed { font-size: 13px; color: var(--ink-3); display: flex; gap: 6px; align-items: center; }
 .seed input {
   width: 100px; font: 14px var(--sans); padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper-3); color: var(--ink);

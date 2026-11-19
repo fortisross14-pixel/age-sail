@@ -86,6 +86,22 @@ still need a real laptop.
 13. Splitting Pixi into its own chunk (`manualChunks`) would let browsers keep it cached across
     deploys. A nice-to-have.
 
+## Status (Pass 1)
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | Saves break silently | Fixed: `src/save.ts` envelope with `saveVersion` and `genVersion` (`src/sim/version.ts`), migration chain, refusal message on the menu, legacy v9 save upgraded in place, stale keys removed, `src/save.test.ts` |
+| 2 | Worker error locks the game | Fixed: every worker call is guarded; on failure the worker is restored to the last state on screen and the player is told. `ErrorBoundary` catches render crashes |
+| 3 | Map renders when idle | Fixed: render on demand. Measured 0 frames in 2 idle seconds (it used to render every frame) |
+| 4 | GPU memory | Partly: the New World's art is built on first view, so a game that hasn't crossed holds half the textures. Releasing canvases after upload is not done: Pixi needs them to recover from a lost GPU context |
+| 5 | Map update on every store change | Fixed: the map redraws only when the state or a field it shows changes; hover no longer triggers it |
+| 6 | Scattered balance numbers | For the balance pass |
+| 7 | Test gaps | Fixed: save round-trip, pinned RNG outputs, pinned world digest for seed 1492, 25-seed sweep in Vitest (63 tests) |
+| 8 | Accessibility and readability | Folded into the GUI pass |
+| 9 | Font subsets | Fixed: latin files only, 57 → 21 build assets |
+| 10 | Two default game lengths | Fixed: `DEFAULT_UNTIL` in `src/data/eras.ts` |
+| 11–13 | File size, linter, chunking | Open, low |
+
 ## Proposed Pass 1 scope
 
 Fix 1, 2, 3, 5, 7, 9, 10 and 12 now (robustness, battery, tests, tooling). Do 4 after a laptop

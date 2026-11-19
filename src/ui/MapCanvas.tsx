@@ -91,11 +91,16 @@ export function MapCanvas() {
       viewRef = view;
       if (import.meta.env.DEV) (window as unknown as { __view: MapView; __store: typeof useStore }).__view = view;
       if (import.meta.env.DEV) (window as unknown as { __store: typeof useStore }).__store = useStore;
-      await view.init((m) => setStatus(m));
+      await view.init((m) => setStatus(m || null));
       if (cancelled) return;
       setStatus(null);
+      // Redraw only when something the map shows changes: hover, toasts and drawers don't count.
+      let last: unknown[] = [];
       const push = () => {
         const s = useStore.getState();
+        const deps = [s.game, s.map, s.selectedFleet, s.selectedParty, s.preview, s.landing, s.showWind, s.showGrid, s.highlightAll];
+        if (deps.length === last.length && deps.every((d, i) => d === last[i])) return;
+        last = deps;
         if (s.game) view!.update(s.game, {
           map: s.map, selectedFleet: s.selectedFleet, selectedParty: s.selectedParty, preview: s.preview && { ...s.preview },
           landing: s.landing ? landingHexes(s) : null,

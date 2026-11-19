@@ -7,6 +7,8 @@ import type { World, MapData, PortDef, WindField, Rumour, NationDef } from './ty
 import { RESOURCE_IDS, type ResourceId } from '../data/city';
 import { nativeWord, islandName } from './names';
 
+// Changing what generateWorld makes for an existing seed? Bump GEN_VERSION in ./version.ts.
+
 /** The Old World board looks the same every game. */
 const OLD_WORLD_SEED = 1492;
 

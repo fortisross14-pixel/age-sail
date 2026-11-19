@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import * as Comlink from 'comlink';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
+import { DEFAULT_UNTIL } from './data/eras';
+import { SAVE_KEY, LEGACY_KEY, STALE_KEYS, wrap, fromLegacy, readSave, type LoadResult } from './save';
 import type { SimApi, Command } from './sim/worker';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import type { MovePreview } from './sim/game';
-
-const SAVE_KEY = 'age-sail:save:v9';
 
 const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' }));
 
@@ -19,6 +19,8 @@ export const newsKey = (c: ChronicleEntry) => `${c.turn}|${c.text}`;
 interface Store {
   phase: 'menu' | 'loading' | 'playing';
   hasSave: boolean;
+  /** why the stored voyage can't be continued, if it can't */
+  saveProblem: string | null;
   world: World | null;
   game: GameState | null;
   map: MapId;
@@ -59,8 +61,24 @@ interface Store {
 
 let toastId = 0;
 
+let saveWarned = false;
 async function save(game: GameState) {
-  try { await idbSet(SAVE_KEY, game); } catch { /* storage unavailable: play on without saving */ }
+  try { await idbSet(SAVE_KEY, wrap(game)); saveWarned = false; } catch {
+    // storage unavailable or full: play on, but say so once
+    if (!saveWarned) { saveWarned = true; useStore.getState().say('The voyage could not be saved. Progress will be lost when you close the page.', true); }
+  }
+}
+
+/** Find the stored voyage, upgrading a pre-envelope save and clearing ones no build can read. */
+async function loadStored(): Promise<LoadResult | null> {
+  let raw = await idbGet(SAVE_KEY);
+  if (raw === undefined) {
+    const legacy = fromLegacy(await idbGet(LEGACY_KEY));
+    if (legacy) { await idbSet(SAVE_KEY, legacy); raw = legacy; }
+  }
+  // the legacy save is copied by now; older keys can't be read by any build
+  void Promise.all([LEGACY_KEY, ...STALE_KEYS].map((k) => idbDel(k))).catch(() => {});
+  return raw === undefined ? null : readSave(raw);
 }
 
 /** The New World view opens once someone has sailed there. */
@@ -72,29 +90,51 @@ export const useStore = create<Store>((set, get) => {
     const f = state.fleets.find((x) => x.id === get().selectedFleet);
     if (f && f.map !== get().map) set({ map: f.map, preview: null, selectedPort: null });
   };
+  /**
+   * A worker call threw: the worker's copy may be half-changed, so put back the last state the
+   * screen shows (which is also the last one saved) and tell the player.
+   */
+  const recover = async (what: string, e: unknown) => {
+    console.error(`Age of Sail: ${what} failed`, e);
+    const g = get().game;
+    try { if (g) await sim.load(g); } catch (e2) { console.error('Age of Sail: could not restore the game', e2); }
+    set({ busy: false, preview: null, landing: null });
+    get().say(`Something went wrong ${what}. The game is back where it was.`, true);
+  };
+  const startFailed = (e: unknown) => {
+    console.error('Age of Sail: could not start the voyage', e);
+    set({ phase: 'menu', world: null, game: null, saveProblem: 'The voyage could not be started. Try again, or try another world seed.' });
+  };
   return {
-    phase: 'menu', hasSave: false, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, selectedPort: null, selectedColony: null, preview: null,
+    phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, selectedPort: null, selectedColony: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false,
     drawer: null, courtTab: 'people', dismissed: [], toast: null, busy: false,
 
     set: (p) => set(p),
 
     async checkSave() {
-      try { set({ hasSave: !!(await idbGet(SAVE_KEY)) }); } catch { set({ hasSave: false }); }
+      try {
+        const r = await loadStored();
+        set({ hasSave: !!r?.ok, saveProblem: r && !r.ok ? r.reason : null });
+      } catch { set({ hasSave: false, saveProblem: null }); }
     },
 
-    async newGame(seed, until = 1650) {
-      set({ phase: 'loading' });
-      const { world, state } = await sim.newGame(seed, until);
+    async newGame(seed, until = DEFAULT_UNTIL) {
+      set({ phase: 'loading', saveProblem: null });
+      let r;
+      try { r = await sim.newGame(seed, until); } catch (e) { startFailed(e); return; }
+      const { world, state } = r;
       await save(state);
       set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: [], showHelp: true });
     },
 
     async continueGame() {
-      const saved = await idbGet<GameState>(SAVE_KEY);
-      if (!saved) return;
+      const r = await loadStored().catch(() => null);
+      if (!r?.ok) { set({ hasSave: false, saveProblem: r ? r.reason : null }); return; }
       set({ phase: 'loading' });
-      const { world, state } = await sim.load(saved);
+      let loaded;
+      try { loaded = await sim.load(r.state); } catch (e) { startFailed(e); return; }
+      const { world, state } = loaded;
       set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: state.chronicle.filter((c) => c.turn < state.turn - 1).map(newsKey) });
     },
 
@@ -104,7 +144,9 @@ export const useStore = create<Store>((set, get) => {
     },
 
     async run(c) {
-      const { result, state } = await sim.command(c);
+      let out;
+      try { out = await sim.command(c); } catch (e) { await recover('with that order', e); return false; }
+      const { result, state } = out;
       set({ game: state });
       follow(state);
       void save(state);
@@ -117,7 +159,8 @@ export const useStore = create<Store>((set, get) => {
       const g = get().game;
       if (!g || get().busy) return;
       set({ busy: true, preview: null });
-      const state = await sim.endTurn();
+      let state: GameState;
+      try { state = await sim.endTurn(); } catch (e) { await recover('while ending the season', e); return; }
       const sel = get().selectedFleet;
       const keep = sel != null && state.fleets.some((f) => f.id === sel);
       // news older than last season fades from the feed by itself
@@ -151,24 +194,11 @@ export const useStore = create<Store>((set, get) => {
     },
 
     async planTo(hex) {
-      const party = get().game?.parties.find((x) => x.id === get().selectedParty);
-      if (party) {
-        const lp = await sim.previewParty(party.id, hex);
-        if (!lp) { set({ preview: null }); get().say('No way there on foot.', true); return; }
-        set({ preview: { ...lp, cost: 0, risk: 0, provision: 0, deep: 0, cross: false, crossBlocked: false, fleet: -1, party: party.id, dest: hex, map: party.map } });
-        return;
-      }
-      const fleet = get().selectedFleet;
-      const f = get().game?.fleets.find((x) => x.id === fleet);
-      if (fleet == null || !f) return;
-      const p = await sim.preview(fleet, hex);
-      if (!p) {
+      try { await plan(hex); } catch (e) {
+        console.error('Age of Sail: route preview failed', e);
         set({ preview: null });
-        get().say(f.leader != null ? 'No sea route there.' : 'No charted route there. Only a fleet led by an explorer may sail into unknown waters.', true);
-        return;
+        get().say('Could not plot that course.', true);
       }
-      if (p.crossBlocked) get().say('No captain will sail into the unknown west without an explorer to lead the way.', true);
-      set({ preview: { ...p, fleet, dest: hex, map: f.map } });
     },
 
     async confirmPreview() {
@@ -187,6 +217,29 @@ export const useStore = create<Store>((set, get) => {
     },
   };
 });
+
+/** Ask the worker for a route preview to a hex for the selected fleet or party. */
+async function plan(hex: number) {
+  const get = useStore.getState, set = useStore.setState;
+  const party = get().game?.parties.find((x) => x.id === get().selectedParty);
+  if (party) {
+    const lp = await sim.previewParty(party.id, hex);
+    if (!lp) { set({ preview: null }); get().say('No way there on foot.', true); return; }
+    set({ preview: { ...lp, cost: 0, risk: 0, provision: 0, deep: 0, cross: false, crossBlocked: false, fleet: -1, party: party.id, dest: hex, map: party.map } });
+    return;
+  }
+  const fleet = get().selectedFleet;
+  const f = get().game?.fleets.find((x) => x.id === fleet);
+  if (fleet == null || !f) return;
+  const p = await sim.preview(fleet, hex);
+  if (!p) {
+    set({ preview: null });
+    get().say(f.leader != null ? 'No sea route there.' : 'No charted route there. Only a fleet led by an explorer may sail into unknown waters.', true);
+    return;
+  }
+  if (p.crossBlocked) get().say('No captain will sail into the unknown west without an explorer to lead the way.', true);
+  set({ preview: { ...p, fleet, dest: hex, map: f.map } });
+}
 
 export async function clearSave() {
   try { await idbDel(SAVE_KEY); } catch { /* ignore */ }
