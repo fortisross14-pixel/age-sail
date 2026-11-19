@@ -22,7 +22,7 @@ const HEADS: Record<Exclude<DrawerId, 'cities'>, { title: string; icon: IconName
   chronicle: { title: 'Chronicle', icon: 'chronicle', sub: () => 'What has happened in your reign' },
 };
 
-/** The panel on the right: one at a time, sliding in on its runners and out again. */
+/** A screen over everything (HUD included): one at a time; closing returns to the map. */
 export function Drawer() {
   const drawer = useStore((s) => s.drawer);
   const game = useStore((s) => s.game)!;
@@ -49,6 +49,8 @@ export function Drawer() {
   if (!shown) return null;
   const head = shown === 'cities' ? null : HEADS[shown];
   return (
+    <>
+    <div className={`screen-back ${leaving ? 'leave' : ''}`} onClick={() => set({ drawer: null })} aria-hidden />
     <Frame className={`panel drawer drawer-${shown} ${leaving ? 'leave' : entering ? 'enter' : ''} ${shine ? `shine-${shine % 2}` : ''}`} aria-label={head?.title ?? 'Cities'} role="complementary">
       <button className="adm-medal adm-close" onClick={() => set({ drawer: null })} aria-label="Close" title="Close (Esc)"><Icon name="close" size={20} /></button>
       {head && (
@@ -66,6 +68,7 @@ export function Drawer() {
         {shown === 'chronicle' && <Chronicle />}
       </div>
     </Frame>
+    </>
   );
 }
 

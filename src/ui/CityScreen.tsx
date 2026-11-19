@@ -147,6 +147,8 @@ function Buildings({ city }: { city: City }) {
   const lvSel = sel ? city.buildings[sel] : 0;
   return (
     <>
+      <div className="buildings-split">
+      <div>
       <div className="sec">Building places <span className="count">({slots})</span></div>
       <div className="tiles">
         {tiles.map((t) => (
@@ -176,7 +178,9 @@ function Buildings({ city }: { city: City }) {
           </button>
         ))}
       </div>
-      {sel && selCost && (
+      <p className="muted small">Each level of a building takes one place. {slotsUsedIn(city) + (building ? 1 : 0)} of {slots} used. One project at a time.</p>
+      </div>
+      {sel && selCost ? (
         <div className="detail-card" key={sel}>
           <span className="art">{buildingArt(sel)}</span>
           <h3>{BUILDINGS[sel].name} {lvSel ? ROMAN[lvSel] : ''}</h3>
@@ -194,8 +198,8 @@ function Buildings({ city }: { city: City }) {
               : <span className="muted">{selCost.why}</span>}
           </div>
         </div>
-      )}
-      <p className="muted small">Each level of a building takes one place. {slotsUsedIn(city) + (building ? 1 : 0)} of {slots} used. One project at a time.</p>
+      ) : <div className="detail-card"><span className="muted">Choose a building to see what it does, or an empty place to add one.</span></div>}
+      </div>
       {picking && <BuildPicker city={city} onClose={() => setPicking(false)} onBuild={(b) => void start({ kind: 'building', building: b })} />}
     </>
   );

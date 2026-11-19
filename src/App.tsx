@@ -74,7 +74,7 @@ export function App() {
   useKeys();
   if (phase !== 'playing') return <Menu />;
   return (
-    <div className={`game ${drawer ? 'drawer-open' : ''}`}>
+    <div className={`game ${drawer ? 'screen-open' : ''}`}>
       <GoldDefs />
       <MapCanvas />
       <Hud />

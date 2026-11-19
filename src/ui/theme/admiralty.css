@@ -220,25 +220,40 @@ button.link { background: none; border: 0; box-shadow: none; padding: 0; min-hei
 .minimap canvas { border-radius: 6px; }
 .minimap canvas { display: block; width: 100%; height: auto; cursor: pointer; }
 .minimap .zoom { position: absolute; right: -26px; top: 50%; transform: translateY(-50%); display: grid; gap: 8px; z-index: 6; }
-.game.drawer-open .minimap { right: calc(var(--panel-w) + 26px); bottom: calc(var(--dock-h) + 26px); }
+/* screens open over everything, so nothing on the map moves aside */
 .hud .stat.plain { background: none; border: 0; box-shadow: none; padding: 0 18px; min-height: 0; color: inherit; text-align: left; font: inherit; }
 .hud .stat.plain:hover { filter: brightness(1.15); background: none; }
 
 /* ---------- panels (drawers) ---------- */
 .drawer.adm-frame {
-  position: absolute; top: calc(var(--top) + 16px); right: 12px; bottom: 14px; width: var(--panel-w); padding: 7px; z-index: 12;
-  display: flex; user-select: text; border-radius: 14px; background-size: auto;
+  position: fixed; z-index: 25; left: 50%; top: 50%; width: min(1180px, calc(100vw - 48px)); height: min(860px, calc(100vh - 40px));
+  transform: translate(-50%, -50%); padding: 8px; display: flex; user-select: text; border-radius: 16px;
 }
+.drawer.adm-frame.drawer-court, .drawer.adm-frame.drawer-fleets, .drawer.adm-frame.drawer-research, .drawer.adm-frame.drawer-chronicle { width: min(1040px, calc(100vw - 48px)); }
 .drawer.adm-frame > .adm-frame-inner { flex: 1; }
-.drawer.enter { animation: drawerIn 560ms var(--ease-out) both; }
-.drawer.leave { animation: drawerOut 320ms cubic-bezier(.6, 0, .8, .3) both; pointer-events: none; }
-@keyframes drawerIn {
-  0% { transform: translateX(calc(100% + 30px)); }
-  70% { transform: translateX(-12px); }
-  86% { transform: translateX(4px); }
-  100% { transform: none; }
+.drawer.adm-frame .adm-corner { width: 64px; height: 64px; top: -8px; left: -8px; }
+.drawer.adm-frame .adm-corner-tr { left: auto; right: -8px; }
+.drawer.adm-frame .adm-corner-bl { top: auto; bottom: -8px; }
+.drawer.adm-frame .adm-corner-br { top: auto; left: auto; right: -8px; bottom: -8px; }
+.screen-back { position: fixed; inset: 0; z-index: 24; background: radial-gradient(ellipse at center, rgba(5, 12, 18, .45), rgba(5, 12, 18, .78)); backdrop-filter: blur(2px) saturate(.8); animation: fade 320ms ease both; }
+.screen-back.leave { animation: fade 260ms ease reverse both; }
+.drawer.enter { animation: screenIn 520ms var(--ease-out) both; }
+.drawer.leave { animation: screenOut 260ms cubic-bezier(.6, 0, .8, .3) both; pointer-events: none; }
+@keyframes screenIn {
+  0% { transform: translate(-50%, calc(-50% + 46px)) scale(.94); opacity: 0; }
+  65% { transform: translate(-50%, calc(-50% - 6px)) scale(1.005); opacity: 1; }
+  100% { transform: translate(-50%, -50%); opacity: 1; }
 }
-@keyframes drawerOut { 0% { transform: none; } 20% { transform: translateX(-8px); } 100% { transform: translateX(calc(100% + 40px)); } }
+@keyframes screenOut { to { transform: translate(-50%, calc(-50% + 30px)) scale(.96); opacity: 0; } }
+.drawer-body { padding: 6px 26px 26px; }
+.drawer-court .drawer-body > *, .drawer-fleets .drawer-body > *, .drawer-research .drawer-body > *, .drawer-chronicle .drawer-body > * { max-width: 920px; margin-left: auto; margin-right: auto; }
+/* the city screen uses the width: places on the left, the chosen building on the right */
+.buildings-split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+.buildings-split .detail-card { position: sticky; top: 0; grid-template-columns: 1fr; justify-items: start; }
+.buildings-split .detail-card .art { grid-row: auto; width: 100%; height: 190px; }
+.drawer-cities .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.drawer-cities .offer-cards { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+@media (max-width: 900px) { .buildings-split { grid-template-columns: 1fr; } }
 .drawer-head { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; padding: 16px 64px 10px 18px; border: 0; position: relative; min-height: 96px; }
 .drawer-head h2 { font-size: 36px; line-height: 1; }
 .drawer-head .sub { font: 15px var(--serif); color: var(--ink-2); margin-top: 3px; }
@@ -344,7 +359,7 @@ button.link { background: none; border: 0; box-shadow: none; padding: 0; min-hei
 .offer-card.locked { filter: grayscale(.7); opacity: .65; }
 
 /* picker */
-.adm-modal-back { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; background: radial-gradient(ellipse at center, rgba(5, 10, 15, .35), rgba(5, 10, 15, .7)); animation: fade 200ms ease both; }
+.adm-modal-back { position: fixed; inset: 0; z-index: 32; display: grid; place-items: center; padding: 20px; background: radial-gradient(ellipse at center, rgba(5, 10, 15, .35), rgba(5, 10, 15, .7)); animation: fade 200ms ease both; }
 .adm-modal-back.leave { animation: fade 200ms ease reverse both; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 .adm-modal { width: min(600px, 100%); max-height: min(720px, 100%); display: flex; animation: lid 520ms var(--ease-out) both; }
@@ -391,7 +406,9 @@ button.link { background: none; border: 0; box-shadow: none; padding: 0; min-hei
 .selection .muted, .news-item .muted, .hover-line .muted { color: #a9b7c2; }
 .selection h3, .selection b { color: var(--parch-3); }
 .selection button:not(.x) { font-size: 14px; }
-.toast { color: var(--parch-3); }
+.toast { position: fixed; z-index: 36; top: calc(var(--top) + 16px); left: 50%; transform: translateX(-50%); max-width: min(560px, 90vw);
+  padding: 10px 18px; color: var(--parch-3); font-size: 16px; animation: toastIn 360ms var(--ease-spring) both; }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, -12px) scale(.96); } to { opacity: 1; transform: translate(-50%, 0); } }
 .toast.bad { box-shadow: inset 4px 0 0 var(--oxblood-hi), 0 10px 22px -8px rgba(0, 0, 0, .7); }
 .hover-line { color: var(--parch); }
 

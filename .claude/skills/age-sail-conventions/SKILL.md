@@ -67,7 +67,9 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   icons) and `Art` slots for painted pictures (`src/ui/theme/Art.tsx`, list in `art/PROMPTS.md`).
 - Sounds go through `sfx()` in `src/ui/sound.ts` (synthesized, no files). Game orders get their
   sound in `store.run`; panels, tabs and pickers play their own.
-- Overlays opened from inside a sliding panel must portal to `.game`: the panel's transform traps
+- Screens (the `Drawer`) open centred over everything, HUD included, on a dimmed backdrop; a
+  click outside or Escape closes them. Nothing on the map moves when one opens.
+- Overlays opened from inside a screen must portal to `.game`: the panel's transform traps
   `position: fixed`.
 
 ## Balance
