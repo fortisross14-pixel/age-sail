@@ -403,3 +403,14 @@ button.on { background: linear-gradient(#e9c45c, #cf9f2c); border-color: #8a6516
 .stop-goods { display: grid; gap: 3px; margin-top: 4px; }
 .stop-good { display: grid; grid-template-columns: 22px 70px 36px auto auto auto; gap: 6px; align-items: center; font-size: 13px; }
 .num-in { width: 60px; font: 13px var(--sans); padding: 2px 4px; border: 1px solid var(--line); border-radius: 3px; background: var(--paper-3); margin-left: 3px; }
+
+/* cities */
+.city-body h4 { font: 16px var(--serif); margin: 12px 0 4px; }
+.slot-bar { display: flex; gap: 4px; margin: 2px 0 6px; }
+.slot-bar i { width: 22px; height: 8px; border-radius: 2px; border: 1px solid var(--ink-3); }
+.slot-bar i.on { background: var(--crown); border-color: #8a6516; }
+.buildings { display: grid; gap: 6px; }
+.building { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 250, 236, 0.4); }
+.building.built { background: rgba(217, 165, 33, 0.1); }
+.building button, .offer button { min-height: 28px; padding: 3px 9px; font-size: 13px; }
+.b-icon { font-size: 22px; text-align: center; color: var(--ink-2); }

@@ -1,6 +1,11 @@
 import { useStore } from '../store';
 import { provisionsMax, maxMoves, leaderOf, slotsUsed, slotsMax, isPortal, canCross, portById, cargoUsed, cargoCapacity, provisionCost } from '../sim/game';
 import { fmt } from './format';
+import { GRIDS } from '../sim/hex';
+import { isWater } from '../data/terrain';
+import { UNIT_INFO } from '../data/court';
+import { partyMaxMoves, partyUnits } from '../sim/land';
+import { personById } from '../sim/court';
 import { ShipIcon } from './Icon';
 
 /** A compact card for the selected fleet: what it has, and what it can do next. */
@@ -13,8 +18,15 @@ export function SelectionCard() {
   const run = useStore((s) => s.run);
   const confirm = useStore((s) => s.confirmPreview);
   const set = useStore((s) => s.set);
+  const landing = useStore((s) => s.landing);
+  const partyId = useStore((s) => s.selectedParty);
+  const party = game.parties.find((p) => p.id === partyId && p.map === map);
+  if (party) return <PartyCard partyId={party.id} />;
   const fleet = game.fleets.find((f) => f.id === selected && f.map === map);
   if (!fleet) return null;
+  const g = GRIDS[fleet.map];
+  const shoreNear = [fleet.hex, ...g.neighbors(fleet.hex)].some((h) => !isWater(world[fleet.map].terrain[h]) && game.fog[fleet.map][h] > 0);
+  const aboard = game.units.filter((u) => u.fleet === fleet.id).length;
   const leader = leaderOf(game, fleet);
   const port = fleet.at ? portById(world, fleet.at) : undefined;
   const lowFood = fleet.supplies <= 2;
@@ -34,7 +46,9 @@ export function SelectionCard() {
           <span title="Places aboard for people and units">☺ {slotsUsed(game, fleet)}/{slotsMax(fleet)}</span>
           <span title="Ships">{fleet.ships.length} ship{fleet.ships.length > 1 ? 's' : ''}</span>
         </div>
-        {preview && preview.fleet === fleet.id ? (
+        {landing ? (
+          <div className="sel-plan"><b>Choose the shore</b> highlighted beside the fleet. Esc cancels.</div>
+        ) : preview && preview.fleet === fleet.id ? (
           <div className="sel-plan">
             <b>{preview.turns > 1 ? `${preview.turns} seasons` : 'This season'}</b>{preview.cross ? ', then across the ocean' : ''}
             <span className="muted"> · storm risk {Math.round(preview.risk * 100)}%{preview.provision ? ` · provisions ${fmt(preview.provision)}` : ''}</span>
@@ -65,9 +79,65 @@ export function SelectionCard() {
         {port && !preview && provisionCost(world, fleet, game) > 0 && (
           <button onClick={() => void run({ kind: 'provision', fleet: fleet.id })}>Provision · {fmt(provisionCost(world, fleet, game))}</button>
         )}
+        {!preview && shoreNear && (aboard > 0 || leaderOf(game, fleet)?.rank === 'explorer') && !landing && (
+          <>
+            <button className="primary" title="Put the units aboard ashore, with the explorer" onClick={() => set({ landing: { leader: leaderOf(game, fleet)?.rank === 'explorer' } })}>Land party</button>
+            {leaderOf(game, fleet) && aboard > 0 && <button title="Units go ashore; the leader stays with the ships" onClick={() => set({ landing: { leader: false } })}>Land units only</button>}
+          </>
+        )}
         {!preview && <button onClick={() => set({ drawer: 'fleets' })}>Details</button>}
       </div>
       <button className="x" onClick={() => useStore.getState().selectFleet(null)} aria-label="Deselect">×</button>
+    </div>
+  );
+}
+
+function PartyCard({ partyId }: { partyId: number }) {
+  const game = useStore((s) => s.game)!;
+  const preview = useStore((s) => s.preview);
+  const run = useStore((s) => s.run);
+  const confirm = useStore((s) => s.confirmPreview);
+  const set = useStore((s) => s.set);
+  const p = game.parties.find((x) => x.id === partyId)!;
+  const g = GRIDS[p.map];
+  const leader = personById(game, p.leader);
+  const units = partyUnits(game, p);
+  const ships = game.fleets.filter((f) => f.map === p.map && (f.hex === p.hex || g.neighbors(p.hex).includes(f.hex)));
+  return (
+    <div className="selection" role="region" aria-label={`Selected party ${p.name}`}>
+      <img src={`${import.meta.env.BASE_URL}sprites/${units[0] ? UNIT_INFO[units[0].type].sprite : 'units/scout'}.png`} alt="" height={54} />
+      <div className="sel-main">
+        <div className="sel-title">
+          <b>{p.name}</b>
+          <span className="muted small">{leader ? `led by ${leader.name}` : 'no leader'} · ashore</span>
+        </div>
+        <div className="sel-stats">
+          <span title="Movement left this season">🥾 {p.moves}/{partyMaxMoves(game, p)}</span>
+          {units.map((u) => <span key={u.id}>{UNIT_INFO[u.type].name}</span>)}
+        </div>
+        {preview && preview.party === p.id ? (
+          <div className="sel-plan"><b>{preview.turns > 1 ? `${preview.turns} seasons` : 'This season'}</b> on foot</div>
+        ) : p.order ? (
+          <div className="sel-plan muted">Marching: {p.order.length - 1} hexes to go.</div>
+        ) : (
+          <div className="sel-plan muted">Click land to march · Space to confirm · they survey the country as they go, and follow rumours (?)</div>
+        )}
+      </div>
+      <div className="sel-actions">
+        {preview && preview.party === p.id && (
+          <>
+            <button className="primary" onClick={() => void confirm()}>March</button>
+            <button onClick={() => set({ preview: null })}>Cancel</button>
+          </>
+        )}
+        {!preview && p.order && <button onClick={() => void run({ kind: 'stopParty', party: p.id })}>Halt</button>}
+        {!preview && ships.map((f) => (
+          <button key={f.id} onClick={async () => {
+            if (await run({ kind: 'boardParty', party: p.id, fleet: f.id })) useStore.getState().selectFleet(f.id);
+          }}>Board {f.name}</button>
+        ))}
+      </div>
+      <button className="x" onClick={() => useStore.getState().selectParty(null)} aria-label="Deselect">×</button>
     </div>
   );
 }

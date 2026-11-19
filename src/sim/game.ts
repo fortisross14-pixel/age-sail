@@ -1,5 +1,7 @@
 import { GOODS, GOOD_INFO, type GoodId } from '../data/goods';
-import { SHIPS, SHIP_NAMES, PORT_UPGRADE, type ShipType } from '../data/ships';
+import { SHIPS, SHIP_NAMES, type ShipType } from '../data/ships';
+import { BUILDINGS, BUILDING_ORDER, CITY_SPACE, UNIT_SPECS, type BuildingId } from '../data/city';
+import * as Land from './land';
 import { EUROPEAN_PORTS, KNOWN_SOUTH, ATLANTIC_ISLANDS } from '../data/europe';
 import { TECHS, techById, type TechId } from '../data/tech';
 import { T, isWater } from '../data/terrain';
@@ -13,7 +15,7 @@ import { RANK_INFO, UNIT_INFO } from '../data/court';
 import {
   Fog, dateLabel, seasonOf, yearOf,
   type Fleet, type GameState, type World, type PortDef, type ChronicleEntry, type MapData, type ProjectKind, type GameEvent,
-  type Person, type UnitType, type TradeRoute, type Rank,
+  type Person, type UnitType, type TradeRoute, type Rank, type City,
 } from './types';
 export { leaderOf };
 
@@ -61,6 +63,8 @@ const deepStorms = (s: GameState, f: Fleet) => 3 - 0.3 * skill(leaderOf(s, f), '
 export function spreadFor(s: GameState, f?: Fleet, native = false): number {
   const l = f ? leaderOf(s, f) : undefined;
   let sp = (has(s, 'bookkeeping') ? 0.06 : 0.1) - skill(l, 'commerce') * 0.01;
+  const city = f?.at ? s.cities[f.at] : undefined;
+  if (city) sp -= city.buildings.market * 0.02;
   if (native) sp -= skill(l, 'diplomacy') * 0.01;
   return Math.max(0.01, sp);
 }
@@ -214,12 +218,19 @@ export function newGame(seed: number): { world: World; state: GameState } {
   }
   for (const p of allPorts(world)) if (p.kind === 'native') markets[p.id] = nativeMarket(world, p, rng);
   const cities: GameState['cities'] = {};
-  for (const p of EUROPEAN_PORTS) if (p.kind === 'home') cities[p.id] = { id: p.id, port: p.port ?? 1, project: null, governor: null };
+  for (const p of EUROPEAN_PORTS) {
+    if (p.kind !== 'home') continue;
+    const start = CITY_SPACE[p.id]?.start ?? { docks: 1 };
+    const buildings = Object.fromEntries(BUILDING_ORDER.map((b) => [b, start[b] ?? 0])) as Record<BuildingId, number>;
+    cities[p.id] = { id: p.id, buildings, project: null, governor: null };
+  }
 
   const state: GameState = {
     seed, turn: 0, treasury: 5000, prestige: 0,
     fog: { old: initialOldFog(world), new: new Array(GRIDS.new.N).fill(Fog.Unknown) },
-    fleets: [], people: [], petitioners: [], units: [], cities, markets, discovered: [],
+    fleets: [], people: [], petitioners: [], units: [], parties: [], cities, markets, discovered: [],
+    surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
+    rumoursDone: { old: [], new: [] }, finds: [],
     adoption: { furs: 1, dyes: 1, gold: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1 },
     chronicle: [], events: [], nextId: 1, newWorldFound: false,
     research: { known: [], current: 'portolan', progress: 0, pending: 0 },
@@ -311,23 +322,38 @@ export function repair(world: World, s: GameState, fleetId: number): CommandResu
   return { ok: true, message: `Repaired for ${cost} ducats.` };
 }
 
+/** Building places used in a city: one per level of every building. */
+export const slotsUsedIn = (c: City) => BUILDING_ORDER.reduce((t, b) => t + c.buildings[b], 0);
+export const citySlots = (c: City) => CITY_SPACE[c.id]?.slots ?? 4;
+
 /** What a project costs in a city; a governor's construction skill makes it faster and cheaper. */
-export function projectCost(p: ProjectKind, cityPort: number, governor?: Person): { cost: number; build: number; allowed: boolean; why?: string } {
+export function projectCost(p: ProjectKind, city: City, governor?: Person): { cost: number; build: number; allowed: boolean; why?: string } {
   const c = skill(governor, 'construction');
   const adj = (cost: number, build: number) => ({ cost: Math.round(cost * (1 - 0.05 * c)), build: Math.max(1, build - Math.floor(c / 2)) });
   if (p.kind === 'ship') {
     const spec = SHIPS[p.ship];
-    return { ...adj(spec.cost, spec.build), allowed: cityPort >= spec.port, why: cityPort < spec.port ? `Needs a level ${spec.port} port.` : undefined };
+    const ok = city.buildings.docks >= spec.port;
+    return { ...adj(spec.cost, spec.build), allowed: ok, why: ok ? undefined : `Needs docks level ${spec.port}.` };
   }
-  const up = PORT_UPGRADE[cityPort + 1];
-  return up ? { ...adj(up.cost, up.build), allowed: true } : { cost: 0, build: 0, allowed: false, why: 'The port is as large as it can be.' };
+  if (p.kind === 'unit') {
+    const spec = UNIT_SPECS[p.unit];
+    if (spec.needs && city.buildings[spec.needs] < 1) return { cost: spec.cost, build: spec.build, allowed: false, why: `Needs ${BUILDINGS[spec.needs].name.toLowerCase()}.` };
+    const drilled = p.unit === 'infantry' && city.buildings.barracks >= 2;
+    return { cost: Math.round(spec.cost * (drilled ? 0.7 : 1)), build: Math.max(1, spec.build - (drilled ? 1 : 0)), allowed: true };
+  }
+  const b = BUILDINGS[p.building];
+  const next = city.buildings[p.building] + 1;
+  const lv = b.levels[next];
+  if (!lv) return { cost: 0, build: 0, allowed: false, why: `${b.name} are as large as they can be.` };
+  if (slotsUsedIn(city) >= citySlots(city)) return { ...adj(lv.cost, lv.build), allowed: false, why: 'No room left in the city.' };
+  return { ...adj(lv.cost, lv.build), allowed: true };
 }
 
 export function startProject(s: GameState, cityId: string, p: ProjectKind): CommandResult {
   const city = s.cities[cityId];
   if (!city) return fail('Only your own cities can build.');
   if (city.project) return fail('This city is already busy with a project.');
-  const c = projectCost(p, city.port, personById(s, city.governor));
+  const c = projectCost(p, city, personById(s, city.governor));
   if (!c.allowed) return fail(c.why ?? 'Not possible.');
   if (c.cost > s.treasury) return fail(`That costs ${c.cost} ducats.`);
   s.treasury -= c.cost;
@@ -404,7 +430,7 @@ export function assignLeader(s: GameState, personId: number, fleetId: number): C
   p.fleet = f.id;
   p.city = null;
   let msg = `${p.name} takes command of ${f.name}.`;
-  for (const u of s.units.filter((x) => x.city === f.at && x.fleet == null)) {
+  for (const u of s.units.filter((x) => x.city === f.at && x.fleet == null && x.party == null)) {
     if (slotsUsed(s, f) >= slotsMax(f)) { msg += ' There is no room aboard for everyone waiting in port.'; break; }
     u.fleet = f.id;
     u.city = null;
@@ -440,6 +466,7 @@ export function embark(world: World, s: GameState, unitId: number, fleetId: numb
   if (slotsUsed(s, f) >= slotsMax(f)) return fail('No room aboard. A caravel carries one, a carrack two, a galleon four (the leader takes one).');
   u.fleet = f.id;
   u.city = null;
+  u.party = null;
   void world;
   return { ok: true, message: `${UNIT_INFO[u.type].name} board ${f.name}.` };
 }
@@ -474,6 +501,38 @@ export function mergeFleets(s: GameState, fromId: number, intoId: number): Comma
   for (const u of unitsAboard(s, a)) u.fleet = b.id;
   s.fleets = s.fleets.filter((f) => f !== a);
   return { ok: true, message: `${a.name} joins ${b.name}.` };
+}
+
+// ---------- parties ashore ----------
+
+const landLog = (s: GameState) => (kind: 'discovery' | 'peril', text: string) => log(s, kind, text);
+const landEvent = (s: GameState) => (e: GameEvent) => event(s, e);
+const landResearch = (s: GameState) => (n: number) => addResearch(s, n);
+
+export function landParty(world: World, s: GameState, fleetId: number, hex: number, withLeader: boolean): CommandResult {
+  const f = fleetById(s, fleetId);
+  if (!f) return fail('No such fleet.');
+  return Land.landParty(world, s, f, hex, withLeader, landLog(s), landEvent(s), landResearch(s));
+}
+
+export function moveParty(world: World, s: GameState, partyId: number, hex: number): CommandResult {
+  const p = Land.partyById(s, partyId);
+  if (!p) return fail('No such party.');
+  return Land.moveParty(world, s, p, hex, landLog(s), landEvent(s), landResearch(s));
+}
+
+export function boardParty(s: GameState, partyId: number, fleetId: number): CommandResult {
+  const p = Land.partyById(s, partyId);
+  const f = fleetById(s, fleetId);
+  if (!p || !f) return fail('No such party or fleet.');
+  return Land.boardParty(s, p, f);
+}
+
+export function stopParty(s: GameState, partyId: number): CommandResult {
+  const p = Land.partyById(s, partyId);
+  if (!p) return fail('No such party.');
+  p.order = null;
+  return { ok: true };
 }
 
 // ---------- trade routes ----------
@@ -868,11 +927,23 @@ export function endTurn(world: World, s: GameState): void {
       const fleet = makeFleet(s, `${port.name} Fleet ${n}`, [ship], port);
       s.fleets.push(fleet);
       log(s, 'court', `The ${SHIPS[p.ship].name.toLowerCase()} ${ship.name} is launched in ${port.name}.`);
+    } else if (p.kind === 'unit') {
+      s.units.push({ id: s.nextId++, type: p.unit, fleet: null, city: city.id, party: null });
+      log(s, 'court', `${UNIT_INFO[p.unit].name} are ready in ${port.name}, waiting for a ship.`);
     } else {
-      city.port++;
-      log(s, 'court', `${port.name}’s harbour works are finished. The port is now level ${city.port}.`);
+      city.buildings[p.building]++;
+      const b = BUILDINGS[p.building];
+      log(s, 'court', `${port.name}: the ${b.name.toLowerCase()} ${city.buildings[p.building] > 1 ? 'are enlarged' : 'are finished'}. ${b.effect[city.buildings[p.building]]}`);
     }
   }
+
+  // taxes and market dues; universities feed the scholars
+  let taxes = 0;
+  for (const c of Object.values(s.cities)) {
+    taxes += (CITY_SPACE[c.id]?.taxes ?? 30) + c.buildings.market * 60;
+    addResearch(s, c.buildings.university * 2);
+  }
+  s.treasury += taxes;
 
   // the court: commissions take effect, salaries, a learned court helps the scholars
   for (const p of s.people) {
@@ -881,7 +952,7 @@ export function endTurn(world: World, s: GameState): void {
     if (p.ready > 0) continue;
     if (p.rank === 'explorer' && p.unitType) {
       const at = p.city ?? 'seville';
-      s.units.push({ id: s.nextId++, type: p.unitType, fleet: null, city: at });
+      s.units.push({ id: s.nextId++, type: p.unitType, fleet: null, city: at, party: null });
       log(s, 'court', `${p.name} is ready to lead an expedition. ${UNIT_INFO[p.unitType].name} wait with them in ${portById(world, at)?.name}.`);
     } else {
       log(s, 'court', `${p.name} is ready to serve as ${RANK_INFO[p.rank].name.toLowerCase()}.`);
@@ -925,7 +996,8 @@ export function endTurn(world: World, s: GameState): void {
   }
 
   // wages and upkeep
-  const upkeep = s.fleets.reduce((t, f) => t + f.ships.reduce((u, sh) => u + SHIPS[sh.type].upkeep, 0), 0);
+  const upkeep = s.fleets.reduce((t, f) => t + f.ships.reduce((u, sh) => u + SHIPS[sh.type].upkeep, 0), 0)
+    + s.units.reduce((t, u) => t + UNIT_SPECS[u.type].upkeep, 0);
   s.treasury -= upkeep + wages;
   if (s.treasury < 0) {
     const interest = Math.ceil(-s.treasury * 0.05);
@@ -952,6 +1024,7 @@ export function endTurn(world: World, s: GameState): void {
       const f = p.fleet != null ? fleetById(s, p.fleet) : undefined;
       if (f) { f.leader = null; f.route = null; }
       for (const c of Object.values(s.cities)) if (c.governor === p.id) c.governor = null;
+      for (const pt of s.parties) if (pt.leader === p.id) pt.leader = null;
       p.fleet = null;
       const where = f ? ` aboard ${f.name}, far from home` : '';
       log(s, 'court', `${p.name} has died${where}, aged ${ageOf(p, s.turn)}.${f ? ' The fleet has no leader now.' : ''}`);
@@ -972,6 +1045,12 @@ export function endTurn(world: World, s: GameState): void {
       f.order = null;
       crossOcean(world, s, f.id);
     } else advance(world, s, f);
+  }
+  // parties ashore march on
+  for (const p of s.parties) {
+    p.moves = Land.partyMaxMoves(s, p);
+    p.trail = [p.hex];
+    Land.advanceParty(world, s, p, landLog(s), landEvent(s), landResearch(s));
   }
   // merchants sail their routes
   const notes: string[] = [];

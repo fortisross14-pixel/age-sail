@@ -43,11 +43,6 @@ export const SHIP_NAMES = [
   'Nuestra Señora', 'La Capitana', 'San Salvador', 'Santa Ana', 'San Lucas', 'La Magdalena', 'San Telmo',
 ];
 
-export const PORT_UPGRADE = [
-  null,
-  null,
-  { cost: 2500, build: 3, blurb: 'Deeper quays and a dry dock. Lets you build carracks.' },
-  { cost: 5000, build: 4, blurb: 'A great harbour with a royal arsenal. Lets you build galleons.' },
-] as const;
+
 
 

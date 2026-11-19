@@ -3,7 +3,8 @@ import { T, isWater } from '../data/terrain';
 import { OLD_WORLD, ATLANTIC_ISLANDS, STRAITS, EUROPEAN_PORTS, DECOR_CITIES, AFRICA_OUTLINE, FIXED_SOUTH } from '../data/europe';
 import { OLD, NEW, type Grid } from './hex';
 import { mulberry32, hashSeed, range, int, shuffle, type Rng } from './rng';
-import type { World, MapData, PortDef, WindField } from './types';
+import type { World, MapData, PortDef, WindField, Rumour } from './types';
+import { RESOURCE_IDS, type ResourceId } from '../data/city';
 import { nativeWord, islandName } from './names';
 
 /** The Old World board looks the same every game. */
@@ -148,6 +149,48 @@ function makeRivers(g: Grid, terrain: Uint8Array, elevation: Float32Array, toSea
   return rivers;
 }
 
+/**
+ * Hidden riches: resources that only a party on foot will find, and one unusually rich region.
+ * `where` limits them to the generated parts of a board.
+ */
+function placeResources(g: Grid, terrain: Uint8Array, rivers: number[][], toSea: Int32Array, rng: Rng, map: 'old' | 'new', where: (i: number) => boolean) {
+  const resource = new Uint8Array(g.N);
+  const onRiver = new Set(rivers.flat());
+  const land = [...Array(g.N).keys()].filter((i) => where(i) && !isWater(terrain[i]));
+  // the rich region: a cluster of gold (and, in the New World, silver) somewhere inland
+  const inland = land.filter((i) => toSea[i] >= 3);
+  const rich = inland.length ? inland[int(rng, 0, inland.length - 1)] : -1;
+  const id = (r: ResourceId) => RESOURCE_IDS.indexOf(r) + 1;
+  for (const i of land) {
+    const t = terrain[i];
+    const near = rich >= 0 && g.distance(i, rich) <= 5;
+    const boost = near ? 6 : 1;
+    const r = rng();
+    let pick: ResourceId | null = null;
+    if (t === T.Mountains) pick = map === 'new' && r < 0.06 * boost ? 'silver' : r < 0.11 * boost ? 'gold' : null;
+    else if (t === T.Hills) pick = r < 0.05 * boost ? 'gold' : null;
+    else if (near && r < 0.12) pick = 'gold';
+    else if ((t === T.Plains || t === T.Savanna) && (onRiver.has(i) ? r < 0.25 : r < 0.04)) pick = 'fertile';
+    else if (t === T.Forest) pick = r < 0.05 ? 'timber' : onRiver.has(i) && r < 0.12 ? 'fertile' : null;
+    else if (t === T.Taiga) pick = r < 0.08 ? 'furs' : r < 0.11 ? 'timber' : null;
+    else if (t === T.Jungle) pick = map === 'old' ? (r < 0.07 ? 'spices' : r < 0.1 ? 'dyes' : null) : r < 0.06 ? 'dyes' : r < 0.08 ? 'fertile' : null;
+    if (pick) resource[i] = id(pick);
+  }
+  return { resource, rich };
+}
+
+function placeRumours(g: Grid, terrain: Uint8Array, toSea: Int32Array, rng: Rng, n: number, where: (i: number) => boolean): Rumour[] {
+  const kinds: Rumour['kind'][] = ['ruins', 'city', 'shrine'];
+  const cands = shuffle(rng, [...Array(g.N).keys()].filter((i) => where(i) && !isWater(terrain[i]) && toSea[i] >= 2 && terrain[i] !== T.Mountains));
+  const out: Rumour[] = [];
+  for (const h of cands) {
+    if (out.length >= n) break;
+    if (out.some((r) => g.distance(r.hex, h) < 6)) continue;
+    out.push({ hex: h, kind: kinds[int(rng, 0, 2)] });
+  }
+  return out;
+}
+
 /** Spread trading grounds of native peoples along coasts, a few per latitude band. */
 function placeSites(g: Grid, terrain: Uint8Array, rng: Rng, map: 'old' | 'new', bands: [number, number, number][], ok: (i: number) => boolean): PortDef[] {
   const coast = shuffle(rng, [...Array(g.N).keys()].filter((i) => coastal(g, terrain, i) && ok(i)));
@@ -276,9 +319,12 @@ export function generateOldWorld(seed: number): MapData {
     .filter((c) => c.length >= 2 && c.length < 40 && g.lat(c[0]) < FIXED_SOUTH - 1)
     .map((c) => ({ name: islandName(rng), hex: [...c].sort((a, b) => south.toSea[b] - south.toSea[a])[0] }));
   const wind = [0, 1, 2, 3].map((sn) => windField(g, OLD_WORLD_SEED, sn, terrain));
+  const south_ = (i: number) => g.lat(i) < FIXED_SOUTH - 2;
+  const { resource } = placeResources(g, terrain, rivers, south.toSea, rng, 'old', south_);
+  const rumours = placeRumours(g, terrain, south.toSea, rng, 5, south_);
   return {
     id: 'old', terrain, elevation, rivers, wind, ports, decorCities, islandNames, monsters: [],
-    portals: edgePortals(g, terrain, 0), mainland: south.mainland, deep: south.deep,
+    portals: edgePortals(g, terrain, 0), mainland: south.mainland, deep: south.deep, resource, rumours,
   };
 }
 
@@ -379,9 +425,11 @@ export function generateNewWorld(seed: number): MapData {
   }
 
   const wind = [0, 1, 2, 3].map((s) => windField(g, seed, s, terrain));
+  const { resource } = placeResources(g, terrain, rivers, toSea, rng, 'new', () => true);
+  const rumours = placeRumours(g, terrain, toSea, rng, 9, () => true);
   return {
     id: 'new', terrain, elevation, rivers, wind, ports, decorCities: [], islandNames, monsters,
-    portals: edgePortals(g, terrain, g.W - 1), mainland, deep,
+    portals: edgePortals(g, terrain, g.W - 1), mainland, deep, resource, rumours,
   };
 }
 

@@ -5,11 +5,11 @@ import type { SimApi, Command } from './sim/worker';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import type { MovePreview } from './sim/game';
 
-const SAVE_KEY = 'age-sail:save:v4';
+const SAVE_KEY = 'age-sail:save:v5';
 
 const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' }));
 
-export interface Preview extends MovePreview { fleet: number; dest: number; map: MapId }
+export interface Preview extends MovePreview { fleet: number; dest: number; map: MapId; party?: number }
 
 export type DrawerId = 'cities' | 'markets' | 'fleets' | 'court';
 
@@ -23,6 +23,9 @@ interface Store {
   game: GameState | null;
   map: MapId;
   selectedFleet: number | null;
+  selectedParty: number | null;
+  /** choosing where the selected fleet puts its people ashore */
+  landing: { leader: boolean } | null;
   selectedPort: string | null;
   preview: Preview | null;
   hover: { map: MapId; hex: number } | null;
@@ -44,6 +47,7 @@ interface Store {
   run: (c: Command) => Promise<boolean>;
   endTurn: () => Promise<void>;
   selectFleet: (id: number | null) => void;
+  selectParty: (id: number | null) => void;
   selectPort: (id: string | null) => void;
   planTo: (hex: number) => Promise<void>;
   confirmPreview: () => Promise<void>;
@@ -68,7 +72,7 @@ export const useStore = create<Store>((set, get) => {
     if (f && f.map !== get().map) set({ map: f.map, preview: null, selectedPort: null });
   };
   return {
-    phase: 'menu', hasSave: false, world: null, game: null, map: 'old', selectedFleet: null, selectedPort: null, preview: null,
+    phase: 'menu', hasSave: false, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, selectedPort: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false,
     drawer: null, courtTab: 'people', dismissed: [], toast: null, busy: false,
 
@@ -117,14 +121,20 @@ export const useStore = create<Store>((set, get) => {
       const keep = sel != null && state.fleets.some((f) => f.id === sel);
       // news older than last season fades from the feed by itself
       const old = state.chronicle.filter((c) => c.turn < state.turn - 1).map(newsKey);
-      set({ game: state, busy: false, selectedFleet: keep ? sel : null, dismissed: [...new Set([...get().dismissed.slice(-200), ...old])] });
+      const psel = get().selectedParty;
+      set({ game: state, busy: false, selectedFleet: keep ? sel : null, selectedParty: psel != null && state.parties.some((p) => p.id === psel) ? psel : null, landing: null, dismissed: [...new Set([...get().dismissed.slice(-200), ...old])] });
       follow(state);
       void save(state);
     },
 
     selectFleet(id) {
       const f = get().game?.fleets.find((x) => x.id === id);
-      set({ selectedFleet: id, preview: null, selectedPort: f?.at ?? null, ...(f && f.map !== get().map ? { map: f.map } : {}) });
+      set({ selectedFleet: id, selectedParty: null, landing: null, preview: null, selectedPort: f?.at ?? null, ...(f && f.map !== get().map ? { map: f.map } : {}) });
+    },
+
+    selectParty(id) {
+      const p = get().game?.parties.find((x) => x.id === id);
+      set({ selectedParty: id, selectedFleet: null, landing: null, preview: null, ...(p && p.map !== get().map ? { map: p.map } : {}) });
     },
 
     selectPort(id) {
@@ -140,6 +150,13 @@ export const useStore = create<Store>((set, get) => {
     },
 
     async planTo(hex) {
+      const party = get().game?.parties.find((x) => x.id === get().selectedParty);
+      if (party) {
+        const lp = await sim.previewParty(party.id, hex);
+        if (!lp) { set({ preview: null }); get().say('No way there on foot.', true); return; }
+        set({ preview: { ...lp, cost: 0, risk: 0, provision: 0, deep: 0, cross: false, crossBlocked: false, fleet: -1, party: party.id, dest: hex, map: party.map } });
+        return;
+      }
       const fleet = get().selectedFleet;
       const f = get().game?.fleets.find((x) => x.id === fleet);
       if (fleet == null || !f) return;
@@ -157,6 +174,7 @@ export const useStore = create<Store>((set, get) => {
       const p = get().preview;
       if (!p || p.crossBlocked) return;
       set({ preview: null });
+      if (p.party != null) { await get().run({ kind: 'moveParty', party: p.party, hex: p.dest }); return; }
       const ok = await get().run({ kind: 'move', fleet: p.fleet, hex: p.dest });
       if (ok) set({ selectedPort: get().game?.fleets.find((f) => f.id === p.fleet)?.at ?? null });
     },

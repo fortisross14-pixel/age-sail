@@ -3,6 +3,7 @@ import * as Comlink from 'comlink';
 import type { GoodId } from '../data/goods';
 import type { TechId } from '../data/tech';
 import { generateWorld } from './mapgen';
+import { previewParty } from './land';
 import * as G from './game';
 import type { GameState, World, ProjectKind, Rank, UnitType, TradeRoute } from './types';
 
@@ -27,6 +28,10 @@ export type Command =
   | { kind: 'split'; fleet: number; ship: number }
   | { kind: 'rename'; fleet: number; name: string }
   | { kind: 'research'; tech: TechId }
+  | { kind: 'land'; fleet: number; hex: number; leader: boolean }
+  | { kind: 'moveParty'; party: number; hex: number }
+  | { kind: 'boardParty'; party: number; fleet: number }
+  | { kind: 'stopParty'; party: number }
   | { kind: 'dismissEvent' };
 
 let world: World | null = null;
@@ -53,6 +58,11 @@ const api = {
     const { world, state } = need();
     return G.previewMove(world, state, fleet, hex);
   },
+  previewParty(party: number, hex: number) {
+    const { world, state } = need();
+    const p = state.parties.find((x) => x.id === party);
+    return p ? previewParty(world, state, p, hex) : null;
+  },
   command(c: Command): { result: G.CommandResult; state: GameState } {
     const { world, state } = need();
     let result: G.CommandResult;
@@ -77,6 +87,10 @@ const api = {
       case 'split': result = G.splitShip(state, c.fleet, c.ship); break;
       case 'rename': result = G.renameFleet(state, c.fleet, c.name); break;
       case 'research': result = G.setResearch(state, c.tech); break;
+      case 'land': result = G.landParty(world, state, c.fleet, c.hex, c.leader); break;
+      case 'moveParty': result = G.moveParty(world, state, c.party, c.hex); break;
+      case 'boardParty': result = G.boardParty(state, c.party, c.fleet); break;
+      case 'stopParty': result = G.stopParty(state, c.party); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
     return { result, state };

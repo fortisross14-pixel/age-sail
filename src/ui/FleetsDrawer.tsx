@@ -49,6 +49,22 @@ export function Fleets() {
           ) : <p className="muted small">{title === 'Expeditions' ? 'None yet. Make a courtier an explorer and give them a fleet.' : title === 'Trade' ? 'Make a courtier a merchant to run trade routes.' : 'Every ship has a leader.'}</p>}
         </section>
       ))}
+      {game.parties.length > 0 && (
+        <section className="fleet-group">
+          <h3>Ashore <span className="muted small">{game.parties.length}</span></h3>
+          <ul className="fleet-list">
+            {game.parties.map((p) => (
+              <li key={p.id}>
+                <button className="fleet-row" onClick={() => { useStore.getState().selectParty(p.id); setTimeout(() => getView()?.focusHex(p.map, p.hex), 0); }}>
+                  <img src={`${import.meta.env.BASE_URL}sprites/units/scout.png`} alt="" height={34} />
+                  <span className="fleet-name">{p.name}<span className="muted small"> · {game.units.filter((u) => u.party === p.id).length} units</span></span>
+                  <span className="fleet-where">{p.order ? 'marching' : p.moves > 0 ? 'ready' : 'resting'}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {fleet && <FleetDetail fleet={fleet} />}
     </>
   );
@@ -64,7 +80,7 @@ function FleetDetail({ fleet }: { fleet: Fleet }) {
   const others = game.fleets.filter((f) => f !== fleet && f.map === fleet.map && f.hex === fleet.hex);
   const port = fleet.at ? portById(world, fleet.at) : undefined;
   const home = port?.kind === 'home';
-  const waitingUnits = home ? game.units.filter((u) => u.city === port!.id && u.fleet == null) : [];
+  const waitingUnits = home ? game.units.filter((u) => u.city === port!.id && u.fleet == null && u.party == null) : [];
   const ready = home && !leader ? game.people.filter((p) => p.alive && p.fleet == null && p.city === port!.id && p.ready === 0 && (p.rank === 'explorer' || p.rank === 'merchant')) : [];
   return (
     <div className="fleet-detail">

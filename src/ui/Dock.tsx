@@ -16,11 +16,11 @@ export function Dock() {
   const badge: Record<DrawerId, number> = {
     cities: Object.values(game.cities).filter((c) => !c.project).length,
     markets: 0,
-    fleets: game.fleets.filter((f) => f.moves > 0 && !f.order && !f.at).length,
-    court: game.people.filter((p) => p.alive && p.ready === 0 && p.fleet == null && (p.rank === 'explorer' || p.rank === 'merchant')).length,
+    fleets: game.fleets.filter((f) => f.moves > 0 && !f.order && !f.at).length + game.parties.filter((p) => p.moves > 0 && !p.order).length,
+    court: game.people.filter((p) => p.alive && p.ready === 0 && p.fleet == null && (p.rank === 'explorer' || p.rank === 'merchant') && !game.parties.some((x) => x.leader === p.id)).length,
   };
   const why: Record<DrawerId, string> = {
-    cities: 'idle yards', markets: '', fleets: 'fleets at sea without orders', court: 'leaders ready, waiting for a fleet',
+    cities: 'idle yards', markets: '', fleets: 'fleets and parties without orders', court: 'leaders ready, waiting for a fleet',
   };
   return (
     <nav className="dock" aria-label="Panels">

@@ -1,6 +1,7 @@
 import type { GoodId } from '../data/goods';
 import type { ShipType } from '../data/ships';
 import type { TechId } from '../data/tech';
+import type { BuildingId, ResourceId } from '../data/city';
 import type { MapId } from './hex';
 
 export type { MapId };
@@ -47,6 +48,9 @@ export interface MapData {
   mainland: Uint8Array;
   /** 1 for open ocean far from any land, where ships without long-distance navigation suffer */
   deep: Uint8Array;
+  /** hidden resources, found only by parties on foot: index into RESOURCE_IDS + 1, 0 for none */
+  resource: Uint8Array;
+  rumours: Rumour[];
 }
 
 export interface World {
@@ -104,10 +108,26 @@ export interface Person {
 export interface Unit {
   id: number;
   type: UnitType;
-  /** aboard this fleet, or waiting in this home city */
+  /** aboard this fleet, ashore in this party, or waiting in this home city */
   fleet: number | null;
   city: string | null;
+  party: number | null;
 }
+
+/** People and units ashore, exploring on foot. */
+export interface Party {
+  id: number;
+  name: string;
+  map: MapId;
+  hex: number;
+  leader: number | null;
+  moves: number;
+  order: number[] | null;
+  trail: number[];
+}
+
+/** A rumour of ruins or a lost city, somewhere inland. */
+export interface Rumour { hex: number; kind: 'ruins' | 'city' | 'shrine' }
 
 export interface TradeStop {
   port: string;
@@ -156,12 +176,12 @@ export interface Fleet {
   deepThisTurn: boolean;
 }
 
-export type ProjectKind = { kind: 'ship'; ship: ShipType } | { kind: 'port' };
+export type ProjectKind = { kind: 'ship'; ship: ShipType } | { kind: 'building'; building: BuildingId } | { kind: 'unit'; unit: UnitType };
 export type Project = ProjectKind & { turnsLeft: number; total: number };
 
 export interface City {
   id: string;
-  port: number;
+  buildings: Record<BuildingId, number>;
   project: Project | null;
   governor: number | null;
 }
@@ -192,6 +212,13 @@ export interface GameState {
   /** people asking for a place at court, and what they ask */
   petitioners: { person: Person; cost: number }[];
   units: Unit[];
+  parties: Party[];
+  /** land walked and surveyed by parties: resources there are known */
+  surveyed: Record<MapId, number[]>;
+  /** rumours already followed up */
+  rumoursDone: Record<MapId, number[]>;
+  /** resources found, for the record */
+  finds: { map: MapId; hex: number; resource: ResourceId; turn: number; by: string }[];
   cities: Record<string, City>;
   markets: Record<string, Partial<Record<GoodId, MarketGood>>>;
   /** native trading sites found so far */

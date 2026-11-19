@@ -4,8 +4,17 @@ import { loadAssets } from '../render/assets';
 import { useStore } from '../store';
 import { isWater } from '../data/terrain';
 import { Fog } from '../sim/types';
+import { GRIDS } from '../sim/hex';
 
 let viewRef: MapView | null = null;
+
+/** Shore hexes beside the selected fleet where it can put people ashore. */
+export function landingHexes(s: ReturnType<typeof useStore.getState>): number[] {
+  const f = s.game?.fleets.find((x) => x.id === s.selectedFleet);
+  if (!f || !s.world) return [];
+  const g = GRIDS[f.map];
+  return [f.hex, ...g.neighbors(f.hex)].filter((h) => !isWater(s.world![f.map].terrain[h]) && s.game!.fog[f.map][h] !== Fog.Unknown);
+}
 export const getView = () => viewRef;
 
 export function MapCanvas() {
@@ -23,9 +32,29 @@ export function MapCanvas() {
       await document.fonts.load('16px "IM Fell English"').catch(() => undefined);
       if (cancelled) return;
       view = new MapView(host.current!, world, assets, {
-        onClick: (map, hex, fleetId) => {
+        onClick: (map, hex, fleetId, partyId) => {
           const s = useStore.getState();
           const g = s.game!;
+          // choosing a shore to land on
+          if (s.landing && s.selectedFleet != null) {
+            const lead = s.landing.leader;
+            s.set({ landing: null });
+            if (!isWater(world[map].terrain[hex])) void s.run({ kind: 'land', fleet: s.selectedFleet, hex, leader: lead }).then((ok) => {
+              const st = useStore.getState();
+              if (ok) { const p = st.game?.parties[st.game.parties.length - 1]; if (p) st.selectParty(p.id); }
+            });
+            return;
+          }
+          if (partyId != null) {
+            if (s.selectedParty !== partyId) s.selectParty(partyId);
+            return;
+          }
+          const party = g.parties.find((p) => p.id === s.selectedParty && p.map === map);
+          if (party && fleetId == null) {
+            if (s.preview?.dest === hex && s.preview.map === map) void s.confirmPreview();
+            else void s.planTo(hex);
+            return;
+          }
           if (fleetId != null) {
             if (s.selectedFleet !== fleetId) s.selectFleet(fleetId);
             return;
@@ -51,7 +80,8 @@ export function MapCanvas() {
         onRightClick: async (map, hex) => {
           const s = useStore.getState();
           const fleet = s.game?.fleets.find((f) => f.id === s.selectedFleet && f.map === map);
-          if (!fleet) return;
+          const party = s.game?.parties.find((p) => p.id === s.selectedParty && p.map === map);
+          if (!fleet && !party) return;
           await s.planTo(hex);
           if (useStore.getState().preview) await useStore.getState().confirmPreview();
         },
@@ -66,7 +96,8 @@ export function MapCanvas() {
       const push = () => {
         const s = useStore.getState();
         if (s.game) view!.update(s.game, {
-          map: s.map, selectedFleet: s.selectedFleet, preview: s.preview && { ...s.preview },
+          map: s.map, selectedFleet: s.selectedFleet, selectedParty: s.selectedParty, preview: s.preview && { ...s.preview },
+          landing: s.landing ? landingHexes(s) : null,
           showWind: s.showWind, showGrid: s.showGrid, highlightAll: s.highlightAll,
         });
       };

@@ -33,9 +33,10 @@ function useKeys() {
         case 'enter': e.preventDefault(); void s.endTurn(); break;
         case ' ': e.preventDefault(); void s.confirmPreview(); break;
         case 'escape':
-          if (s.preview) s.set({ preview: null });
+          if (s.landing) s.set({ landing: null });
+          else if (s.preview) s.set({ preview: null });
           else if (s.drawer) s.set({ drawer: null });
-          else s.selectFleet(null);
+          else { s.selectFleet(null); s.selectParty(null); }
           break;
         case 'v': s.set({ showWind: !s.showWind }); break;
         case 'g': s.set({ showGrid: !s.showGrid }); break;

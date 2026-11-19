@@ -47,6 +47,8 @@ function status(game: ReturnType<typeof useStore.getState>['game'], world: Retur
   if (!p.alive) return `Died ${p.died != null ? yearOf(p.died) : ''}`;
   const where = p.city ? portById(world, p.city)?.name : '';
   if (p.fleet != null) return `Leading ${game.fleets.find((f) => f.id === p.fleet)?.name ?? 'a fleet'}`;
+  const party = game.parties.find((x) => x.leader === p.id);
+  if (party) return `Ashore, leading ${party.name}`;
   if (p.ready > 0) return `Preparing: ready in ${p.ready} season${p.ready > 1 ? 's' : ''}`;
   if (p.rank === 'governor') return `Governor of ${where}`;
   if (p.rank === 'courtier') return `At court in ${where}`;
@@ -86,7 +88,7 @@ function PersonActions({ p }: { p: Person }) {
   const run = useStore((s) => s.run);
   const set = useStore((s) => s.set);
   const selectFleet = useStore((s) => s.selectFleet);
-  const atHome = p.fleet == null && p.city != null;
+  const atHome = p.fleet == null && p.city != null && !game.parties.some((x) => x.leader === p.id);
   const fleetsHere = game.fleets.filter((f) => f.at === p.city && f.leader == null);
   const units: UnitType[] = ['colonist', 'infantry', 'missionary'];
   return (

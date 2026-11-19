@@ -3,7 +3,7 @@ import { generateWorld, generateOldWorld } from './mapgen';
 import {
   newGame, endTurn, buy, sell, moveFleet, previewMove, crossOcean, startProject, portById, cargoUsed, maxMoves,
   provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
-  slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost,
+  slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost, landParty, moveParty, boardParty, citySlots, slotsUsedIn,
 } from './game';
 import { makeMarket, unitPrice, buyCost, sellValue } from './market';
 import { planRoute } from './sailing';
@@ -171,9 +171,10 @@ describe('a voyage, turn by turn', () => {
     endTurn(world, state);
     expect(state.fleets.length).toBe(n + 1);
     const builder = [...state.people].sort((x, y) => y.skills.construction - x.skills.construction)[0];
-    const plain = projectCost({ kind: 'port' }, 1);
+    const cadiz = state.cities.cadiz;
+    const plain = projectCost({ kind: 'building', building: 'docks' }, cadiz);
     expect(promote(state, builder.id, 'governor', { city: 'cadiz' }).ok).toBe(true);
-    const governed = projectCost({ kind: 'port' }, 1, builder);
+    const governed = projectCost({ kind: 'building', building: 'docks' }, cadiz, builder);
     expect(governed.cost).toBeLessThan(plain.cost);
     expect(governed.build).toBeLessThanOrEqual(plain.build);
     expect(portById(world, 'cadiz')).toBeDefined();
@@ -356,5 +357,71 @@ describe('M3: the court', () => {
     expect(log).toContain('at Sevilla: sold');
     void visits;
     void start;
+  });
+});
+
+describe('M4: cities and parties ashore', () => {
+  it('cities have limited room for buildings, and buildings unlock units', () => {
+    const { world, state } = newGame(1492);
+    const c = state.cities.cadiz;
+    expect(startProject(state, 'cadiz', { kind: 'unit', unit: 'infantry' }).ok).toBe(false); // no barracks
+    expect(startProject(state, 'cadiz', { kind: 'unit', unit: 'colonist' }).ok).toBe(true);
+    endTurn(world, state);
+    expect(state.units.some((u) => u.type === 'colonist' && u.city === 'cadiz')).toBe(true);
+    state.treasury = 1e6;
+    for (let k = 0; k < 20 && slotsUsedIn(c) < citySlots(c); k++) {
+      if (!c.project) startProject(state, 'cadiz', { kind: 'building', building: (['barracks', 'church', 'university', 'market', 'barracks'] as const)[k % 5] });
+      endTurn(world, state);
+    }
+    expect(slotsUsedIn(c)).toBe(citySlots(c));
+    expect(projectCost({ kind: 'building', building: 'university' }, c).allowed).toBe(false);
+  });
+
+  it('taxes come in every season', () => {
+    const { world, state } = newGame(1492);
+    const before = state.treasury;
+    endTurn(world, state);
+    // two ships of upkeep and the court's salaries, against Sevilla and Cádiz taxes and Sevilla's market
+    expect(state.treasury).toBeGreaterThan(before - 200);
+  });
+
+  it('an expedition lands a party that walks inland, surveys, and boards again', () => {
+    const game = newGame(1492);
+    const { world, state } = game;
+    const f = expedition(game);
+    // sail to the first coastal people and put the party ashore beside the ship
+    const site = world.old.ports.filter((p) => p.kind === 'native' && world.old.mainland[p.hex]).sort((a, b) => OLD.lat(b.hex) - OLD.lat(a.hex))[0];
+    sailTo(world, state, f.id, site.hex, 10);
+    const shore = OLD.neighbors(f.hex).find((h) => world.old.terrain[h] > 1 && h !== f.hex) ?? f.hex;
+    expect(landParty(world, state, f.id, shore, true).ok).toBe(true);
+    expect(state.parties.length).toBe(1);
+    const p = state.parties[0];
+    expect(f.leader).toBeNull();
+    const surveyedBefore = state.surveyed.old.filter(Boolean).length;
+    expect(surveyedBefore).toBeGreaterThan(0);
+    // march a few hexes inland and come back
+    const inland = OLD.within(p.hex, 4).find((h) => world.old.terrain[h] > 1 && OLD.distance(h, p.hex) === 4)!;
+    expect(moveParty(world, state, p.id, inland).ok).toBe(true);
+    for (let k = 0; k < 4 && p.order; k++) endTurn(world, state);
+    expect(state.surveyed.old.filter(Boolean).length).toBeGreaterThan(surveyedBefore);
+    expect(moveParty(world, state, p.id, shore).ok).toBe(true);
+    for (let k = 0; k < 4 && p.order; k++) endTurn(world, state);
+    expect(p.hex).toBe(shore);
+    expect(boardParty(state, p.id, f.id).ok).toBe(true);
+    expect(state.parties.length).toBe(0);
+    expect(f.leader).not.toBeNull();
+  });
+
+  it('resources and rumours exist on both boards, and every game differs', () => {
+    const a = generateWorld(1), b = generateWorld(2);
+    for (const w of [a, b]) {
+      expect(w.new.resource.filter(Boolean).length).toBeGreaterThan(40);
+      expect(w.old.resource.filter(Boolean).length).toBeGreaterThan(10);
+      expect(w.new.rumours.length).toBeGreaterThanOrEqual(6);
+      expect(w.old.rumours.length).toBeGreaterThanOrEqual(3);
+      // nothing hidden in fixed Europe
+      for (let i = 0; i < OLD.N; i++) if (OLD.lat(i) >= FIXED_SOUTH) expect(w.old.resource[i]).toBe(0);
+    }
+    expect(Buffer.from(a.new.resource).equals(Buffer.from(b.new.resource))).toBe(false);
   });
 });

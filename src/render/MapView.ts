@@ -9,12 +9,17 @@ import {
   buildField, drawWash, drawInk, drawFogMask, drawPaper, drawVeil, INK_RES, WASH_SCALE, VEIL_SCALE, PAPER_ALPHA, PAPER_TILE,
 } from './mapArt';
 import { CROWN, NATIVE } from './palette';
+import { RESOURCES, RESOURCE_IDS } from '../data/city';
+import { UNIT_INFO } from '../data/court';
 
 export interface RoutePreview { path: number[]; turns: number; risk: number; turnEnds: number[]; cross: boolean }
 
 export interface ViewUi {
   map: MapId;
   selectedFleet: number | null;
+  selectedParty: number | null;
+  /** shore hexes the selected fleet can land on, while choosing */
+  landing: number[] | null;
   preview: RoutePreview | null;
   showWind: boolean;
   showGrid: boolean;
@@ -22,7 +27,7 @@ export interface ViewUi {
 }
 
 export interface MapCallbacks {
-  onClick: (map: MapId, hex: number, fleetId: number | null) => void;
+  onClick: (map: MapId, hex: number, fleetId: number | null, partyId: number | null) => void;
   onRightClick: (map: MapId, hex: number) => void;
   onHover: (map: MapId, hex: number) => void;
 }
@@ -111,6 +116,12 @@ class Scene {
   plateLayer = new Container();
   portPlates = new Map<string, Container>();
   plates: Container[] = [];
+  resLayer = new Container();
+  rumourLayer = new Container();
+  parties = new Container();
+  landingG = new Graphics();
+  partySprites = new Map<number, { root: Container; ring: Graphics; fig: Sprite; target: string }>();
+  lastFinds = '';
   fleetSprites = new Map<number, FleetSprite>();
   portSprites = new Map<string, Container>();
   decorLabels: { hex: number; node: Container }[] = [];
@@ -176,7 +187,8 @@ class Scene {
     this.root.addChild(this.grid);
     this.root.addChild(this.portalBand());
     this.buildMonsters();
-    this.root.addChild(this.monsters, this.windG, this.labels, this.routes, this.turnMarks, this.highlight, this.ports, this.fleets, this.plateLayer, this.hover, this.previewLabel);
+    this.root.addChild(this.monsters, this.windG, this.labels, this.resLayer, this.rumourLayer, this.routes, this.landingG, this.turnMarks, this.highlight,
+      this.ports, this.parties, this.fleets, this.plateLayer, this.hover, this.previewLabel);
     this.buildLabels();
     this.buildPorts();
   }
@@ -385,9 +397,91 @@ class Scene {
     if (season !== this.lastSeason) { this.lastSeason = season; this.drawWind(season, fog); }
     this.windG.visible = ui.showWind;
     this.grid.alpha = ui.showGrid || ui.preview ? 0.22 : 0.1;
+    const surveyed = state.surveyed[g.id];
+    let sk = 0;
+    for (let i = 0; i < surveyed.length; i++) sk += surveyed[i];
+    const findsKey = `${sk}|${state.rumoursDone[g.id].length}|${fogKey}`;
+    if (findsKey !== this.lastFinds) { this.lastFinds = findsKey; this.drawFinds(state); }
     this.syncFleets(state, ui, animate);
+    this.syncParties(state, ui);
+    this.landingG.clear();
+    if (ui.landing && ui.map === g.id) {
+      for (const h of ui.landing) this.landingG.poly(g.corners(h, 0.9)).fill({ color: CROWN.spain.primary, alpha: 0.28 }).stroke({ width: 2, color: CROWN.spain.secondary, alpha: 0.9 });
+    }
     this.drawRoutes(state, ui);
     this.drawHighlight(ui);
+  }
+
+  /** Resources found on foot, and rumours seen but not yet followed. */
+  private drawFinds(state: GameState) {
+    const { g, m } = this;
+    this.resLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
+    this.rumourLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
+    const surveyed = state.surveyed[g.id];
+    for (let i = 0; i < g.N; i++) {
+      const r = m.resource[i];
+      if (!r || !surveyed[i]) continue;
+      const node = new Container();
+      node.addChild(new Graphics().circle(0, 0, 13).fill({ color: 0xfbf3df, alpha: 0.92 }).stroke({ width: 1.2, color: INK_HEX, alpha: 0.8 }));
+      const icon = new Sprite(this.assets.tex(RESOURCES[RESOURCE_IDS[r - 1]].icon));
+      icon.anchor.set(0.5);
+      icon.width = 20;
+      icon.scale.y = icon.scale.x;
+      node.addChild(icon);
+      node.position.set(g.cx(i) + HEX_R * 0.35, g.cy(i) - HEX_R * 0.3);
+      this.resLayer.addChild(node);
+    }
+    const fog = state.fog[g.id];
+    for (const r of m.rumours) {
+      if (fog[r.hex] < Fog.Explored || state.rumoursDone[g.id].includes(r.hex)) continue;
+      const node = new Container();
+      node.addChild(new Graphics().circle(0, 0, 12).fill({ color: 0xf3e2b0 }).stroke({ width: 1.8, color: 0x8b2a1a }));
+      const t = label('?', 18, { color: '#8b2a1a' });
+      t.style.fontWeight = 'bold';
+      node.addChild(t);
+      node.position.set(g.cx(r.hex), g.cy(r.hex));
+      this.rumourLayer.addChild(node);
+    }
+  }
+
+  private syncParties(state: GameState, ui: ViewUi) {
+    const { g } = this;
+    const here = state.parties.filter((p) => p.map === g.id);
+    const alive = new Set(here.map((p) => p.id));
+    for (const [id, ps] of this.partySprites) if (!alive.has(id)) { ps.root.destroy({ children: true }); this.partySprites.delete(id); }
+    for (const p of here) {
+      let ps = this.partySprites.get(p.id);
+      if (!ps) {
+        const root = new Container();
+        const ring = new Graphics();
+        const fig = new Sprite();
+        fig.anchor.set(0.5, 0.9);
+        root.addChild(ring, fig);
+        this.parties.addChild(root);
+        ps = { root, ring, fig, target: '' };
+        this.partySprites.set(p.id, ps);
+      }
+      const units = state.units.filter((u) => u.party === p.id);
+      const lead = units.find((u) => u.type === 'infantry') ?? units[0];
+      ps.fig.texture = this.assets.tex(lead ? UNIT_INFO[lead.type].sprite : 'units/scout');
+      ps.fig.height = HEX_R * 1.6;
+      ps.fig.scale.x = ps.fig.scale.y;
+      const sel = ui.selectedParty === p.id;
+      ps.ring.clear();
+      if (sel) ps.ring.ellipse(0, 0, HEX_W * 0.5, HEX_W * 0.2).fill({ color: 0xfff6d8, alpha: 0.9 });
+      ps.ring.ellipse(0, 0, HEX_W * 0.36, HEX_W * 0.14).fill({ color: CROWN.spain.primary, alpha: p.moves > 0 ? 0.6 : 0.25 })
+        .stroke({ width: sel ? 2.4 : 1.4, color: CROWN.spain.secondary });
+      ps.root.position.set(g.cx(p.hex), g.cy(p.hex) + HEX_R * 0.3);
+    }
+  }
+
+  partyAt(mx: number, my: number): number | null {
+    let best: number | null = null, bd = HEX_R * 0.9;
+    for (const [id, ps] of this.partySprites) {
+      const d = Math.hypot(ps.root.x - mx, ps.root.y - HEX_R * 0.6 - my);
+      if (d < bd) { bd = d; best = id; }
+    }
+    return best;
   }
 
   private fleetPos(f: Fleet): [number, number] {
@@ -492,6 +586,11 @@ class Scene {
       dashed(r, pts, 5, 6);
       r.stroke({ width: ui.selectedFleet === f.id ? 2.2 : 1.4, color: 0x7a2416, alpha: ui.selectedFleet === f.id ? 0.8 : 0.45 });
     }
+    for (const pt of state.parties) {
+      if (pt.map !== g.id || !pt.order || pt.order.length < 2) continue;
+      dashed(r, chaikin(pt.order.flatMap((h) => [g.cx(h), g.cy(h)])), 4, 5);
+      r.stroke({ width: ui.selectedParty === pt.id ? 2.2 : 1.4, color: 0x5a3d22, alpha: 0.7 });
+    }
     const p = ui.preview;
     this.previewLabel.visible = !!p && ui.map === g.id;
     if (p && ui.map === g.id && p.path.length > 0) {
@@ -517,7 +616,7 @@ class Scene {
         this.turnMarks.addChild(mark);
       });
       const when = p.turns > 1 ? `arrives in ${p.turns} seasons` : 'arrives this season';
-      this.previewLabel.text = `${when}${p.cross ? ', then crosses the ocean' : ''} · storm risk ${Math.round(p.risk * 100)}%`;
+      this.previewLabel.text = ui.selectedParty != null ? `on foot · ${when}` : `${when}${p.cross ? ', then crosses the ocean' : ''} · storm risk ${Math.round(p.risk * 100)}%`;
       // keep the label inside the board
       const half = this.previewLabel.width / 2 + 10;
       this.previewLabel.position.set(Math.min(g.pxW - half, Math.max(half, x)), y - 24);
@@ -800,7 +899,7 @@ export class MapView {
       const sc = this.scene;
       const [mx, my] = this.toMap(sx, sy);
       const h = sc.g.atPixel(mx, my);
-      const overFleet = sc.fleetAt(mx, my) != null;
+      const overFleet = sc.fleetAt(mx, my) != null || sc.partyAt(mx, my) != null;
       const overPort = sc.m.ports.some((p) => p.hex === h && sc.portSprites.get(p.id)!.visible);
       cv.style.cursor = overFleet || overPort ? 'pointer' : 'default';
       if (h !== this.hoverHex) {
@@ -823,7 +922,10 @@ export class MapView {
       const h = this.scene.g.atPixel(mx, my);
       if (h < 0) return;
       if (d.button === 2) this.cb.onRightClick(this.active, h);
-      else this.cb.onClick(this.active, h, this.scene.fleetAt(mx, my));
+      else {
+        const party = this.scene.partyAt(mx, my);
+        this.cb.onClick(this.active, h, party == null ? this.scene.fleetAt(mx, my) : null, party);
+      }
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
