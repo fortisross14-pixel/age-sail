@@ -5,7 +5,7 @@ import type { SimApi, Command } from './sim/worker';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import type { MovePreview } from './sim/game';
 
-const SAVE_KEY = 'age-sail:save:v8';
+const SAVE_KEY = 'age-sail:save:v9';
 
 const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' }));
 
@@ -42,7 +42,7 @@ interface Store {
   busy: boolean;
 
   checkSave: () => Promise<void>;
-  newGame: (seed: number) => Promise<void>;
+  newGame: (seed: number, until?: number) => Promise<void>;
   continueGame: () => Promise<void>;
   quitToMenu: () => void;
   run: (c: Command) => Promise<boolean>;
@@ -83,9 +83,9 @@ export const useStore = create<Store>((set, get) => {
       try { set({ hasSave: !!(await idbGet(SAVE_KEY)) }); } catch { set({ hasSave: false }); }
     },
 
-    async newGame(seed) {
+    async newGame(seed, until = 1650) {
       set({ phase: 'loading' });
-      const { world, state } = await sim.newGame(seed);
+      const { world, state } = await sim.newGame(seed, until);
       await save(state);
       set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: [], showHelp: true });
     },

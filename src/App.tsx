@@ -23,7 +23,7 @@ function useKeys() {
       const k = e.key.toLowerCase();
       if (PAN_KEYS.has(k)) return; // the map view pans on these
       if (e.key === 'Alt') { e.preventDefault(); s.set({ highlightAll: true }); return; }
-      if (s.game.events.length) return;
+      if (s.game.events.length) return; // answer the card first
       if (s.showHelp) {
         if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); s.set({ showHelp: false }); }
         return;

@@ -153,6 +153,11 @@ function PartyCard({ partyId }: { partyId: number }) {
           </>
         )}
         {!preview && p.order && <button onClick={() => void run({ kind: 'stopParty', party: p.id })}>Halt</button>}
+        {!preview && game.freeStates.filter((f) => f.map === p.map && (f.hex === p.hex || g.neighbors(p.hex).includes(f.hex))).map((f) => (
+          <button key={f.id} className="danger" onClick={() => void run({ kind: 'retake', party: p.id, free: f.id })}>
+            Retake {f.name} · {Math.round(odds(partyStrength(game, p), f.pop * 1.5 + (f.level === 'town' ? 4 : f.level === 'city' ? 8 : 0)) * 100)}%
+          </button>
+        ))}
         {!preview && game.rivalColonies.filter((c) => c.map === p.map && (c.hex === p.hex || g.neighbors(p.hex).includes(c.hex))).map((c) => {
           const o = odds(partyStrength(game, p), rivalColonyDefence(c));
           return (

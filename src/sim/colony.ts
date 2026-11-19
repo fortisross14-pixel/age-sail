@@ -127,7 +127,7 @@ export function colonySeason(world: World, s: GameState, c: Colony, log: (text: 
   const discontentBefore = c.last.discontent;
   // the colony's own fields, plus whatever idle hands can forage
   const produced: Partial<Record<GoodId, number>> = { food: 2 + Math.max(0, c.pop - worked.length) * 0.5 };
-  for (const w of worked) produced[w.good] = (produced[w.good] ?? 0) + w.amount * (discontentBefore ? 0.7 : 1);
+  for (const w of worked) produced[w.good] = (produced[w.good] ?? 0) + w.amount * (discontentBefore ? 0.7 : 1) * (c.unrest ? 0.75 : 1);
   for (const g of GOODS) if (produced[g]) c.stock[g] = Math.round(((c.stock[g] ?? 0) + produced[g]!) * 10) / 10;
   const take = (g: GoodId, n: number) => {
     const have = c.stock[g] ?? 0;
@@ -184,6 +184,8 @@ export function canFound(world: World, s: GameState, p: Party): { ok: boolean; w
   if (s.colonies.some((c) => c.map === p.map && g.distance(c.hex, p.hex) <= 3)) return { ok: false, why: 'Too close to another colony.' };
   const rival = s.rivalColonies.find((c) => c.map === p.map && g.distance(c.hex, p.hex) <= 3);
   if (rival) return { ok: false, why: `This coast is claimed by ${rival.name}, a rival colony.` };
+  const free = s.freeStates.find((c) => c.map === p.map && g.distance(c.hex, p.hex) <= 3);
+  if (free) return { ok: false, why: `This coast belongs to ${free.name}, which broke away from the Crown.` };
   if (m.ports.some((x) => g.distance(x.hex, p.hex) <= 2)) return { ok: false, why: 'Too close to a trading ground or port.' };
   if (p.map === 'old' && g.lat(p.hex) >= 30) return { ok: false, why: 'This land already belongs to European crowns.' };
   const needs = foundingNeeds(s, p);
@@ -205,7 +207,7 @@ export function foundColony(world: World, s: GameState, p: Party): Result & { co
   const free = NAMES.filter((n) => !s.colonies.some((c) => c.name === n));
   const c: Colony = {
     id: `col-${s.nextId++}`, name: free.length ? pick(rng, free) : `Colonia ${s.colonies.length + 1}`, map: p.map, hex: p.hex,
-    founded: s.turn, pop: colonists.length, level: 'outpost', stock: { food: 4 }, growth: 0,
+    founded: s.turn, pop: colonists.length, level: 'outpost', stock: { food: 4 }, growth: 0, loyalty: 85, charter: false, unrest: false,
     last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false },
   };
   s.units = s.units.filter((u) => !colonists.includes(u));

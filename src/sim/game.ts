@@ -5,6 +5,8 @@ import * as Land from './land';
 import * as Col from './colony';
 import * as Nat from './natives';
 import * as Riv from './rivals';
+import * as Emp from './empire';
+import * as Story from './stories';
 import type { CrownId } from '../data/rivals';
 import { EUROPEAN_PORTS, KNOWN_SOUTH, ATLANTIC_ISLANDS } from '../data/europe';
 import { TECHS, techById, type TechId } from '../data/tech';
@@ -211,7 +213,7 @@ function initialOldFog(world: World): number[] {
   return fog;
 }
 
-export function newGame(seed: number): { world: World; state: GameState } {
+export function newGame(seed: number, until = 1750): { world: World; state: GameState } {
   const world = generateWorld(seed);
   const rng = mulberry32(hashSeed(seed, 99));
   const markets: GameState['markets'] = {};
@@ -245,6 +247,7 @@ export function newGame(seed: number): { world: World; state: GameState } {
     fleets: [], people: [], petitioners: [], units: [], parties: [], cities, markets, discovered: [],
     surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
     rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0, natives: Nat.initNatives(world), rivals: Riv.initRivals(), rivalColonies: [], rivalShips: [],
+    freeStates: [], endTurn: (until - 1492) * 4, ended: false, taxRate: 'normal', loans: [], told: {},
     adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
     chronicle: [], events: [], nextId: 1, newWorldFound: false,
     research: { known: [], current: 'portolan', progress: 0, pending: 0 },
@@ -595,6 +598,18 @@ export function stormColony(world: World, s: GameState, partyId: number, colonyI
   const p = Land.partyById(s, partyId);
   if (!p) return fail('No such party.');
   return Riv.stormColony(world, s, p, colonyId, Nat.partyStrength(s, p), natRng(s, 4), (k, t) => log(s, k, t), (e) => event(s, e));
+}
+
+// ---------- the empire ----------
+
+export function grantCharter(s: GameState, colonyId: string): CommandResult { return Emp.charter(s, colonyId); }
+export function holdFestival(s: GameState, colonyId: string): CommandResult { return Emp.festival(s, colonyId); }
+export function setTaxRate(s: GameState, rate: GameState['taxRate']): CommandResult { return Emp.setTaxRate(s, rate); }
+export function chooseStory(world: World, s: GameState, index: number): CommandResult { return Story.resolveStory(world, s, index, (k, t) => log(s, k, t)); }
+export function retakeFree(s: GameState, partyId: number, freeId: string): CommandResult {
+  const p = Land.partyById(s, partyId);
+  if (!p) return fail('No such party.');
+  return Emp.retake(s, p, freeId, Nat.partyStrength(s, p), (k, t) => log(s, k, t));
 }
 
 // ---------- colonies ----------
@@ -1060,7 +1075,7 @@ export function endTurn(world: World, s: GameState): void {
   // the colonies: work, eat, grow; they pay a little tax
   for (const c of s.colonies) Col.colonySeason(world, s, c, colLog(s));
   // taxes and market dues; universities feed the scholars
-  let taxes = s.colonies.reduce((t, c) => t + c.pop * 5, 0);
+  let taxes = s.colonies.reduce((t, c) => t + Emp.colonyTaxes(s, c), 0);
   for (const c of Object.values(s.cities)) {
     taxes += (CITY_SPACE[c.id]?.taxes ?? 30) + c.buildings.market * 60;
     addResearch(s, c.buildings.university * 2);
@@ -1139,6 +1154,10 @@ export function endTurn(world: World, s: GameState): void {
   } else if (s.turn === GOAL.turn && s.treasury < GOAL.treasury) {
     log(s, 'court', 'The Crown’s deadline has passed. The King is displeased, but the voyages go on.');
   }
+
+  // the long game: eras, loyalty and independence, loans, the end of the age; and perhaps a story
+  Emp.empireSeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e));
+  Story.maybeStory(world, s, (e) => event(s, e));
 
   // each spring the court grows a year older, and new faces ask to join it
   if (seasonOf(s.turn) === 0) {

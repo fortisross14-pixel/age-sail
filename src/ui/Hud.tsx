@@ -5,6 +5,8 @@ import { techById } from '../data/tech';
 import { score } from '../sim/colony';
 import { rivalScore } from '../sim/rivals';
 import { RIVALS } from '../data/rivals';
+import { eraAt } from '../data/eras';
+import { yearOf } from '../sim/types';
 import { fmt } from './format';
 import { spriteUrl } from '../render/assets';
 
@@ -26,7 +28,7 @@ export function Hud() {
   const turnsLeft = GOAL.turn - game.turn;
   return (
     <header className="hud">
-      <div className="cartouche" style={{ backgroundImage: `url(${spriteUrl('ornaments/cartouche')})` }}>
+      <div className="cartouche" title={`${eraAt(yearOf(game.turn)).name}. The age ends in ${1492 + Math.floor(game.endTurn / 4)}${game.ended ? ' (passed: playing on)' : ''}.`} style={{ backgroundImage: `url(${spriteUrl('ornaments/cartouche')})` }}>
         <div className="cartouche-season">{SEASONS[seasonOf(game.turn)]}</div>
         <div className="cartouche-year">Anno {dateLabel(game.turn).split(' ')[1]}</div>
       </div>
@@ -42,6 +44,7 @@ export function Hud() {
         <span className="prestige-mark" aria-hidden>♛</span>
         <div><div className="stat-value">{fmt(mine)}</div><div className="stat-label">score · {['1st', '2nd', '3rd', '4th'][rank - 1]} of 4</div></div>
       </div>
+      <div className="era-label" title={eraAt(yearOf(game.turn)).blurb}>{eraAt(yearOf(game.turn)).name}<span className="muted small"> · to {1492 + Math.floor(game.endTurn / 4)}</span></div>
       <div className="goal" title={`The Crown asks for ${fmt(GOAL.treasury)} ducats by ${dateLabel(GOAL.turn)}`}>
         <div className="goal-text">{turnsLeft > 0 ? <>Crown’s charge: {fmt(GOAL.treasury)} by {dateLabel(GOAL.turn)}</> : <>The Crown’s deadline has passed</>}</div>
         <div className="goal-bar"><div style={{ width: `${goalPct}%` }} /></div>

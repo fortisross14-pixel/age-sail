@@ -439,3 +439,20 @@ button.danger { border-color: #7d1a12; color: #7d1a12; }
 
 .standings tr.me td { background: rgba(217, 165, 33, 0.14); font-weight: 600; }
 .stat.clickable { cursor: pointer; }
+
+/* the long game */
+.choices { display: grid; gap: 8px; margin-top: 14px; text-align: left; }
+.choices button { display: grid; gap: 2px; text-align: left; padding: 10px 14px; font-size: 16px; }
+.choices .hint { font: 13px var(--sans); opacity: 0.75; font-weight: 400; }
+.modal.event.story h2 { font-size: 30px; }
+.modal.event.era h2 { font-size: 38px; color: var(--ink-2); }
+.modal .standings { margin: 12px 0; text-align: left; }
+.era-label { font: italic 15px var(--serif); color: var(--ink-2); white-space: nowrap; }
+.loyalty { margin: 6px 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 250, 236, 0.5); }
+.loyalty .row { margin-top: 4px; }
+.lengths { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.lengths button { min-width: 0 !important; padding: 6px 12px !important; font-size: 15px !important; }
+@media (max-width: 1600px) { .era-label { display: none; } }
+.hud button, .hud .stat-label, .hud .goal-text { white-space: nowrap; }
+.hud .goal { min-width: 150px; max-width: 220px; overflow: hidden; }
+.hud .goal-text { overflow: hidden; text-overflow: ellipsis; }

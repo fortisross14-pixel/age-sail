@@ -5,6 +5,7 @@ import {
   provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
   slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost, landParty, moveParty, boardParty, citySlots, slotsUsedIn,
   foundColony, upgradeColony, colonyTransfer, allyNation, incorporateNation, attackVillage, tradingPost, declareWar, rivalPeace, stormColony,
+  grantCharter, setTaxRate, chooseStory,
 } from './game';
 import { makeMarket, unitPrice, buyCost, sellValue } from './market';
 import { planRoute } from './sailing';
@@ -13,6 +14,7 @@ import { FIXED_SOUTH } from '../data/europe';
 import { canFound, score } from './colony';
 import { gift, odds } from './natives';
 import { rivalScore } from './rivals';
+import { colonyTaxes, loyaltyTarget } from './empire';
 import { Fog } from './types';
 
 const SEEDS = [1492, 7, 42, 2024, 31337];
@@ -586,7 +588,7 @@ describe('M6: native peoples', () => {
     const n = world.old.nations.find((x) => x.villages.length > 0)!;
     const st = state.natives[n.id];
     st.met = true; st.contact = 0; st.epidemic = true; st.attitude = -80; st.warriors = 30;
-    state.colonies.push({ id: 'col-x', name: 'Test', map: 'old', hex: n.villages[0], founded: 0, pop: 4, level: 'outpost', stock: { food: 40, cloth: 40, wine: 40 }, growth: 0,
+    state.colonies.push({ id: 'col-x', name: 'Test', map: 'old', hex: n.villages[0], founded: 0, pop: 4, level: 'outpost', stock: { food: 40, cloth: 40, wine: 40 }, growth: 0, loyalty: 80, charter: false, unrest: false,
       last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false } });
     for (let k = 0; k < 8; k++) endTurn(world, state);
     expect(state.chronicle.some((c) => c.text.includes('raid Test'))).toBe(true);
@@ -667,5 +669,72 @@ describe('M7: rival crowns', () => {
     const { world, state } = newGame(7);
     for (let k = 0; k < 30; k++) endTurn(world, state);
     for (const r of ['portugal', 'england', 'netherlands'] as const) expect(rivalScore(state, r).total).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('M8: the long game', () => {
+  const testColony = (state: ReturnType<typeof newGame>['state'], world: ReturnType<typeof newGame>['world'], pop = 8) => {
+    const hex = [...Array(NEW.N).keys()].find((h) => world.new.terrain[h] > 1)!;
+    const c = { id: 'col-t', name: 'Testa', map: 'new' as const, hex, founded: 0, pop, level: 'town' as const, stock: { food: 100, cloth: 100, wine: 100 }, growth: 0,
+      loyalty: 80, charter: false, unrest: false, last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false } };
+    state.colonies.push(c);
+    return c;
+  };
+
+  it('a new era begins with a card', () => {
+    const { world, state } = newGame(1492);
+    state.turn = (1520 - 1492) * 4 - 1;
+    endTurn(world, state);
+    expect(state.events.some((e) => e.kind === 'era' && e.title === 'Age of Conquest')).toBe(true);
+  });
+
+  it('loyalty falls with high taxes and generations overseas; a charter wins it back and halves taxes', () => {
+    const { world, state } = newGame(1492);
+    const c = testColony(state, world);
+    const t0 = loyaltyTarget(state, c);
+    setTaxRate(state, 'high');
+    state.turn = 400;
+    expect(loyaltyTarget(state, c)).toBeLessThan(t0);
+    const tax = colonyTaxes(state, c);
+    expect(grantCharter(state, c.id).ok).toBe(true);
+    expect(colonyTaxes(state, c)).toBeLessThan(tax);
+    expect(loyaltyTarget(state, c)).toBeGreaterThan(loyaltyTarget({ ...state, colonies: [] } as never, { ...c, charter: false }));
+  });
+
+  it('a large, disloyal colony without a garrison may break away', () => {
+    const { world, state } = newGame(1492);
+    const c = testColony(state, world, 10);
+    setTaxRate(state, 'high');
+    state.turn = 4 * (1700 - 1492);
+    c.founded = 0;
+    for (let k = 0; k < 60 && state.colonies.includes(c); k++) endTurn(world, state);
+    expect(state.colonies.includes(c)).toBe(false);
+    expect(state.freeStates.some((f) => f.name === 'Testa')).toBe(true);
+  });
+
+  it('stories come with choices, and answering one changes the game', () => {
+    const { world, state } = newGame(1492);
+    let story = false;
+    for (let k = 0; k < 40 && !story; k++) {
+      endTurn(world, state);
+      while (state.events.length && state.events[0].kind !== 'story') state.events.shift();
+      story = state.events[0]?.kind === 'story';
+    }
+    expect(story).toBe(true);
+    const e = state.events[0];
+    expect(e.choices!.length).toBeGreaterThanOrEqual(1);
+    const logBefore = state.chronicle.length;
+    expect(chooseStory(world, state, 0).ok).toBe(true);
+    expect(state.chronicle.length).toBeGreaterThan(logBefore);
+    expect(state.events[0]?.story === e.story && state.events[0]?.ctx === e.ctx).toBe(false);
+  });
+
+  it('a short game ends with a final reckoning, and play can go on', () => {
+    const { world, state } = newGame(1492, 1495);
+    for (let k = 0; k < 13; k++) endTurn(world, state);
+    expect(state.ended).toBe(true);
+    expect(state.events.some((e) => e.kind === 'end')).toBe(true);
+    endTurn(world, state);
+    expect(state.events.filter((e) => e.kind === 'end').length).toBe(1);
   });
 });

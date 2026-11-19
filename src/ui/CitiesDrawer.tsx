@@ -10,6 +10,7 @@ import { fmt } from './format';
 import { GoodIcon } from './Icon';
 import { GOODS, GOOD_INFO, NEEDS, LUXURIES, LUXURY_NEED, type GoodId } from '../data/goods';
 import { LEVELS, GROWTH_STEP, territoryOf } from '../sim/colony';
+import { loyaltyFactors, loyaltyTarget, colonyTaxes, TAX } from '../sim/empire';
 import { cargoUsed, cargoCapacity } from '../sim/game';
 import { getView } from './MapCanvas';
 import { ShipIcon } from './Icon';
@@ -24,6 +25,7 @@ export function Cities() {
       </p>
       {Object.keys(game.cities).map((id) => <CityCard key={id} cityId={id} />)}
       <h3 className="section">Colonies <span className="muted small">{game.colonies.length || ''}</span></h3>
+      {game.colonies.length > 0 && <TaxRate />}
       {game.colonies.length ? game.colonies.map((c) => <ColonyCard key={c.id} colonyId={c.id} />) : (
         <p className="muted small">None yet. Land a party with colonists on surveyed coast, with a fleet beside it carrying timber and tools, and choose <b>Found colony</b>.</p>
       )}
@@ -164,6 +166,16 @@ function ColonyCard({ colonyId }: { colonyId: string }) {
       </button>
       {open && (
         <div className="city-body">
+          <div className="loyalty" title={loyaltyFactors(game, c).map((f) => `${f.label}: ${f.value > 0 ? '+' : ''}${f.value}`).join('\n')}>
+            <span className="small">Loyalty <b>{Math.round(c.loyalty)}</b> → {Math.round(loyaltyTarget(game, c))}{c.unrest ? ' · unrest: work slows' : ''}{c.loyalty < 15 && c.pop >= 6 ? ' · talk of independence' : ''}</span>
+            <div className="bar"><div className={c.loyalty < 30 ? 'bad' : ''} style={{ width: `${c.loyalty}%` }} /></div>
+            <div className="row">
+              {!c.charter && <button title="Loyalty rises for good; this colony pays half taxes" onClick={() => void run({ kind: 'charter', colony: c.id })}>Grant royal charter</button>}
+              {c.charter && <span className="chip">Chartered</span>}
+              <button disabled={game.treasury < 150 + c.pop * 40} onClick={() => void run({ kind: 'festival', colony: c.id })}>Festival · {fmt(150 + c.pop * 40)}</button>
+              <span className="muted small">pays {colonyTaxes(game, c)} a season</span>
+            </div>
+          </div>
           <div className="small">Growth {Math.floor(c.growth)}/{GROWTH_STEP}{c.last.luxuries ? ' · luxuries: growing faster' : ''}{c.pop >= L.cap ? ' · full: raise it to grow further' : ''}</div>
           <div className="bar"><div style={{ width: `${Math.min(100, (c.growth / GROWTH_STEP) * 100)}%` }} /></div>
 
@@ -233,5 +245,22 @@ function ColonyCard({ colonyId }: { colonyId: string }) {
         </div>
       )}
     </section>
+  );
+}
+
+function TaxRate() {
+  const game = useStore((s) => s.game)!;
+  const run = useStore((s) => s.run);
+  return (
+    <div className="row small">
+      Colonial taxes:
+      <div className="maps tabs" role="radiogroup">
+        {(['low', 'normal', 'high'] as const).map((r) => (
+          <button key={r} role="radio" aria-checked={game.taxRate === r} className={game.taxRate === r ? 'on' : ''} title={`${TAX[r].per} ducats a colonist a season; loyalty ${TAX[r].loyalty >= 0 ? '+' : ''}${TAX[r].loyalty}`}
+            onClick={() => void run({ kind: 'taxRate', rate: r })}>{r}</button>
+        ))}
+      </div>
+      <span className="muted">Higher taxes fill the treasury and wear down loyalty.</span>
+    </div>
   );
 }

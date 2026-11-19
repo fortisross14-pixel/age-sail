@@ -46,6 +46,11 @@ export type Command =
   | { kind: 'mission'; fleet?: number; party?: number }
   | { kind: 'attack'; party: number; hex: number }
   | { kind: 'declareWar'; crown: CrownId }
+  | { kind: 'charter'; colony: string }
+  | { kind: 'festival'; colony: string }
+  | { kind: 'taxRate'; rate: 'low' | 'normal' | 'high' }
+  | { kind: 'choose'; index: number }
+  | { kind: 'retake'; party: number; free: string }
   | { kind: 'rivalPeace'; crown: CrownId }
   | { kind: 'storm'; party: number; colony: string }
   | { kind: 'dismissEvent' };
@@ -59,8 +64,8 @@ function need() {
 }
 
 const api = {
-  newGame(seed: number) {
-    const g = G.newGame(seed);
+  newGame(seed: number, until = 1750) {
+    const g = G.newGame(seed, until);
     world = g.world;
     state = g.state;
     return g;
@@ -120,6 +125,11 @@ const api = {
       case 'mission': result = G.mission(world, state, { fleet: c.fleet, party: c.party }); break;
       case 'attack': result = G.attackVillage(world, state, c.party, c.hex); break;
       case 'declareWar': result = G.declareWar(state, c.crown); break;
+      case 'charter': result = G.grantCharter(state, c.colony); break;
+      case 'festival': result = G.holdFestival(state, c.colony); break;
+      case 'taxRate': result = G.setTaxRate(state, c.rate); break;
+      case 'choose': result = G.chooseStory(world, state, c.index); break;
+      case 'retake': result = G.retakeFree(state, c.party, c.free); break;
       case 'rivalPeace': result = G.rivalPeace(state, c.crown); break;
       case 'storm': result = G.stormColony(world, state, c.party, c.colony); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;

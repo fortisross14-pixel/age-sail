@@ -529,7 +529,8 @@ class Scene {
     const fog = state.fog[g.id];
     const cols = state.rivalColonies.filter((c) => c.map === g.id && fog[c.hex] >= Fog.Charted);
     const ships = state.rivalShips.filter((x) => x.map === g.id && fog[x.hex] >= Fog.Explored);
-    const key = `${cols.map((c) => `${c.id}${c.pop}${c.level}`).join(',')}|${ships.map((x) => `${x.id}@${x.hex}`).join(',')}|${fogKey}`;
+    const free = state.freeStates.filter((c) => c.map === g.id);
+    const key = `${cols.map((c) => `${c.id}${c.pop}${c.level}`).join(',')}|${ships.map((x) => `${x.id}@${x.hex}`).join(',')}|${free.map((f) => f.id + f.pop).join(',')}|${fogKey}`;
     if (key === this.lastRivals) return;
     this.lastRivals = key;
     this.rivalLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
@@ -547,6 +548,18 @@ class Scene {
       this.rivalLayer.addChild(icon);
       const plate = this.plate(`${c.name} · ${c.pop}`, crown.primary, crown.name);
       plate.position.set(g.cx(c.hex), g.cy(c.hex) + HEX_R * 0.75);
+      this.plates.push(plate);
+      this.rivalLayer.addChild(plate);
+    }
+    for (const f of free) {
+      const icon = new Sprite(this.assets.tex(`colonies/port-${f.level}`));
+      icon.anchor.set(0.5, 0.72);
+      icon.width = HEX_W * (f.level === 'outpost' ? 1.1 : f.level === 'town' ? 1.5 : 1.9);
+      icon.scale.y = icon.scale.x;
+      icon.position.set(g.cx(f.hex), g.cy(f.hex));
+      this.rivalLayer.addChild(icon);
+      const plate = this.plate(`${f.name} · ${f.pop}`, 0x3b3b3b, 'free since ' + (1492 + Math.floor(f.since / 4)));
+      plate.position.set(g.cx(f.hex), g.cy(f.hex) + HEX_R * 0.75);
       this.plates.push(plate);
       this.rivalLayer.addChild(plate);
     }

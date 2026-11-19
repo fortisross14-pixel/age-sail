@@ -4,6 +4,19 @@ import { GOAL } from '../sim/game';
 import { fmt } from './format';
 import { spriteUrl } from '../render/assets';
 import { getView } from './MapCanvas';
+import { standings } from '../sim/empire';
+
+function FinalStandings() {
+  const game = useStore((s) => s.game)!;
+  const world = useStore((s) => s.world)!;
+  const st = standings(world, game);
+  return (
+    <table className="market standings">
+      <thead><tr><th>Crown</th><th>Score</th><th>Colonists</th><th>Territory</th><th>Commerce</th></tr></thead>
+      <tbody>{st.map((r, i) => <tr key={r.id} className={r.id === 'castile' ? 'me' : ''}><td>{i + 1}. {r.name}</td><td className="num"><b>{r.total}</b></td><td className="num">{r.pop}</td><td className="num">{r.territory}</td><td className="num">{r.commerce}</td></tr>)}</tbody>
+    </table>
+  );
+}
 
 /** Big moments: the first landfall, meeting a people, an expedition lost. */
 export function EventCard() {
@@ -11,7 +24,7 @@ export function EventCard() {
   const run = useStore((s) => s.run);
   const set = useStore((s) => s.set);
   if (!ev) return null;
-  const art = ev.kind === 'landfall' || ev.kind === 'tech' ? 'ornaments/compass-large' : ev.kind === 'people' ? 'colonies/trading-post-outpost' : 'ornaments/serpent';
+  const art = ev.kind === 'landfall' || ev.kind === 'tech' || ev.kind === 'era' || ev.kind === 'end' ? 'ornaments/compass-large' : ev.kind === 'people' ? 'colonies/trading-post-outpost' : ev.kind === 'story' ? 'ornaments/cartouche' : 'ornaments/serpent';
   const close = async (look: boolean) => {
     await run({ kind: 'dismissEvent' });
     if (look) {
@@ -25,10 +38,22 @@ export function EventCard() {
         <img className="event-art" src={spriteUrl(art)} alt="" />
         <h2>{ev.title}</h2>
         <p className="event-text">{ev.text}</p>
+        {ev.kind === 'end' && <FinalStandings />}
+        {ev.choices ? (
+          <div className="choices">
+            {ev.choices.map((c, i) => (
+              <button key={i} className={i === 0 ? 'primary' : ''} autoFocus={i === 0} onClick={() => void run({ kind: 'choose', index: i })}>
+                {c.label}{c.hint && <span className="hint">{c.hint}</span>}
+              </button>
+            ))}
+          </div>
+        ) : (
         <div className="row center">
-          {ev.kind !== 'lost' && ev.kind !== 'tech' && <button className="primary" autoFocus onClick={() => void close(true)}>{ev.kind === 'landfall' ? 'See the new lands' : 'Go there'}</button>}
-          <button autoFocus={ev.kind === 'lost' || ev.kind === 'tech'} onClick={() => void close(false)}>Continue</button>
+          {ev.kind !== 'lost' && ev.kind !== 'tech' && ev.kind !== 'era' && ev.kind !== 'end' && <button className="primary" autoFocus onClick={() => void close(true)}>{ev.kind === 'landfall' ? 'See the new lands' : 'Go there'}</button>}
+          <button autoFocus={ev.kind === 'lost' || ev.kind === 'tech' || ev.kind === 'era' || ev.kind === 'end'} onClick={() => void close(false)}>{ev.kind === 'end' ? 'Play on' : 'Continue'}</button>
+          {ev.kind === 'end' && <button onClick={async () => { await close(false); useStore.getState().quitToMenu(); }}>New voyage</button>}
         </div>
+        )}
       </div>
     </div>
   );
@@ -51,6 +76,7 @@ export function Help() {
           <li><b>Found colonies.</b> Train colonists in your cities and take them over with <b>timber</b> and <b>tools</b> in the hold. Land them on surveyed coast and choose <b>Found colony</b>. Each colonist works a hex: food first, then sugar, tobacco, furs, gold, silver… Colonists need food, <b>cloth</b> and <b>wine</b> every season; luxuries make them grow faster. Ship their goods home and sell them.</li>
           <li><b>The peoples.</b> Every coast belongs to someone. In <b>Court → Peoples</b>, send gifts, make alliances, or pay a people to turn on its rivals. Dock to build a trading post; land a missionary to found a mission. You can also conquer: a battle is a matter of numbers, and every people will remember it. Colonies on a people’s land anger them; angry peoples raid.</li>
           <li><b>Rival crowns.</b> Portugal, England and the Netherlands race you for the same coasts: their ships appear on the map, their colonies claim land you can no longer settle, their trading posts thin out the native trade. Settle too close and they grow hostile; at war, their privateers hunt your ships. <b>Court → Crowns</b> shows the standings.</li>
+          <li><b>The long game.</b> Eras pass, and colonies grow less loyal with every generation born overseas, with high taxes and when their needs go unmet. Charters, festivals and garrisons hold them; a disloyal city may break away. Stories ask for your decisions. The age ends at the year you chose; the crown with the highest score wins.</li>
           <li><b>Score</b> counts colonists, territory and the ducats your sales have earned.</li>
           <li><b>Research.</b> Your court studies one subject at a time (the scroll at the top). <i>Volta do mar</i>, long-distance navigation, makes the open ocean survivable. Before it, the darker open sea spoils food twice as fast. You can try the western crossing, but few come back.</li>
           <li><b>Mind wind and food.</b> Trade winds blow west in the south, westerlies blow east in the north (<kbd>V</kbd> shows them). Ships carry food for about 8 seasons; then scurvy kills the crew. Away from home, stores refill only to half: in foreign ports, from native traders, or by anchoring a whole season off a green coast.</li>

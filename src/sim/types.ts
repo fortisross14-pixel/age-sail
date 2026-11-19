@@ -145,6 +145,11 @@ export interface Colony {
   stock: Partial<Record<GoodId, number>>;
   /** progress toward the next colonist */
   growth: number;
+  /** 0..100: how loyal the settlers are to the Crown */
+  loyalty: number;
+  /** a royal charter: self-government and half taxes, in return for loyalty */
+  charter: boolean;
+  unrest: boolean;
   /** last season's account, for the player */
   last: {
     produced: Partial<Record<GoodId, number>>;
@@ -301,8 +306,14 @@ export interface ChronicleEntry {
 }
 
 /** A big moment shown as a card: the first landfall, meeting a people. */
+export interface EventChoice { label: string; hint?: string }
+
 export interface GameEvent {
-  kind: 'landfall' | 'people' | 'lost' | 'tech';
+  kind: 'landfall' | 'people' | 'lost' | 'tech' | 'story' | 'era' | 'end';
+  /** for stories with choices: which story, and what it is about */
+  story?: string;
+  ctx?: Record<string, string | number>;
+  choices?: EventChoice[];
   title: string;
   text: string;
   map: MapId;
@@ -326,7 +337,16 @@ export interface GameState {
   /** rumours already followed up */
   rumoursDone: Record<MapId, number[]>;
   colonies: Colony[];
+  /** colonies that broke away from the Crown */
+  freeStates: { id: string; name: string; map: MapId; hex: number; pop: number; level: ColonyLevel; since: number }[];
   natives: Record<string, NativeState>;
+  /** the game ends (with a final reckoning) after this season; play may go on */
+  endTurn: number;
+  ended: boolean;
+  taxRate: 'low' | 'normal' | 'high';
+  loans: { perSeason: number; left: number }[];
+  /** stories already told, so they are not repeated too often */
+  told: Record<string, number>;
   rivals: Record<CrownId, RivalState>;
   rivalColonies: RivalColony[];
   rivalShips: RivalShip[];

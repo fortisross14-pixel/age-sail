@@ -66,6 +66,10 @@ other. Later: wars with rival crowns for space, and independence wars against in
 - M7: with no player action, Portugal has 3–5 colonies by 1507 (2–3 across the ocean), England 3–5, the Dutch 1 plus
   trading posts. Rival colonies grow one colonist every 5 seasons without needs, so they are steady rather than fast.
 
+- M8: over 600 seasons with no player input, the three rivals settle about 38 colonies and level off as good coast runs
+  out; England and Portugal reach scores near 10,000 by 1642. A player needs a handful of large, loyal colonies to compete.
+  The whole simulation stays under a millisecond a season, and a save stays under 100 KB.
+
 ## Milestones
 
 | # | Milestone | Status |
@@ -78,5 +82,6 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | M5 | Colonies (first playable): new goods (timber, stone, food, cloth, wine, silver); found a colony with a party's colonists on surveyed coast and timber and tools from a fleet beside it; colonists work hexes (food first, then the most valuable crop or resource); needs each season (food; cloth and wine or work slows and growth stops; luxuries speed growth); outpost → town → city with materials; fleets dock, load and unload; merchant routes can serve colonies; score = colonists ×10 + territory ×2 + sales/200 | done |
 | M6 | Native peoples: every trading ground is a people with inland villages, warriors and rivals, one empire per board; attitude from trade, gifts, posts, missions, encroaching colonies and attacks; trading posts (more trade), missions (conversion, then peaceful joining), alliances, inciting rivals, peace; numbers-based battles with terrain and allies; conquest makes subjects who pay tribute and whose land counts as territory; hostile peoples raid colonies and ambush parties; an epidemic some seasons after first contact | done |
 | M7 | Rival crowns: Portugal, England and the Netherlands, each with its own pace, preferred coasts and taste for trade; their ships sail visibly to found colonies at the richest sites (blocking yours) and to open trading posts that thin native trade; their colonies grow; attitude sours when you settle near them (and, after the Tordesillas event, on Portugal's African coast); wars with privateers hunting your fleets (sea battles by guns), raids on colonies, storming and taking their colonies, paying for peace; standings in Court → Crowns and your rank in the HUD | done |
-| M8 | Independence and the long game: colonial loyalty and unrest, independence movements, eras and the end date (1750), final score and victory, events and characters' stories | next |
+| M8 | The long game: five eras with cards; colonial loyalty drifting toward a target (taxes, generations overseas, era, size, distance, garrison, charter, needs, luxuries), unrest, independence risings decided by the garrison, free states that can be retaken; a colonial tax rate; royal charters and festivals; a dozen stories with choices (mutiny, plague, court quarrels, Genoese loans, a scholar, a pilot's secret, colony petitions, survivors at sea, native envoys, a marriage, the Armada, the price revolution); short, standard or full games ending in 1550, 1650 or 1750 with final standings and victory, and play on | done |
+| next | Your call: playtest feedback, balance, and the 'later' list below | |
 | later | Rival AI depth (real fleets and economies, rival-native alliances), Old World depth (buildings, full research), events and characters' stories, eras, score and victory, Chronicle, iPad performance, an illustrator's cohesive art set | |

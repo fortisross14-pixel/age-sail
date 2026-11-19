@@ -133,10 +133,11 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
           if (site != null) spawn(w, s, spec.id, map, 'settlers', site);
         }
       }
-      r.next = s.turn + Math.max(4, spec.pace - Math.floor(s.turn / 16));
+      r.next = s.turn + Math.max(8, spec.pace - Math.floor(s.turn / 40));
     }
     // earnings
-    r.revenue += s.rivalColonies.filter((c) => c.crown === spec.id).reduce((t, c) => t + c.pop * 25, 0) + r.posts.length * 60;
+    // what their trade earns, on the same scale as the player's sales
+    r.revenue += s.rivalColonies.filter((c) => c.crown === spec.id).reduce((t, c) => t + c.pop * 6, 0) + r.posts.length * 25;
     // relations drift, and sour with neighbours too close
     r.attitude += r.attitude > 10 ? -0.5 : r.attitude < 10 ? 0.5 : 0;
     for (const c of s.colonies) {
@@ -292,7 +293,7 @@ export function stormColony(_w: World, s: GameState, p: Party, colonyId: string,
     s.rivalColonies = s.rivalColonies.filter((x) => x !== c);
     const col: Colony = {
       id: `col-${s.nextId++}`, name: c.name, map: c.map, hex: c.hex, founded: s.turn, pop: Math.max(1, Math.round(c.pop * 0.7)), level: c.level,
-      stock: { food: 10 }, growth: 0, last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false },
+      stock: { food: 10 }, growth: 0, loyalty: 50, charter: false, unrest: false, last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false },
     };
     s.colonies.push(col);
     for (const u of units) if (u.type === 'infantry') { u.party = null; u.colony = col.id; }
