@@ -2,6 +2,7 @@
 import * as Comlink from 'comlink';
 import type { GoodId } from '../data/goods';
 import type { TechId } from '../data/tech';
+import type { CrownId } from '../data/rivals';
 import { generateWorld } from './mapgen';
 import { previewParty } from './land';
 import * as G from './game';
@@ -44,6 +45,9 @@ export type Command =
   | { kind: 'tradingPost'; fleet: number }
   | { kind: 'mission'; fleet?: number; party?: number }
   | { kind: 'attack'; party: number; hex: number }
+  | { kind: 'declareWar'; crown: CrownId }
+  | { kind: 'rivalPeace'; crown: CrownId }
+  | { kind: 'storm'; party: number; colony: string }
   | { kind: 'dismissEvent' };
 
 let world: World | null = null;
@@ -115,6 +119,9 @@ const api = {
       case 'tradingPost': result = G.tradingPost(world, state, c.fleet); break;
       case 'mission': result = G.mission(world, state, { fleet: c.fleet, party: c.party }); break;
       case 'attack': result = G.attackVillage(world, state, c.party, c.hex); break;
+      case 'declareWar': result = G.declareWar(state, c.crown); break;
+      case 'rivalPeace': result = G.rivalPeace(state, c.crown); break;
+      case 'storm': result = G.stormColony(world, state, c.party, c.colony); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
     return { result, state };

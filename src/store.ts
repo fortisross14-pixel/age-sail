@@ -5,7 +5,7 @@ import type { SimApi, Command } from './sim/worker';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import type { MovePreview } from './sim/game';
 
-const SAVE_KEY = 'age-sail:save:v7';
+const SAVE_KEY = 'age-sail:save:v8';
 
 const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' }));
 
@@ -35,7 +35,7 @@ interface Store {
   highlightAll: boolean;
   showHelp: boolean;
   drawer: DrawerId | null;
-  courtTab: 'people' | 'petitioners' | 'peoples' | 'research' | 'chronicle';
+  courtTab: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'research' | 'chronicle';
   /** news the player has waved away */
   dismissed: string[];
   toast: { text: string; bad?: boolean; id: number } | null;

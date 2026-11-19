@@ -10,6 +10,9 @@ import { KIND_MARK } from './NewsFeed';
 import { Tabs, Pips } from './Drawers';
 import { getView } from './MapCanvas';
 import { allNations, moodOf, envoy } from '../sim/natives';
+import { RIVALS } from '../data/rivals';
+import { rivalScore } from '../sim/rivals';
+import { score } from '../sim/colony';
 import { SKILL_INFO as SK } from '../data/court';
 
 export function Court() {
@@ -22,12 +25,14 @@ export function Court() {
         ['people', `People (${game.people.filter((p) => p.alive).length})`],
         ['petitioners', `Petitioners${game.petitioners.length ? ` (${game.petitioners.length})` : ''}`],
         ['peoples', `Peoples${Object.values(game.natives).filter((n) => n.met).length ? ` (${Object.values(game.natives).filter((n) => n.met).length})` : ''}`],
+        ['crowns', 'Crowns'],
         ['research', 'Research'],
         ['chronicle', 'Chronicle'],
       ]} />
       {tab === 'people' && <People />}
       {tab === 'petitioners' && <Petitioners />}
       {tab === 'peoples' && <Peoples />}
+      {tab === 'crowns' && <Crowns />}
       {tab === 'research' && <Research />}
       {tab === 'chronicle' && <Chronicle />}
     </>
@@ -300,6 +305,61 @@ function Peoples() {
                   {rivals.length ? `Rivals: ${rivals.map((r) => `the ${r.people}`).join(', ')}. ` : ''}
                   {st.relation === 'peace' && st.attitude <= -40 ? 'They raid colonies and ambush parties near their land. ' : ''}
                   {st.relation === 'subject' ? 'They pay tribute every season; their land counts as yours.' : 'Trade, a trading post or a mission builds goodwill; colonies on their land and attacks on anyone wear it down.'}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+function Crowns() {
+  const game = useStore((s) => s.game)!;
+  const world = useStore((s) => s.world)!;
+  const run = useStore((s) => s.run);
+  const me = score(game, world);
+  const rows = [
+    { id: 'castile', name: 'Castile (you)', ...me, colonies: game.colonies.length, posts: Object.values(game.natives).filter((n) => n.post).length },
+    ...RIVALS.map((r) => ({ id: r.id, name: r.name, ...rivalScore(game, r.id), posts: game.rivals[r.id].posts.length })),
+  ].sort((a, b) => b.total - a.total);
+  return (
+    <>
+      <p className="muted small">The crowns of Europe race for the same coasts. Their colonies claim the land around them; their trading posts take what the peoples have to sell. Score: colonists ×10, territory ×2, and every 200 ducats of trade.</p>
+      <table className="market standings">
+        <thead><tr><th>Crown</th><th>Score</th><th>Colonies</th><th>Colonists</th><th>Territory</th><th>Posts</th></tr></thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.id} className={r.id === 'castile' ? 'me' : ''}>
+              <td>{i + 1}. {r.name}</td><td className="num"><b>{fmt(r.total)}</b></td><td className="num">{r.colonies}</td><td className="num">{r.pop}</td><td className="num">{r.territory}</td><td className="num">{r.posts}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <ul className="people">
+        {RIVALS.map((r) => {
+          const st = game.rivals[r.id];
+          const war = st.relation === 'war';
+          const cost = 1000 + Math.max(0, -st.attitude) * 10;
+          const mood = war ? 'at war' : st.attitude <= -40 ? 'hostile' : st.attitude < 0 ? 'wary' : 'cautious';
+          return (
+            <li key={r.id} className="person nation">
+              <div className="person-head static">
+                <span className={`rank-badge mood-${mood.split(' ')[0]}`}>{mood}</span>
+                <span className="person-name">{r.name}</span>
+                <span className="muted small">{r.blurb}</span>
+                <div className="attitude" title={`Attitude ${Math.round(st.attitude)}`}><div className="att-mid" /><div className="att-dot" style={{ left: `${(st.attitude + 100) / 2}%` }} /></div>
+              </div>
+              <div className="person-actions">
+                <div className="muted small">
+                  {war ? 'Their privateers hunt your ships and they raid colonies near theirs. A party beside one of their colonies can storm it.' : 'Settling close to their colonies sours relations; below −50 they may declare war.'}
+                  {r.id === 'portugal' && game.turn > 6 ? ' Under the Treaty of Tordesillas, they resent Castilian colonies on the African coast.' : ''}
+                </div>
+                <div className="row">
+                  {war
+                    ? <button disabled={game.treasury < cost} onClick={() => void run({ kind: 'rivalPeace', crown: r.id })}>Make peace · {fmt(cost)}</button>
+                    : <button className="danger" onClick={() => { if (confirm(`Declare war on ${r.name}?`)) void run({ kind: 'declareWar', crown: r.id }); }}>Declare war</button>}
                 </div>
               </div>
             </li>

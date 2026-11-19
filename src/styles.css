@@ -436,3 +436,6 @@ h3.section { margin-top: 14px; }
 .rank-badge.mood-wary { background: rgba(176, 122, 42, 0.2); color: #7a5418; }
 .rank-badge.mood-subjects { background: rgba(217, 165, 33, 0.25); color: #6d4f07; }
 button.danger { border-color: #7d1a12; color: #7d1a12; }
+
+.standings tr.me td { background: rgba(217, 165, 33, 0.14); font-weight: 600; }
+.stat.clickable { cursor: pointer; }

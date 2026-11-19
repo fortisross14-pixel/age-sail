@@ -4,6 +4,8 @@ import { BUILDINGS, BUILDING_ORDER, CITY_SPACE, UNIT_SPECS, type BuildingId } fr
 import * as Land from './land';
 import * as Col from './colony';
 import * as Nat from './natives';
+import * as Riv from './rivals';
+import type { CrownId } from '../data/rivals';
 import { EUROPEAN_PORTS, KNOWN_SOUTH, ATLANTIC_ISLANDS } from '../data/europe';
 import { TECHS, techById, type TechId } from '../data/tech';
 import { T, isWater } from '../data/terrain';
@@ -242,7 +244,7 @@ export function newGame(seed: number): { world: World; state: GameState } {
     fog: { old: initialOldFog(world), new: new Array(GRIDS.new.N).fill(Fog.Unknown) },
     fleets: [], people: [], petitioners: [], units: [], parties: [], cities, markets, discovered: [],
     surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
-    rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0, natives: Nat.initNatives(world),
+    rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0, natives: Nat.initNatives(world), rivals: Riv.initRivals(), rivalColonies: [], rivalShips: [],
     adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
     chronicle: [], events: [], nextId: 1, newWorldFound: false,
     research: { known: [], current: 'portolan', progress: 0, pending: 0 },
@@ -583,6 +585,16 @@ export function attackVillage(world: World, s: GameState, partyId: number, hex: 
   const p = Land.partyById(s, partyId);
   if (!p) return fail('No such party.');
   return Nat.attack(world, s, p, hex, natRng(s, 3), (k, t) => log(s, k, t), (e) => event(s, e));
+}
+
+// ---------- rival crowns ----------
+
+export function declareWar(s: GameState, crown: CrownId): CommandResult { return Riv.declareWar(s, crown, (k, t) => log(s, k, t)); }
+export function rivalPeace(s: GameState, crown: CrownId): CommandResult { return Riv.makePeace(s, crown); }
+export function stormColony(world: World, s: GameState, partyId: number, colonyId: string): CommandResult {
+  const p = Land.partyById(s, partyId);
+  if (!p) return fail('No such party.');
+  return Riv.stormColony(world, s, p, colonyId, Nat.partyStrength(s, p), natRng(s, 4), (k, t) => log(s, k, t), (e) => event(s, e));
 }
 
 // ---------- colonies ----------
@@ -1041,6 +1053,8 @@ export function endTurn(world: World, s: GameState): void {
     }
   }
 
+  // rival crowns sail, settle, trade and fight
+  Riv.rivalsSeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e), (f, why) => loseFleet(s, f, why));
   // native peoples: missions, trade, encroachment, sickness, raids
   Nat.nativesSeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e));
   // the colonies: work, eat, grow; they pay a little tax

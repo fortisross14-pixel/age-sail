@@ -2,6 +2,7 @@ import type { GoodId } from '../data/goods';
 import type { ShipType } from '../data/ships';
 import type { TechId } from '../data/tech';
 import type { BuildingId, ResourceId } from '../data/city';
+import type { CrownId } from '../data/rivals';
 import type { MapId } from './hex';
 
 export type { MapId };
@@ -189,6 +190,50 @@ export interface NativeState {
   epidemic: boolean;
 }
 
+export type { CrownId };
+
+/** How a rival crown stands with Castile. */
+export interface RivalState {
+  attitude: number;
+  relation: 'peace' | 'war';
+  /** season when their next colony expedition sails */
+  next: number;
+  /** abstract earnings from trade, for their score */
+  revenue: number;
+  /** trading posts they hold at native grounds (site ids) */
+  posts: string[];
+  warSince: number | null;
+}
+
+/** A rival colony: grows by itself, can be raided or taken. */
+export interface RivalColony {
+  id: string;
+  crown: CrownId;
+  name: string;
+  map: MapId;
+  hex: number;
+  pop: number;
+  level: ColonyLevel;
+  founded: number;
+  garrison: number;
+  /** the player has seen it */
+  seen: boolean;
+}
+
+/** A rival ship on the map, sailing with a purpose. */
+export interface RivalShip {
+  id: number;
+  crown: CrownId;
+  map: MapId;
+  hex: number;
+  kind: 'settlers' | 'trader' | 'privateer';
+  /** where it is going: a hex to settle, a port to trade at, or home */
+  target: number | null;
+  path: number[] | null;
+  trail: number[];
+  strength: number;
+}
+
 /** A rumour of ruins or a lost city, somewhere inland. */
 export interface Rumour { hex: number; kind: 'ruins' | 'city' | 'shrine' }
 
@@ -282,6 +327,9 @@ export interface GameState {
   rumoursDone: Record<MapId, number[]>;
   colonies: Colony[];
   natives: Record<string, NativeState>;
+  rivals: Record<CrownId, RivalState>;
+  rivalColonies: RivalColony[];
+  rivalShips: RivalShip[];
   /** ducats earned from all sales, ever: part of the score */
   revenue: number;
   /** resources found, for the record */

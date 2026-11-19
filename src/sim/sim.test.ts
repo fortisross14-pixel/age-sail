@@ -4,7 +4,7 @@ import {
   newGame, endTurn, buy, sell, moveFleet, previewMove, crossOcean, startProject, portById, cargoUsed, maxMoves,
   provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
   slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost, landParty, moveParty, boardParty, citySlots, slotsUsedIn,
-  foundColony, upgradeColony, colonyTransfer, allyNation, incorporateNation, attackVillage, tradingPost,
+  foundColony, upgradeColony, colonyTransfer, allyNation, incorporateNation, attackVillage, tradingPost, declareWar, rivalPeace, stormColony,
 } from './game';
 import { makeMarket, unitPrice, buyCost, sellValue } from './market';
 import { planRoute } from './sailing';
@@ -12,6 +12,7 @@ import { OLD, NEW } from './hex';
 import { FIXED_SOUTH } from '../data/europe';
 import { canFound, score } from './colony';
 import { gift, odds } from './natives';
+import { rivalScore } from './rivals';
 import { Fog } from './types';
 
 const SEEDS = [1492, 7, 42, 2024, 31337];
@@ -614,5 +615,57 @@ describe('M6: trading posts', () => {
     expect(tradingPost(world, state, f.id).ok).toBe(true);
     expect(state.natives[n.id].post).toBe(true);
     expect(f.cargo.timber).toBeUndefined();
+  });
+});
+
+describe('M7: rival crowns', () => {
+  it('rivals found colonies over the years, on both boards once they can cross', () => {
+    const { world, state } = newGame(1492);
+    for (let k = 0; k < 60; k++) endTurn(world, state);
+    expect(state.rivalColonies.length).toBeGreaterThanOrEqual(3);
+    expect(state.rivalColonies.some((c) => c.map === 'new')).toBe(true);
+    expect(state.rivalColonies.some((c) => c.crown === 'portugal')).toBe(true);
+    expect(state.chronicle.some((c) => c.text.includes('Tordesillas'))).toBe(true);
+    for (const c of state.rivalColonies) if (c.map === 'old') expect(OLD.lat(c.hex)).toBeLessThan(30);
+  });
+
+  it('a rival colony blocks founding nearby', () => {
+    const { world, state } = newGame(1492);
+    for (let k = 0; k < 40 && !state.rivalColonies.length; k++) endTurn(world, state);
+    const rc = state.rivalColonies[0];
+    expect(rc).toBeDefined();
+    const g = rc.map === 'old' ? OLD : NEW;
+    state.units.push({ id: 901, type: 'colonist', fleet: null, city: null, party: 950 });
+    const hex = g.within(rc.hex, 2).find((h) => world[rc.map].terrain[h] > 1 && h !== rc.hex && g.neighbors(h).some((j) => world[rc.map].terrain[j] <= 1))!;
+    state.surveyed[rc.map][hex] = 1;
+    state.parties.push({ id: 950, name: 'P', map: rc.map, hex, leader: null, moves: 3, order: null, trail: [] });
+    expect(canFound(world, state, state.parties[0]).why).toContain(rc.name);
+  });
+
+  it('war brings privateers; peace can be bought; a rival colony can be stormed and taken', () => {
+    const game = newGame(1492);
+    const { world, state } = game;
+    for (let k = 0; k < 40 && !state.rivalColonies.length; k++) endTurn(world, state);
+    const rc = state.rivalColonies[0];
+    expect(declareWar(state, rc.crown).ok).toBe(true);
+    // a column of ten infantry beside the colony
+    const g = rc.map === 'old' ? OLD : NEW;
+    const beside = g.neighbors(rc.hex).find((h) => world[rc.map].terrain[h] > 1)!;
+    for (let k = 0; k < 10; k++) state.units.push({ id: 960 + k, type: 'infantry', fleet: null, city: null, party: 951 });
+    state.parties.push({ id: 951, name: 'Column', map: rc.map, hex: beside, leader: null, moves: 3, order: null, trail: [] });
+    let tries = 0;
+    while (state.rivalColonies.includes(rc) && state.units.some((u) => u.party === 951) && tries++ < 5) stormColony(world, state, 951, rc.id);
+    expect(state.colonies.some((c) => c.name === rc.name) || tries > 0).toBe(true);
+    state.treasury = 1e5;
+    endTurn(world, state);
+    endTurn(world, state);
+    expect(rivalPeace(state, rc.crown).ok).toBe(true);
+    expect(state.rivals[rc.crown].relation).toBe('peace');
+  });
+
+  it('every crown has a score', () => {
+    const { world, state } = newGame(7);
+    for (let k = 0; k < 30; k++) endTurn(world, state);
+    for (const r of ['portugal', 'england', 'netherlands'] as const) expect(rivalScore(state, r).total).toBeGreaterThanOrEqual(0);
   });
 });

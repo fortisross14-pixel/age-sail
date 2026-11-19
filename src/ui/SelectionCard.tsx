@@ -8,6 +8,8 @@ import { partyMaxMoves, partyUnits } from '../sim/land';
 import { personById } from '../sim/court';
 import { canFound, foundingNeeds } from '../sim/colony';
 import { nationOfSite, partyStrength, defenceOf, alliedHelp, odds } from '../sim/natives';
+import { rivalColonyDefence } from '../sim/rivals';
+import { CROWN } from '../render/palette';
 import { GOOD_INFO, type GoodId } from '../data/goods';
 import { ShipIcon } from './Icon';
 
@@ -151,6 +153,13 @@ function PartyCard({ partyId }: { partyId: number }) {
           </>
         )}
         {!preview && p.order && <button onClick={() => void run({ kind: 'stopParty', party: p.id })}>Halt</button>}
+        {!preview && game.rivalColonies.filter((c) => c.map === p.map && (c.hex === p.hex || g.neighbors(p.hex).includes(c.hex))).map((c) => {
+          const o = odds(partyStrength(game, p), rivalColonyDefence(c));
+          return (
+            <button key={c.id} className="danger" title={`Your strength ${partyStrength(game, p).toFixed(1)} against ${rivalColonyDefence(c)}. ${game.rivals[c.crown].relation === 'war' ? '' : 'This means war.'}`}
+              onClick={() => void run({ kind: 'storm', party: p.id, colony: c.id })}>Storm {c.name} ({CROWN[c.crown].name}) · {Math.round(o * 100)}%</button>
+          );
+        })}
         {!preview && world[p.map].nations.flatMap((n) => [n.siteHex, ...n.villages].filter((h) => (h === p.hex || g.neighbors(p.hex).includes(h)) && !game.natives[n.id].lost.includes(h)).map((h) => ({ n, h }))).slice(0, 2).map(({ n, h }) => {
           const st = game.natives[n.id];
           if (st.relation === 'subject') return null;

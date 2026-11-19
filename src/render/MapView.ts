@@ -123,6 +123,9 @@ class Scene {
   landingG = new Graphics();
   colonyLayer = new Container();
   nationLayer = new Container();
+  rivalLayer = new Container();
+  rivalShipLayer = new Container();
+  lastRivals = '';
   lastNations = '';
   territoryG = new Graphics();
   lastColonies = '';
@@ -194,7 +197,7 @@ class Scene {
     this.root.addChild(this.portalBand());
     this.buildMonsters();
     this.root.addChild(this.monsters, this.windG, this.territoryG, this.labels, this.nationLayer, this.resLayer, this.rumourLayer, this.routes, this.landingG, this.turnMarks, this.highlight,
-      this.ports, this.colonyLayer, this.parties, this.fleets, this.plateLayer, this.hover, this.previewLabel);
+      this.ports, this.colonyLayer, this.rivalLayer, this.parties, this.rivalShipLayer, this.fleets, this.plateLayer, this.hover, this.previewLabel);
     this.buildLabels();
     this.buildPorts();
   }
@@ -410,6 +413,7 @@ class Scene {
     if (findsKey !== this.lastFinds) { this.lastFinds = findsKey; this.drawFinds(state); }
     this.syncColonies(state);
     this.syncNations(state, fogKey);
+    this.syncRivals(state, fogKey);
     this.syncFleets(state, ui, animate);
     this.syncParties(state, ui);
     this.landingG.clear();
@@ -516,6 +520,49 @@ class Scene {
         ring.position.set(g.cx(n.siteHex), g.cy(n.siteHex));
         this.nationLayer.addChild(ring);
       }
+    }
+  }
+
+  /** Rival colonies (where charted) and rival ships (where you can see them), in their crowns' colours. */
+  private syncRivals(state: GameState, fogKey: string) {
+    const { g } = this;
+    const fog = state.fog[g.id];
+    const cols = state.rivalColonies.filter((c) => c.map === g.id && fog[c.hex] >= Fog.Charted);
+    const ships = state.rivalShips.filter((x) => x.map === g.id && fog[x.hex] >= Fog.Explored);
+    const key = `${cols.map((c) => `${c.id}${c.pop}${c.level}`).join(',')}|${ships.map((x) => `${x.id}@${x.hex}`).join(',')}|${fogKey}`;
+    if (key === this.lastRivals) return;
+    this.lastRivals = key;
+    this.rivalLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
+    this.rivalShipLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
+    for (const c of cols) {
+      const crown = CROWN[c.crown];
+      const t = new Graphics();
+      for (const h of g.within(c.hex, c.level === 'outpost' ? 1 : 2)) t.poly(g.corners(h)).fill({ color: crown.primary, alpha: 0.1 });
+      this.rivalLayer.addChild(t);
+      const icon = new Sprite(this.assets.tex(`colonies/fort-${c.level}`));
+      icon.anchor.set(0.5, 0.72);
+      icon.width = HEX_W * (c.level === 'outpost' ? 1.1 : c.level === 'town' ? 1.5 : 1.9);
+      icon.scale.y = icon.scale.x;
+      icon.position.set(g.cx(c.hex), g.cy(c.hex));
+      this.rivalLayer.addChild(icon);
+      const plate = this.plate(`${c.name} · ${c.pop}`, crown.primary, crown.name);
+      plate.position.set(g.cx(c.hex), g.cy(c.hex) + HEX_R * 0.75);
+      this.plates.push(plate);
+      this.rivalLayer.addChild(plate);
+    }
+    for (const x of ships) {
+      const crown = CROWN[x.crown];
+      const node = new Container();
+      node.addChild(new Graphics().ellipse(0, 0, HEX_W * 0.42, HEX_W * 0.17).fill({ color: crown.primary, alpha: 0.6 }).stroke({ width: x.kind === 'privateer' ? 2.4 : 1.4, color: x.kind === 'privateer' ? 0x111111 : crown.secondary }));
+      const sp = new Sprite(this.assets.tex(`ships/${x.kind === 'privateer' ? 'sloop' : x.kind === 'trader' ? 'fluyt' : 'carrack'}`));
+      sp.anchor.set(0.5, 0.82);
+      sp.width = HEX_W * 0.85;
+      sp.scale.y = sp.scale.x;
+      const prev = x.trail.length > 1 ? x.trail[x.trail.length - 2] : null;
+      if (prev != null && g.cx(prev) > g.cx(x.hex)) sp.scale.x *= -1;
+      node.addChild(sp);
+      node.position.set(g.cx(x.hex), g.cy(x.hex));
+      this.rivalShipLayer.addChild(node);
     }
   }
 

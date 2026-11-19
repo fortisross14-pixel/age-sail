@@ -95,7 +95,7 @@ export const EUROPEAN_PORTS: EuropeanPort[] = [
     market: { silver: [120, 30, 8, 0], timber: [14, 60, 15, 18], stone: [10, 60, 12, 14], food: [7, 100, 30, 32], cloth: [24, 60, 15, 16], wine: [14, 70, 15, 22], sugar: [64, 25, 8, 1], spices: [100, 25, 9, 2], furs: [50, 20, 6, 0], tobacco: [60, 20, 7, 0], cacao: [70, 20, 6, 0], dyes: [78, 25, 9, 1], gold: [165, 30, 10, 0], tools: [21, 90, 22, 30] },
   },
   {
-    id: 'antwerp', name: 'Antwerpen', lat: 51.3, lon: 4.1, kind: 'foreign', nation: 'Flanders',
+    id: 'antwerp', name: 'Antwerpen', lat: 51.3, lon: 4.1, kind: 'foreign', nation: 'the Low Countries',
     blurb: 'The great market of the north. Its cloth workshops pay well for dyes and furs.',
     market: { silver: [115, 40, 12, 0], timber: [11, 100, 25, 32], stone: [9, 80, 15, 18], food: [7, 120, 35, 38], cloth: [15, 120, 25, 40], wine: [22, 60, 18, 15], sugar: [75, 30, 12, 0], spices: [125, 30, 10, 1], furs: [80, 40, 14, 3], tobacco: [70, 30, 10, 0], cacao: [55, 25, 5, 0], dyes: [95, 40, 14, 2], gold: [150, 40, 10, 0], tools: [16, 140, 30, 50] },
   },

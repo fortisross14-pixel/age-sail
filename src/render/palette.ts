@@ -8,4 +8,6 @@ export const CROWN = {
   venice: { name: 'Venice', primary: 0x6b2d6b, secondary: 0xd9b44a, css: '#6b2d6b', css2: '#d9b44a' },
 } as const;
 
+export type CrownKey = keyof typeof CROWN;
+
 export const NATIVE = { plate: 0x7c5a35, css: '#7c5a35' };

@@ -3,6 +3,8 @@ import { dateLabel, seasonOf, SEASONS } from '../sim/types';
 import { GOAL, basePoints } from '../sim/game';
 import { techById } from '../data/tech';
 import { score } from '../sim/colony';
+import { rivalScore } from '../sim/rivals';
+import { RIVALS } from '../data/rivals';
 import { fmt } from './format';
 import { spriteUrl } from '../render/assets';
 
@@ -16,6 +18,9 @@ export function Hud() {
   const setMap = useStore((s) => s.setMap);
   const endTurn = useStore((s) => s.endTurn);
   const open = newWorldOpen(game);
+  const world = useStore((s) => s.world)!;
+  const mine = score(game, world).total;
+  const rank = 1 + RIVALS.filter((r) => rivalScore(game, r.id).total > mine).length;
   const idle = game.fleets.filter((f) => f.moves > 0 && !f.order && !f.at).length;
   const goalPct = Math.max(0, Math.min(100, (game.treasury / GOAL.treasury) * 100));
   const turnsLeft = GOAL.turn - game.turn;
@@ -33,9 +38,9 @@ export function Hud() {
         <span className="prestige-mark" aria-hidden>✦</span>
         <div><div className="stat-value">{fmt(game.prestige)}</div><div className="stat-label">prestige</div></div>
       </div>
-      <div className="stat" title={(() => { const sc = score(game); return `Score: ${sc.pop} colonists ×10, ${sc.territory} hexes of territory ×2, ${sc.commerce} from ${fmt(game.revenue)} ducats of sales`; })()}>
+      <div className="stat clickable" onClick={() => set({ drawer: 'court', courtTab: 'crowns' })} title={(() => { const sc = score(game, world); return `Score: ${sc.pop} colonists ×10, ${sc.territory} hexes of territory ×2, ${sc.commerce} from ${fmt(game.revenue)} ducats of sales`; })()}>
         <span className="prestige-mark" aria-hidden>♛</span>
-        <div><div className="stat-value">{fmt(score(game).total)}</div><div className="stat-label">score</div></div>
+        <div><div className="stat-value">{fmt(mine)}</div><div className="stat-label">score · {['1st', '2nd', '3rd', '4th'][rank - 1]} of 4</div></div>
       </div>
       <div className="goal" title={`The Crown asks for ${fmt(GOAL.treasury)} ducats by ${dateLabel(GOAL.turn)}`}>
         <div className="goal-text">{turnsLeft > 0 ? <>Crown’s charge: {fmt(GOAL.treasury)} by {dateLabel(GOAL.turn)}</> : <>The Crown’s deadline has passed</>}</div>

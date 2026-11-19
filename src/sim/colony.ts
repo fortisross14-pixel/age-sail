@@ -182,6 +182,8 @@ export function canFound(world: World, s: GameState, p: Party): { ok: boolean; w
   if (!g.neighbors(p.hex).some((h) => isWater(m.terrain[h]))) return { ok: false, why: 'Found it on the coast, where ships can reach it.' };
   if (!s.surveyed[p.map][p.hex]) return { ok: false, why: 'Survey the land first.' };
   if (s.colonies.some((c) => c.map === p.map && g.distance(c.hex, p.hex) <= 3)) return { ok: false, why: 'Too close to another colony.' };
+  const rival = s.rivalColonies.find((c) => c.map === p.map && g.distance(c.hex, p.hex) <= 3);
+  if (rival) return { ok: false, why: `This coast is claimed by ${rival.name}, a rival colony.` };
   if (m.ports.some((x) => g.distance(x.hex, p.hex) <= 2)) return { ok: false, why: 'Too close to a trading ground or port.' };
   if (p.map === 'old' && g.lat(p.hex) >= 30) return { ok: false, why: 'This land already belongs to European crowns.' };
   const needs = foundingNeeds(s, p);
