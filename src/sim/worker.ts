@@ -1,0 +1,71 @@
+/// <reference lib="webworker" />
+import * as Comlink from 'comlink';
+import type { GoodId } from '../data/goods';
+import { generateWorld } from './mapgen';
+import * as G from './game';
+import type { GameState, World, ProjectKind } from './types';
+
+export type Command =
+  | { kind: 'buy'; fleet: number; good: GoodId; qty: number }
+  | { kind: 'sell'; fleet: number; good: GoodId; qty: number }
+  | { kind: 'provision'; fleet: number }
+  | { kind: 'repair'; fleet: number }
+  | { kind: 'move'; fleet: number; hex: number }
+  | { kind: 'cross'; fleet: number }
+  | { kind: 'cancelOrder'; fleet: number }
+  | { kind: 'project'; city: string; project: ProjectKind }
+  | { kind: 'assignExplorer'; explorer: number; fleet: number }
+  | { kind: 'merge'; from: number; into: number }
+  | { kind: 'dismissEvent' };
+
+let world: World | null = null;
+let state: GameState | null = null;
+
+function need() {
+  if (!world || !state) throw new Error('No game loaded');
+  return { world, state };
+}
+
+const api = {
+  newGame(seed: number) {
+    const g = G.newGame(seed);
+    world = g.world;
+    state = g.state;
+    return g;
+  },
+  load(saved: GameState) {
+    world = generateWorld(saved.seed);
+    state = saved;
+    return { world, state };
+  },
+  preview(fleet: number, hex: number) {
+    const { world, state } = need();
+    return G.previewMove(world, state, fleet, hex);
+  },
+  command(c: Command): { result: G.CommandResult; state: GameState } {
+    const { world, state } = need();
+    let result: G.CommandResult;
+    switch (c.kind) {
+      case 'buy': result = G.buy(world, state, c.fleet, c.good, c.qty); break;
+      case 'sell': result = G.sell(world, state, c.fleet, c.good, c.qty); break;
+      case 'provision': result = G.provision(world, state, c.fleet); break;
+      case 'repair': result = G.repair(world, state, c.fleet); break;
+      case 'move': result = G.moveFleet(world, state, c.fleet, c.hex); break;
+      case 'cross': result = G.crossOcean(world, state, c.fleet); break;
+      case 'cancelOrder': result = G.cancelOrder(state, c.fleet); break;
+      case 'project': result = G.startProject(state, c.city, c.project); break;
+      case 'assignExplorer': result = G.assignExplorer(state, c.explorer, c.fleet); break;
+      case 'merge': result = G.mergeFleets(state, c.from, c.into); break;
+      case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
+    }
+    return { result, state };
+  },
+  endTurn() {
+    const { world, state } = need();
+    G.endTurn(world, state);
+    return state;
+  },
+};
+
+export type SimApi = typeof api;
+Comlink.expose(api);

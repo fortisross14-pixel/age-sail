@@ -1,0 +1,504 @@
+{
+ "colonies": [
+  {
+   "name": "fort-outpost",
+   "w": 96,
+   "h": 57
+  },
+  {
+   "name": "fort-town",
+   "w": 152,
+   "h": 64
+  },
+  {
+   "name": "fort-city",
+   "w": 258,
+   "h": 66
+  },
+  {
+   "name": "trading-post-outpost",
+   "w": 112,
+   "h": 57
+  },
+  {
+   "name": "trading-post-town",
+   "w": 156,
+   "h": 76
+  },
+  {
+   "name": "trading-post-city",
+   "w": 248,
+   "h": 83
+  },
+  {
+   "name": "mission-outpost",
+   "w": 116,
+   "h": 66
+  },
+  {
+   "name": "mission-town",
+   "w": 164,
+   "h": 79
+  },
+  {
+   "name": "mission-city",
+   "w": 272,
+   "h": 73
+  },
+  {
+   "name": "plantation-outpost",
+   "w": 127,
+   "h": 64
+  },
+  {
+   "name": "plantation-town",
+   "w": 180,
+   "h": 76
+  },
+  {
+   "name": "plantation-city",
+   "w": 276,
+   "h": 78
+  },
+  {
+   "name": "mine-outpost",
+   "w": 124,
+   "h": 64
+  },
+  {
+   "name": "mine-town",
+   "w": 183,
+   "h": 74
+  },
+  {
+   "name": "mine-city",
+   "w": 285,
+   "h": 84
+  },
+  {
+   "name": "port-outpost",
+   "w": 128,
+   "h": 66
+  },
+  {
+   "name": "port-town",
+   "w": 180,
+   "h": 85
+  },
+  {
+   "name": "port-city",
+   "w": 308,
+   "h": 95
+  }
+ ],
+ "units": [
+  {
+   "name": "conquistador",
+   "w": 156,
+   "h": 190
+  },
+  {
+   "name": "musketeer",
+   "w": 164,
+   "h": 186
+  },
+  {
+   "name": "pikeman",
+   "w": 164,
+   "h": 196
+  },
+  {
+   "name": "cannon",
+   "w": 201,
+   "h": 187
+  },
+  {
+   "name": "cavalry",
+   "w": 182,
+   "h": 196
+  },
+  {
+   "name": "friar",
+   "w": 168,
+   "h": 191
+  },
+  {
+   "name": "colonist",
+   "w": 170,
+   "h": 193
+  },
+  {
+   "name": "scout",
+   "w": 182,
+   "h": 189
+  }
+ ],
+ "ships": [
+  {
+   "name": "caravel",
+   "w": 106,
+   "h": 116
+  },
+  {
+   "name": "carrack",
+   "w": 120,
+   "h": 142
+  },
+  {
+   "name": "galleon",
+   "w": 153,
+   "h": 160
+  },
+  {
+   "name": "fluyt",
+   "w": 143,
+   "h": 148
+  },
+  {
+   "name": "sloop",
+   "w": 132,
+   "h": 124
+  },
+  {
+   "name": "frigate",
+   "w": 173,
+   "h": 166
+  },
+  {
+   "name": "ship-of-the-line",
+   "w": 194,
+   "h": 195
+  }
+ ],
+ "terrain": [
+  {
+   "name": "mountain-0",
+   "w": 88,
+   "h": 25
+  },
+  {
+   "name": "mountain-1",
+   "w": 113,
+   "h": 40
+  },
+  {
+   "name": "mountain-2",
+   "w": 141,
+   "h": 54
+  },
+  {
+   "name": "mountain-3",
+   "w": 168,
+   "h": 78
+  },
+  {
+   "name": "mountain-4",
+   "w": 198,
+   "h": 88
+  },
+  {
+   "name": "mountain-5",
+   "w": 63,
+   "h": 18
+  },
+  {
+   "name": "hill-0",
+   "w": 67,
+   "h": 16
+  },
+  {
+   "name": "hill-1",
+   "w": 88,
+   "h": 22
+  },
+  {
+   "name": "hill-2",
+   "w": 118,
+   "h": 22
+  },
+  {
+   "name": "hill-3",
+   "w": 132,
+   "h": 31
+  },
+  {
+   "name": "hill-4",
+   "w": 160,
+   "h": 38
+  },
+  {
+   "name": "hill-5",
+   "w": 184,
+   "h": 50
+  },
+  {
+   "name": "tree-0",
+   "w": 49,
+   "h": 51
+  },
+  {
+   "name": "tree-1",
+   "w": 73,
+   "h": 63
+  },
+  {
+   "name": "tree-2",
+   "w": 80,
+   "h": 79
+  },
+  {
+   "name": "tree-3",
+   "w": 99,
+   "h": 73
+  },
+  {
+   "name": "tree-4",
+   "w": 101,
+   "h": 85
+  },
+  {
+   "name": "tree-5",
+   "w": 76,
+   "h": 74
+  },
+  {
+   "name": "tree-6",
+   "w": 82,
+   "h": 75
+  },
+  {
+   "name": "tree-7",
+   "w": 112,
+   "h": 82
+  },
+  {
+   "name": "conifer-0",
+   "w": 50,
+   "h": 60
+  },
+  {
+   "name": "conifer-1",
+   "w": 57,
+   "h": 69
+  },
+  {
+   "name": "conifer-2",
+   "w": 58,
+   "h": 73
+  },
+  {
+   "name": "conifer-3",
+   "w": 65,
+   "h": 83
+  },
+  {
+   "name": "conifer-4",
+   "w": 72,
+   "h": 86
+  },
+  {
+   "name": "conifer-5",
+   "w": 69,
+   "h": 92
+  },
+  {
+   "name": "conifer-6",
+   "w": 72,
+   "h": 93
+  },
+  {
+   "name": "conifer-7",
+   "w": 87,
+   "h": 101
+  },
+  {
+   "name": "palm-0",
+   "w": 47,
+   "h": 61
+  },
+  {
+   "name": "palm-1",
+   "w": 61,
+   "h": 75
+  },
+  {
+   "name": "palm-2",
+   "w": 68,
+   "h": 81
+  },
+  {
+   "name": "palm-3",
+   "w": 74,
+   "h": 89
+  },
+  {
+   "name": "palm-4",
+   "w": 79,
+   "h": 92
+  },
+  {
+   "name": "palm-5",
+   "w": 82,
+   "h": 91
+  },
+  {
+   "name": "palm-6",
+   "w": 77,
+   "h": 89
+  },
+  {
+   "name": "palm-7",
+   "w": 87,
+   "h": 91
+  },
+  {
+   "name": "marsh-0",
+   "w": 74,
+   "h": 67
+  },
+  {
+   "name": "marsh-1",
+   "w": 85,
+   "h": 66
+  },
+  {
+   "name": "marsh-2",
+   "w": 72,
+   "h": 64
+  },
+  {
+   "name": "marsh-3",
+   "w": 86,
+   "h": 66
+  },
+  {
+   "name": "rocks-0",
+   "w": 88,
+   "h": 35
+  },
+  {
+   "name": "rocks-1",
+   "w": 130,
+   "h": 58
+  },
+  {
+   "name": "rocks-2",
+   "w": 160,
+   "h": 77
+  }
+ ],
+ "goods": [
+  {
+   "name": "silver",
+   "w": 123,
+   "h": 77
+  },
+  {
+   "name": "gold",
+   "w": 124,
+   "h": 85
+  },
+  {
+   "name": "sugar",
+   "w": 121,
+   "h": 90
+  },
+  {
+   "name": "tobacco",
+   "w": 135,
+   "h": 88
+  },
+  {
+   "name": "cacao",
+   "w": 123,
+   "h": 86
+  },
+  {
+   "name": "dyes",
+   "w": 122,
+   "h": 86
+  },
+  {
+   "name": "furs",
+   "w": 133,
+   "h": 84
+  },
+  {
+   "name": "cod",
+   "w": 120,
+   "h": 88
+  },
+  {
+   "name": "timber",
+   "w": 131,
+   "h": 82
+  },
+  {
+   "name": "corn",
+   "w": 117,
+   "h": 87
+  },
+  {
+   "name": "potato",
+   "w": 130,
+   "h": 81
+  },
+  {
+   "name": "tomato",
+   "w": 124,
+   "h": 80
+  },
+  {
+   "name": "spices",
+   "w": 131,
+   "h": 99
+  },
+  {
+   "name": "silk",
+   "w": 135,
+   "h": 97
+  },
+  {
+   "name": "wine",
+   "w": 126,
+   "h": 95
+  },
+  {
+   "name": "tools",
+   "w": 127,
+   "h": 94
+  }
+ ],
+ "ornaments": [
+  {
+   "name": "compass-large",
+   "w": 302,
+   "h": 299
+  },
+  {
+   "name": "compass-small",
+   "w": 135,
+   "h": 167
+  },
+  {
+   "name": "cartouche",
+   "w": 439,
+   "h": 253
+  },
+  {
+   "name": "serpent",
+   "w": 535,
+   "h": 147
+  },
+  {
+   "name": "whale",
+   "w": 442,
+   "h": 210
+  },
+  {
+   "name": "wind-head",
+   "w": 409,
+   "h": 220
+  }
+ ]
+}
