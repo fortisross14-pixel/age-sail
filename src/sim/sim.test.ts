@@ -4,13 +4,14 @@ import {
   newGame, endTurn, buy, sell, moveFleet, previewMove, crossOcean, startProject, portById, cargoUsed, maxMoves,
   provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
   slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost, landParty, moveParty, boardParty, citySlots, slotsUsedIn,
-  foundColony, upgradeColony, colonyTransfer,
+  foundColony, upgradeColony, colonyTransfer, allyNation, incorporateNation, attackVillage, tradingPost,
 } from './game';
 import { makeMarket, unitPrice, buyCost, sellValue } from './market';
 import { planRoute } from './sailing';
 import { OLD, NEW } from './hex';
 import { FIXED_SOUTH } from '../data/europe';
 import { canFound, score } from './colony';
+import { gift, odds } from './natives';
 import { Fog } from './types';
 
 const SEEDS = [1492, 7, 42, 2024, 31337];
@@ -515,5 +516,103 @@ describe('M5: colonies', () => {
     expect(c.stock.food).toBe(5);
     expect(colonyTransfer(state, f.id, 'food', -5).ok).toBe(true);
     expect(f.cargo.food).toBeUndefined();
+  });
+});
+
+describe('M6: native peoples', () => {
+  it('every trading ground is a people with villages and rivals; each board has an empire', () => {
+    const w = generateWorld(1492);
+    for (const m of [w.old, w.new]) {
+      expect(m.nations.length).toBe(m.ports.filter((p) => p.kind === 'native').length);
+      expect(m.nations.filter((n) => n.empire).length).toBe(1);
+      // peoples of small islands may live at their trading ground alone
+      expect(m.nations.filter((n) => n.villages.length > 0).length).toBeGreaterThan(m.nations.length / 2);
+      for (const n of m.nations) expect(n.rivals.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('meeting a people, gifts and an alliance', () => {
+    const { world, state } = newGame(1492);
+    const n = world.old.nations[0];
+    state.discovered.push(n.site);
+    endTurn(world, state);
+    const st = state.natives[n.id];
+    expect(st.met).toBe(true);
+    state.treasury = 1e5;
+    expect(gift(world, state, n.id, 1000).ok).toBe(true);
+    expect(st.attitude).toBeGreaterThanOrEqual(50);
+    let allied = false;
+    for (let k = 0; k < 10 && !allied; k++) { allyNation(world, state, n.id); allied = st.relation === 'allied'; if (!allied) gift(world, state, n.id, 300); }
+    expect(allied).toBe(true);
+  });
+
+  it('a mission converts a friendly people over the years, and they can join the Crown', () => {
+    const { world, state } = newGame(1492);
+    const n = world.old.nations[0];
+    const st = state.natives[n.id];
+    st.met = true; st.contact = 0; st.mission = true; st.attitude = 50;
+    for (let k = 0; k < 30; k++) endTurn(world, state);
+    expect(st.converted).toBe(1);
+    st.attitude = 60;
+    expect(incorporateNation(world, state, n.id).ok).toBe(true);
+    expect(st.relation).toBe('subject');
+    expect(score(state, world).territory).toBeGreaterThan(0);
+  });
+
+  it('battles are about numbers: a lone soldier rarely beats a whole people', () => {
+    expect(odds(4, 15)).toBeLessThan(0.25);
+    expect(odds(40, 15)).toBeGreaterThan(0.7);
+  });
+
+  it('attacking a village means war; taking their ground makes them subjects; others resent it', () => {
+    const game = newGame(1492);
+    const { world, state } = game;
+    const n = world.old.nations.find((x) => !x.empire)!;
+    const other = world.old.nations.find((x) => x !== n)!;
+    state.natives[other.id].met = true;
+    const before = state.natives[other.id].attitude;
+    for (let k = 0; k < 6; k++) state.units.push({ id: 800 + k, type: 'infantry', fleet: null, city: null, party: 700 });
+    state.parties.push({ id: 700, name: 'Test column', map: 'old', hex: OLD.neighbors(n.siteHex).find((h) => world.old.terrain[h] > 1)!, leader: null, moves: 3, order: null, trail: [] });
+    state.natives[n.id].warriors = 6;
+    let tries = 0;
+    while (state.natives[n.id].relation !== 'subject' && tries++ < 6 && state.parties.length) attackVillage(world, state, 700, n.siteHex);
+    expect(['war', 'subject']).toContain(state.natives[n.id].relation);
+    expect(state.natives[other.id].attitude).toBeLessThan(before);
+  });
+
+  it('a hostile people raids colonies near their land', () => {
+    const { world, state } = newGame(1492);
+    const n = world.old.nations.find((x) => x.villages.length > 0)!;
+    const st = state.natives[n.id];
+    st.met = true; st.contact = 0; st.epidemic = true; st.attitude = -80; st.warriors = 30;
+    state.colonies.push({ id: 'col-x', name: 'Test', map: 'old', hex: n.villages[0], founded: 0, pop: 4, level: 'outpost', stock: { food: 40, cloth: 40, wine: 40 }, growth: 0,
+      last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false } });
+    for (let k = 0; k < 8; k++) endTurn(world, state);
+    expect(state.chronicle.some((c) => c.text.includes('raid Test'))).toBe(true);
+  });
+
+  it('first contact is followed, some seasons later, by an epidemic', () => {
+    const { world, state } = newGame(1492);
+    const n = world.old.nations[0];
+    state.discovered.push(n.site);
+    const w0 = state.natives[n.id].warriors;
+    for (let k = 0; k < 10; k++) endTurn(world, state);
+    expect(state.natives[n.id].epidemic).toBe(true);
+    expect(state.natives[n.id].warriors).toBeLessThan(w0);
+  });
+});
+
+describe('M6: trading posts', () => {
+  it('a fleet docked at a people’s ground with timber and tools builds a trading post', () => {
+    const { world, state } = newGame(1492);
+    const n = world.old.nations[0];
+    const f = state.fleets[0];
+    f.hex = n.siteHex; f.at = n.site;
+    state.natives[n.id].met = true;
+    expect(tradingPost(world, state, f.id).ok).toBe(false); // no materials
+    f.cargo = { timber: 20, tools: 10 };
+    expect(tradingPost(world, state, f.id).ok).toBe(true);
+    expect(state.natives[n.id].post).toBe(true);
+    expect(f.cargo.timber).toBeUndefined();
   });
 });

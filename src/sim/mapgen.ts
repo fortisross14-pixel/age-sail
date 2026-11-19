@@ -3,7 +3,7 @@ import { T, isWater } from '../data/terrain';
 import { OLD_WORLD, ATLANTIC_ISLANDS, STRAITS, EUROPEAN_PORTS, DECOR_CITIES, AFRICA_OUTLINE, FIXED_SOUTH } from '../data/europe';
 import { OLD, NEW, type Grid } from './hex';
 import { mulberry32, hashSeed, range, int, shuffle, type Rng } from './rng';
-import type { World, MapData, PortDef, WindField, Rumour } from './types';
+import type { World, MapData, PortDef, WindField, Rumour, NationDef } from './types';
 import { RESOURCE_IDS, type ResourceId } from '../data/city';
 import { nativeWord, islandName } from './names';
 
@@ -179,6 +179,34 @@ function placeResources(g: Grid, terrain: Uint8Array, rivers: number[][], toSea:
   return { resource, rich };
 }
 
+/** Each trading ground is the coast of a people with villages inland; one people per board is a great empire. */
+function placeNations(g: Grid, terrain: Uint8Array, toSea: Int32Array, rng: Rng, sites: PortDef[], map: 'old' | 'new'): NationDef[] {
+  const used = new Set<number>(sites.map((p) => p.hex));
+  const nations: NationDef[] = sites.map((p) => ({
+    id: `nat-${p.id}`, people: p.people!, map, site: p.id, siteHex: p.hex, villages: [], warriors: int(rng, 8, 20), empire: false, rivals: [],
+  }));
+  // the empire: the people whose ground lies furthest inland-reaching, picked at random among the larger coasts
+  if (nations.length) {
+    const e = nations[int(rng, 0, nations.length - 1)];
+    e.empire = true;
+    e.warriors = int(rng, 35, 50);
+  }
+  for (const n of nations) {
+    const want = n.empire ? int(rng, 5, 7) : int(rng, 2, 4);
+    const cands = shuffle(rng, g.within(n.siteHex, n.empire ? 7 : 5).filter((h) => !isWater(terrain[h]) && toSea[h] >= 1 && terrain[h] !== T.Mountains));
+    for (const h of cands) {
+      if (n.villages.length >= want) break;
+      if ([...used].some((u) => g.distance(u, h) < 2)) continue;
+      n.villages.push(h);
+      used.add(h);
+    }
+  }
+  for (const n of nations) {
+    n.rivals = nations.filter((o) => o !== n).sort((a, b) => g.distance(a.siteHex, n.siteHex) - g.distance(b.siteHex, n.siteHex)).slice(0, 2).map((o) => o.id);
+  }
+  return nations;
+}
+
 function placeRumours(g: Grid, terrain: Uint8Array, toSea: Int32Array, rng: Rng, n: number, where: (i: number) => boolean): Rumour[] {
   const kinds: Rumour['kind'][] = ['ruins', 'city', 'shrine'];
   const cands = shuffle(rng, [...Array(g.N).keys()].filter((i) => where(i) && !isWater(terrain[i]) && toSea[i] >= 2 && terrain[i] !== T.Mountains));
@@ -322,9 +350,10 @@ export function generateOldWorld(seed: number): MapData {
   const south_ = (i: number) => g.lat(i) < FIXED_SOUTH - 2;
   const { resource } = placeResources(g, terrain, rivers, south.toSea, rng, 'old', south_);
   const rumours = placeRumours(g, terrain, south.toSea, rng, 5, south_);
+  const nations = placeNations(g, terrain, south.toSea, rng, coastalPeoples, 'old');
   return {
     id: 'old', terrain, elevation, rivers, wind, ports, decorCities, islandNames, monsters: [],
-    portals: edgePortals(g, terrain, 0), mainland: south.mainland, deep: south.deep, resource, rumours,
+    portals: edgePortals(g, terrain, 0), mainland: south.mainland, deep: south.deep, resource, rumours, nations,
   };
 }
 
@@ -427,9 +456,10 @@ export function generateNewWorld(seed: number): MapData {
   const wind = [0, 1, 2, 3].map((s) => windField(g, seed, s, terrain));
   const { resource } = placeResources(g, terrain, rivers, toSea, rng, 'new', () => true);
   const rumours = placeRumours(g, terrain, toSea, rng, 9, () => true);
+  const nations = placeNations(g, terrain, toSea, rng, ports, 'new');
   return {
     id: 'new', terrain, elevation, rivers, wind, ports, decorCities: [], islandNames, monsters,
-    portals: edgePortals(g, terrain, g.W - 1), mainland, deep, resource, rumours,
+    portals: edgePortals(g, terrain, g.W - 1), mainland, deep, resource, rumours, nations,
   };
 }
 

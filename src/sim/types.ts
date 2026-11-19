@@ -51,6 +51,7 @@ export interface MapData {
   /** hidden resources, found only by parties on foot: index into RESOURCE_IDS + 1, 0 for none */
   resource: Uint8Array;
   rumours: Rumour[];
+  nations: NationDef[];
 }
 
 export interface World {
@@ -153,6 +154,41 @@ export interface Colony {
   };
 }
 
+/** A native people: their trading ground on the coast and their villages inland. Fixed for the game. */
+export interface NationDef {
+  id: string;
+  people: string;
+  map: MapId;
+  /** the trading ground (a port id) and its hex */
+  site: string;
+  siteHex: number;
+  villages: number[];
+  /** fighting strength at the start */
+  warriors: number;
+  /** one great empire per board */
+  empire: boolean;
+  rivals: string[];
+}
+
+export type Relation = 'peace' | 'allied' | 'war' | 'subject';
+
+/** How a people stands with the Crown, season by season. */
+export interface NativeState {
+  met: boolean;
+  /** -100 hostile .. 100 friendly */
+  attitude: number;
+  relation: Relation;
+  warriors: number;
+  /** 0..1 */
+  converted: number;
+  post: boolean;
+  mission: boolean;
+  /** villages taken or abandoned */
+  lost: number[];
+  contact: number | null;
+  epidemic: boolean;
+}
+
 /** A rumour of ruins or a lost city, somewhere inland. */
 export interface Rumour { hex: number; kind: 'ruins' | 'city' | 'shrine' }
 
@@ -245,6 +281,7 @@ export interface GameState {
   /** rumours already followed up */
   rumoursDone: Record<MapId, number[]>;
   colonies: Colony[];
+  natives: Record<string, NativeState>;
   /** ducats earned from all sales, ever: part of the score */
   revenue: number;
   /** resources found, for the record */

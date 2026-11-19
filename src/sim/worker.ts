@@ -36,6 +36,14 @@ export type Command =
   | { kind: 'upgradeColony'; colony: string }
   | { kind: 'colonyTransfer'; fleet: number; good: GoodId; qty: number }
   | { kind: 'settle'; fleet: number }
+  | { kind: 'gift'; nation: string; ducats: number }
+  | { kind: 'ally'; nation: string }
+  | { kind: 'incite'; nation: string; target: string }
+  | { kind: 'peace'; nation: string }
+  | { kind: 'incorporate'; nation: string }
+  | { kind: 'tradingPost'; fleet: number }
+  | { kind: 'mission'; fleet?: number; party?: number }
+  | { kind: 'attack'; party: number; hex: number }
   | { kind: 'dismissEvent' };
 
 let world: World | null = null;
@@ -99,6 +107,14 @@ const api = {
       case 'upgradeColony': result = G.upgradeColony(state, c.colony); break;
       case 'colonyTransfer': result = G.colonyTransfer(state, c.fleet, c.good, c.qty); break;
       case 'settle': result = G.settleColonists(state, c.fleet); break;
+      case 'gift': result = G.giftNation(world, state, c.nation, c.ducats); break;
+      case 'ally': result = G.allyNation(world, state, c.nation); break;
+      case 'incite': result = G.inciteNation(world, state, c.nation, c.target); break;
+      case 'peace': result = G.peaceNation(world, state, c.nation); break;
+      case 'incorporate': result = G.incorporateNation(world, state, c.nation); break;
+      case 'tradingPost': result = G.tradingPost(world, state, c.fleet); break;
+      case 'mission': result = G.mission(world, state, { fleet: c.fleet, party: c.party }); break;
+      case 'attack': result = G.attackVillage(world, state, c.party, c.hex); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
     return { result, state };

@@ -3,6 +3,7 @@ import { TERRAIN_INFO } from '../data/terrain';
 import { GRIDS } from '../sim/hex';
 import { Fog, seasonOf } from '../sim/types';
 import { deepPeril } from '../sim/game';
+import { nationAt, moodOf } from '../sim/natives';
 import { RESOURCES, RESOURCE_IDS } from '../data/city';
 import { isWater } from '../data/terrain';
 import { latLabel, lonLabel, windFrom, windStrength } from './format';
@@ -32,6 +33,8 @@ export function HoverInfo() {
   }
   if (fog >= Fog.Explored && m.rumours.some((r) => r.hex === hex) && !game.rumoursDone[map].includes(hex)) parts.push('rumours of ruins: a party might go and see');
   if (fog !== Fog.Unknown && m.deep[hex]) parts.push(deepPeril(game) ? 'open ocean: no landmarks, stores spoil fast' : 'open ocean');
+  const nat = fog !== Fog.Unknown && !isWater(m.terrain[hex]) ? nationAt(world, map, hex) : undefined;
+  if (nat && game.natives[nat.id]?.met) parts.push(`lands of the ${nat.people} (${moodOf(game.natives[nat.id])})`);
   if (m.portals.includes(hex)) parts.push(map === 'old' ? 'edge of the chart: the Mar Océano lies beyond' : 'edge of the chart: Europe lies beyond');
   return <div className="hover-line">{parts.join(' · ')}</div>;
 }

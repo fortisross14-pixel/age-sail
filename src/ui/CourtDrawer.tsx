@@ -9,6 +9,8 @@ import { fmt } from './format';
 import { KIND_MARK } from './NewsFeed';
 import { Tabs, Pips } from './Drawers';
 import { getView } from './MapCanvas';
+import { allNations, moodOf, envoy } from '../sim/natives';
+import { SKILL_INFO as SK } from '../data/court';
 
 export function Court() {
   const game = useStore((s) => s.game)!;
@@ -19,11 +21,13 @@ export function Court() {
       <Tabs value={tab} onChange={(t) => set({ courtTab: t })} tabs={[
         ['people', `People (${game.people.filter((p) => p.alive).length})`],
         ['petitioners', `Petitioners${game.petitioners.length ? ` (${game.petitioners.length})` : ''}`],
+        ['peoples', `Peoples${Object.values(game.natives).filter((n) => n.met).length ? ` (${Object.values(game.natives).filter((n) => n.met).length})` : ''}`],
         ['research', 'Research'],
         ['chronicle', 'Chronicle'],
       ]} />
       {tab === 'people' && <People />}
       {tab === 'petitioners' && <Petitioners />}
+      {tab === 'peoples' && <Peoples />}
       {tab === 'research' && <Research />}
       {tab === 'chronicle' && <Chronicle />}
     </>
@@ -242,5 +246,66 @@ function Chronicle() {
         );
       })}
     </div>
+  );
+}
+
+function Peoples() {
+  const game = useStore((s) => s.game)!;
+  const world = useStore((s) => s.world)!;
+  const run = useStore((s) => s.run);
+  const met = allNations(world).filter((n) => game.natives[n.id]?.met);
+  const e = envoy(game);
+  if (!met.length) return <p className="muted">You have met no peoples yet. Their trading grounds lie along the coasts beyond Cape Bojador, and across the ocean.</p>;
+  return (
+    <>
+      <p className="muted small">
+        Deal with each people your own way: trade and trading posts, missions, alliances, setting rivals against each other, or conquest. Your envoy is
+        {e ? <> <b>{e.name}</b> ({SK.diplomacy.name.toLowerCase()} {e.skills.diplomacy})</> : ' nobody'}; a better diplomat makes gifts go further and treaties likelier.
+      </p>
+      <ul className="people">
+        {met.map((n) => {
+          const st = game.natives[n.id];
+          const mood = moodOf(st);
+          const villages = [n.siteHex, ...n.villages].length - st.lost.length;
+          const rivals = n.rivals.map((r) => allNations(world).find((x) => x.id === r)!).filter((r) => game.natives[r.id]?.met);
+          return (
+            <li key={n.id} className="person nation">
+              <div className="person-head static">
+                <span className={`rank-badge mood-${mood.split(' ')[0]}`}>{mood}</span>
+                <span className="person-name">The {n.people}{n.empire ? <span className="muted small"> · an empire</span> : ''}</span>
+                <span className="muted small">{n.map === 'old' ? 'African coast' : 'New World'}</span>
+                <div className="attitude" title={`Attitude ${Math.round(st.attitude)}`}><div className="att-mid" /><div className="att-dot" style={{ left: `${(st.attitude + 100) / 2}%` }} /></div>
+                <span className="person-status small">
+                  About {st.warriors} warriors · {villages} village{villages === 1 ? '' : 's'}{st.epidemic ? ' · struck by sickness' : ''}
+                  {st.post ? ' · trading post' : ''}{st.mission ? ` · mission (${Math.round(st.converted * 100)}% won over)` : ''}
+                </span>
+              </div>
+              <div className="person-actions">
+                <div className="row">
+                  {st.relation !== 'war' && st.relation !== 'subject' && <>
+                    <button disabled={game.treasury < 200} onClick={() => void run({ kind: 'gift', nation: n.id, ducats: 200 })}>Gifts · 200</button>
+                    <button disabled={game.treasury < 600} onClick={() => void run({ kind: 'gift', nation: n.id, ducats: 600 })}>Rich gifts · 600</button>
+                  </>}
+                  {st.relation === 'peace' && <button disabled={st.attitude < 50} title={st.attitude < 50 ? 'They must be friendly first' : ''} onClick={() => void run({ kind: 'ally', nation: n.id })}>Propose alliance</button>}
+                  {st.relation === 'war' && <button disabled={game.treasury < 500} onClick={() => void run({ kind: 'peace', nation: n.id })}>Make peace · 500</button>}
+                  {st.converted >= 1 && st.relation !== 'subject' && <button className="primary" disabled={st.attitude < 40} onClick={() => void run({ kind: 'incorporate', nation: n.id })}>Invite them to join the Crown</button>}
+                </div>
+                {rivals.length > 0 && (st.relation === 'allied' || st.attitude >= 30) && (
+                  <div className="row small">
+                    Turn them against:
+                    {rivals.map((r) => <button key={r.id} disabled={game.treasury < 400} title="400 ducats in gifts and arms. It may get out." onClick={() => void run({ kind: 'incite', nation: n.id, target: r.id })}>the {r.people}</button>)}
+                  </div>
+                )}
+                <div className="muted small">
+                  {rivals.length ? `Rivals: ${rivals.map((r) => `the ${r.people}`).join(', ')}. ` : ''}
+                  {st.relation === 'peace' && st.attitude <= -40 ? 'They raid colonies and ambush parties near their land. ' : ''}
+                  {st.relation === 'subject' ? 'They pay tribute every season; their land counts as yours.' : 'Trade, a trading post or a mission builds goodwill; colonies on their land and attacks on anyone wear it down.'}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }

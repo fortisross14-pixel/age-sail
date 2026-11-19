@@ -3,6 +3,7 @@ import { SHIPS, SHIP_NAMES, type ShipType } from '../data/ships';
 import { BUILDINGS, BUILDING_ORDER, CITY_SPACE, UNIT_SPECS, type BuildingId } from '../data/city';
 import * as Land from './land';
 import * as Col from './colony';
+import * as Nat from './natives';
 import { EUROPEAN_PORTS, KNOWN_SOUTH, ATLANTIC_ISLANDS } from '../data/europe';
 import { TECHS, techById, type TechId } from '../data/tech';
 import { T, isWater } from '../data/terrain';
@@ -241,7 +242,7 @@ export function newGame(seed: number): { world: World; state: GameState } {
     fog: { old: initialOldFog(world), new: new Array(GRIDS.new.N).fill(Fog.Unknown) },
     fleets: [], people: [], petitioners: [], units: [], parties: [], cities, markets, discovered: [],
     surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
-    rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0,
+    rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0, natives: Nat.initNatives(world),
     adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
     chronicle: [], events: [], nextId: 1, newWorldFound: false,
     research: { known: [], current: 'portolan', progress: 0, pending: 0 },
@@ -268,6 +269,8 @@ const fail = (error: string): CommandResult => ({ ok: false, error });
 function dockedMarket(world: World, s: GameState, f: Fleet, g: GoodId) {
   if (!f.at) return { error: 'The fleet must be in port to trade.' };
   if (f.at.startsWith('col-')) return { error: 'Colonies have no market: load and unload goods in the colony’s panel.' };
+  const nat = Nat.nationOfSite(world, f.at);
+  if (nat && s.natives[nat.id]?.relation === 'war') return { error: `The ${nat.people} will not trade with you while you are at war.` };
   const m = s.markets[f.at]?.[g];
   if (!m) return { error: `${portById(world, f.at, s)?.name} does not trade in ${GOOD_INFO[g].name.toLowerCase()}.` };
   return { m };
@@ -287,7 +290,15 @@ export function buy(world: World, s: GameState, fleetId: number, g: GoodId, qty:
   s.treasury -= cost;
   m.stock -= qty;
   f.cargo[g] = (f.cargo[g] ?? 0) + qty;
+  goodwill(world, s, f);
   return { ok: true, message: `Bought ${qty} ${GOOD_INFO[g].name.toLowerCase()} for ${cost} ducats.` };
+}
+
+/** Fair trade at a people's ground builds goodwill. */
+function goodwill(world: World, s: GameState, f: Fleet) {
+  const n = f.at ? Nat.nationOfSite(world, f.at) : undefined;
+  const st = n ? s.natives[n.id] : undefined;
+  if (st && st.attitude < 60) st.attitude += 1;
 }
 
 export function sell(world: World, s: GameState, fleetId: number, g: GoodId, qty: number): CommandResult {
@@ -301,6 +312,7 @@ export function sell(world: World, s: GameState, fleetId: number, g: GoodId, qty
   const value = sellValue(m, qty, spreadFor(s, f, portById(world, f.at!, s)?.kind === 'native'));
   s.treasury += value;
   s.revenue += value;
+  goodwill(world, s, f);
   m.stock += qty;
   f.cargo[g] = (f.cargo[g] ?? 0) - qty;
   if (!f.cargo[g]) delete f.cargo[g];
@@ -546,6 +558,31 @@ export function stopParty(s: GameState, partyId: number): CommandResult {
   if (!p) return fail('No such party.');
   p.order = null;
   return { ok: true };
+}
+
+// ---------- native peoples ----------
+
+const natRng = (s: GameState, k: number) => mulberry32(hashSeed(s.seed, s.turn, s.nextId++, k));
+
+export function giftNation(world: World, s: GameState, id: string, ducats: number): CommandResult { return Nat.gift(world, s, id, ducats); }
+export function allyNation(world: World, s: GameState, id: string): CommandResult { return Nat.proposeAlliance(world, s, id, natRng(s, 1)); }
+export function inciteNation(world: World, s: GameState, id: string, target: string): CommandResult { return Nat.incite(world, s, id, target, natRng(s, 2), (k, t) => log(s, k, t)); }
+export function peaceNation(world: World, s: GameState, id: string): CommandResult { return Nat.makePeace(world, s, id); }
+export function incorporateNation(world: World, s: GameState, id: string): CommandResult { return Nat.incorporate(world, s, id, (k, t) => log(s, k, t), (e) => event(s, e)); }
+
+export function tradingPost(world: World, s: GameState, fleetId: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  return f ? Nat.tradingPost(world, s, f) : fail('No such fleet.');
+}
+
+export function mission(world: World, s: GameState, from: { fleet?: number; party?: number }): CommandResult {
+  return Nat.foundMission(world, s, { fleet: from.fleet != null ? fleetById(s, from.fleet) : undefined, party: from.party != null ? Land.partyById(s, from.party) : undefined });
+}
+
+export function attackVillage(world: World, s: GameState, partyId: number, hex: number): CommandResult {
+  const p = Land.partyById(s, partyId);
+  if (!p) return fail('No such party.');
+  return Nat.attack(world, s, p, hex, natRng(s, 3), (k, t) => log(s, k, t), (e) => event(s, e));
 }
 
 // ---------- colonies ----------
@@ -832,8 +869,8 @@ function reveal(world: World, s: GameState, f: Fleet) {
     s.prestige += 15;
     addResearch(s, 4);
     if (explorer) explorer.discoveries += 10;
-    const goods = Object.keys(s.markets[p.id] ?? {}).filter((g) => g !== 'tools').map((g) => GOOD_INFO[g as GoodId].name.toLowerCase());
-    const text = `${explorer ? explorer.name : f.name} meets the ${p.people} at ${p.name}. They offer ${goods.join(' and ')}, and ask for iron tools.`;
+    const goods = Object.keys(s.markets[p.id] ?? {}).filter((g) => g !== 'tools' && g !== 'cloth').map((g) => GOOD_INFO[g as GoodId].name.toLowerCase());
+    const text = `${explorer ? explorer.name : f.name} meets the ${p.people} at ${p.name}. They offer ${goods.join(' and ')}, and ask for iron tools and cloth.`;
     log(s, 'discovery', text);
     if (s.discovered.length === 1) event(s, { kind: 'people', title: `The ${p.people}`, text, map: p.map, hex: p.hex });
   }
@@ -996,7 +1033,7 @@ export function endTurn(world: World, s: GameState): void {
       log(s, 'court', `The ${SHIPS[p.ship].name.toLowerCase()} ${ship.name} is launched in ${port.name}.`);
     } else if (p.kind === 'unit') {
       s.units.push({ id: s.nextId++, type: p.unit, fleet: null, city: city.id, party: null });
-      log(s, 'court', `${UNIT_INFO[p.unit].name} are ready in ${port.name}, waiting for a ship.`);
+      log(s, 'court', `A ${UNIT_INFO[p.unit].name.toLowerCase()} is ready in ${port.name}, waiting for a ship.`);
     } else {
       city.buildings[p.building]++;
       const b = BUILDINGS[p.building];
@@ -1004,6 +1041,8 @@ export function endTurn(world: World, s: GameState): void {
     }
   }
 
+  // native peoples: missions, trade, encroachment, sickness, raids
+  Nat.nativesSeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e));
   // the colonies: work, eat, grow; they pay a little tax
   for (const c of s.colonies) Col.colonySeason(world, s, c, colLog(s));
   // taxes and market dues; universities feed the scholars
@@ -1022,7 +1061,7 @@ export function endTurn(world: World, s: GameState): void {
     if (p.rank === 'explorer' && p.unitType) {
       const at = p.city ?? 'seville';
       s.units.push({ id: s.nextId++, type: p.unitType, fleet: null, city: at, party: null });
-      log(s, 'court', `${p.name} is ready to lead an expedition. ${UNIT_INFO[p.unitType].name} wait with them in ${portById(world, at, s)?.name}.`);
+      log(s, 'court', `${p.name} is ready to lead an expedition. A ${UNIT_INFO[p.unitType].name.toLowerCase()} waits with them in ${portById(world, at, s)?.name}.`);
     } else {
       log(s, 'court', `${p.name} is ready to serve as ${RANK_INFO[p.rank].name.toLowerCase()}.`);
     }
@@ -1034,7 +1073,10 @@ export function endTurn(world: World, s: GameState): void {
   for (const [id, book] of Object.entries(s.markets)) {
     const port = portById(world, id, s);
     const european = port?.kind !== 'native';
-    const boost = !european && has(s, 'factors') && s.discovered.includes(id) ? 1.5 : 1;
+    const nat = !european ? Nat.nationOfSite(world, id) : undefined;
+    const nst = nat ? s.natives[nat.id] : undefined;
+    const boost = (!european && has(s, 'factors') && s.discovered.includes(id) ? 1.5 : 1) * (nst?.post ? 1.4 : 1) * (nst?.relation === 'allied' ? 1.2 : 1)
+      * (nst ? Math.max(0.3, nst.warriors / Math.max(1, nat!.warriors)) : 1);
     for (const g of GOODS) {
       const m = book[g];
       if (!m) continue;

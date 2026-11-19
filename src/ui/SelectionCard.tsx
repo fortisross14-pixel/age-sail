@@ -7,6 +7,7 @@ import { UNIT_INFO } from '../data/court';
 import { partyMaxMoves, partyUnits } from '../sim/land';
 import { personById } from '../sim/court';
 import { canFound, foundingNeeds } from '../sim/colony';
+import { nationOfSite, partyStrength, defenceOf, alliedHelp, odds } from '../sim/natives';
 import { GOOD_INFO, type GoodId } from '../data/goods';
 import { ShipIcon } from './Icon';
 
@@ -87,6 +88,19 @@ export function SelectionCard() {
             {leaderOf(game, fleet) && aboard > 0 && <button title="Units go ashore; the leader stays with the ships" onClick={() => set({ landing: { leader: false } })}>Land units only</button>}
           </>
         )}
+        {!preview && port?.kind === 'native' && (() => {
+          const n = nationOfSite(world, port.id);
+          const st = n ? game.natives[n.id] : undefined;
+          if (!n || !st) return null;
+          const hasMissionary = game.units.some((u) => u.fleet === fleet.id && u.type === 'missionary');
+          return (
+            <>
+              {!st.post && <button title="Needs 20 timber and 10 tools in the hold, and a people who are not wary" onClick={() => void run({ kind: 'tradingPost', fleet: fleet.id })}>Trading post</button>}
+              {!st.mission && hasMissionary && <button onClick={() => void run({ kind: 'mission', fleet: fleet.id })}>Found mission</button>}
+              <button onClick={() => set({ drawer: 'court', courtTab: 'peoples' })}>The {n.people}</button>
+            </>
+          );
+        })()}
         {!preview && <button onClick={() => set({ drawer: 'fleets' })}>Details</button>}
       </div>
       <button className="x" onClick={() => useStore.getState().selectFleet(null)} aria-label="Deselect">×</button>
@@ -137,6 +151,19 @@ function PartyCard({ partyId }: { partyId: number }) {
           </>
         )}
         {!preview && p.order && <button onClick={() => void run({ kind: 'stopParty', party: p.id })}>Halt</button>}
+        {!preview && world[p.map].nations.flatMap((n) => [n.siteHex, ...n.villages].filter((h) => (h === p.hex || g.neighbors(p.hex).includes(h)) && !game.natives[n.id].lost.includes(h)).map((h) => ({ n, h }))).slice(0, 2).map(({ n, h }) => {
+          const st = game.natives[n.id];
+          if (st.relation === 'subject') return null;
+          const a = partyStrength(game, p) + alliedHelp(world, game, n);
+          const o = odds(a, defenceOf(world, n, st, h));
+          return (
+            <span key={h} className="row" style={{ margin: 0 }}>
+              {units.some((u) => u.type === 'missionary') && !st.mission && <button onClick={() => void run({ kind: 'mission', party: p.id })}>Mission to the {n.people}</button>}
+              <button className="danger" title={`Your strength ${a.toFixed(1)} against about ${defenceOf(world, n, st, h).toFixed(0)}. War with them; every people will resent it.`}
+                onClick={() => void run({ kind: 'attack', party: p.id, hex: h })}>Attack the {n.people} · {Math.round(o * 100)}%</button>
+            </span>
+          );
+        })}
         {!preview && units.some((u) => u.type === 'colonist') && (() => {
           const chk = canFound(world, game, p);
           const needs = Object.entries(foundingNeeds(game, p)).map(([g, n]) => `${n} ${GOOD_INFO[g as GoodId].name.toLowerCase()}`).join(', ');

@@ -7,6 +7,7 @@ import { GRIDS } from './hex';
 import { mulberry32, hashSeed, pick } from './rng';
 import { personById, skill } from './court';
 import type { Colony, ColonyLevel, Fleet, GameState, MapId, Party, PortDef, World } from './types';
+import * as Nat from './natives';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -266,9 +267,12 @@ export function settle(s: GameState, f: Fleet, c: Colony): Result {
   return { ok: true, message: `${n} colonist${n > 1 ? 's' : ''} settle in ${c.name}.` };
 }
 
-export function score(s: GameState) {
+export function score(s: GameState, w?: World) {
   const pop = s.colonies.reduce((t, c) => t + c.pop, 0);
-  const territory = new Set(s.colonies.flatMap((c) => territoryOf(c).map((h) => `${c.map}:${h}`))).size;
+  const hexes = new Set(s.colonies.flatMap((c) => territoryOf(c).map((h) => `${c.map}:${h}`)));
+  // the lands of peoples who are subjects of the Crown count too
+  if (w) for (const n of [...w.old.nations, ...w.new.nations]) if (s.natives[n.id]?.relation === 'subject') for (const h of Nat.territory(n)) hexes.add(`${n.map}:${h}`);
+  const territory = hexes.size;
   const commerce = Math.floor(s.revenue / 200);
   return { pop, territory, commerce, total: pop * 10 + territory * 2 + commerce };
 }

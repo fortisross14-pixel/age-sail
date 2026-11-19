@@ -5,9 +5,10 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.5, the first playable version
+## Now playing: v0.6
 
-A court of people with skills who age and die; cities with buildings that train units; landing parties
+Native peoples with villages, rivals and moods: trade with them, build trading posts, send missions,
+make alliances, set rivals against each other, or conquer. And from v0.5: a court of people with skills who age and die; cities with buildings that train units; landing parties
 that explore on foot and find hidden resources and ruins; colonies that must be fed, clothed and given
 wine, grow, and ship their goods home; a score of colonists, territory and commerce. Crossing the
 Mar Océano is near-hopeless until the court masters *Volta do mar*. See [docs/ROADMAP.md](docs/ROADMAP.md).

@@ -122,6 +122,8 @@ class Scene {
   parties = new Container();
   landingG = new Graphics();
   colonyLayer = new Container();
+  nationLayer = new Container();
+  lastNations = '';
   territoryG = new Graphics();
   lastColonies = '';
   partySprites = new Map<number, { root: Container; ring: Graphics; fig: Sprite; target: string }>();
@@ -191,7 +193,7 @@ class Scene {
     this.root.addChild(this.grid);
     this.root.addChild(this.portalBand());
     this.buildMonsters();
-    this.root.addChild(this.monsters, this.windG, this.territoryG, this.labels, this.resLayer, this.rumourLayer, this.routes, this.landingG, this.turnMarks, this.highlight,
+    this.root.addChild(this.monsters, this.windG, this.territoryG, this.labels, this.nationLayer, this.resLayer, this.rumourLayer, this.routes, this.landingG, this.turnMarks, this.highlight,
       this.ports, this.colonyLayer, this.parties, this.fleets, this.plateLayer, this.hover, this.previewLabel);
     this.buildLabels();
     this.buildPorts();
@@ -407,6 +409,7 @@ class Scene {
     const findsKey = `${sk}|${state.rumoursDone[g.id].length}|${fogKey}`;
     if (findsKey !== this.lastFinds) { this.lastFinds = findsKey; this.drawFinds(state); }
     this.syncColonies(state);
+    this.syncNations(state, fogKey);
     this.syncFleets(state, ui, animate);
     this.syncParties(state, ui);
     this.landingG.clear();
@@ -477,6 +480,42 @@ class Scene {
       ps.ring.ellipse(0, 0, HEX_W * 0.36, HEX_W * 0.14).fill({ color: CROWN.spain.primary, alpha: p.moves > 0 ? 0.6 : 0.25 })
         .stroke({ width: sel ? 2.4 : 1.4, color: CROWN.spain.secondary });
       ps.root.position.set(g.cx(p.hex), g.cy(p.hex) + HEX_R * 0.3);
+    }
+  }
+
+  /** Villages of the peoples you know, and how each people stands with you. */
+  private syncNations(state: GameState, fogKey: string) {
+    const { g, m } = this;
+    const moods = m.nations.map((n) => { const st = state.natives[n.id]; return st ? `${st.met ? 1 : 0}${st.relation}${Math.round(st.attitude / 20)}${st.lost.length}${st.post ? 'p' : ''}${st.mission ? 'm' : ''}` : ''; }).join('|');
+    const key = `${moods}|${fogKey}`;
+    if (key === this.lastNations) return;
+    this.lastNations = key;
+    this.nationLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
+    const fog = state.fog[g.id];
+    for (const n of m.nations) {
+      const st = state.natives[n.id];
+      if (!st) continue;
+      const color = st.relation === 'subject' ? CROWN.spain.primary : st.relation === 'allied' ? 0x3d6b38 : st.relation === 'war' || st.attitude <= -40 ? 0xa3231a : st.attitude < 0 ? 0xb07a2a : NATIVE.plate;
+      for (const h of n.villages) {
+        if (fog[h] < Fog.Explored) continue;
+        const lost = st.lost.includes(h);
+        const v = new Graphics();
+        // three small huts, inked like the rest of the chart
+        for (const [dx, dy, s] of [[-7, 2, 1], [6, 3, 0.9], [0, -5, 1.1]] as const) {
+          v.moveTo(dx - 6 * s, dy + 4 * s).lineTo(dx, dy - 6 * s).lineTo(dx + 6 * s, dy + 4 * s).closePath();
+        }
+        v.fill({ color: 0xe8d5a6, alpha: lost ? 0.4 : 0.95 }).stroke({ width: 1.3, color: INK_HEX, alpha: lost ? 0.35 : 0.9 });
+        if (st.met && !lost) v.circle(0, 10, 3).fill(color);
+        v.position.set(g.cx(h), g.cy(h));
+        this.nationLayer.addChild(v);
+      }
+      if (st.met && fog[n.siteHex] >= Fog.Explored) {
+        const ring = new Graphics().circle(0, 0, HEX_R * 0.95).stroke({ width: 2.5, color, alpha: 0.75 });
+        if (st.post) ring.rect(-HEX_R * 0.9, -HEX_R * 0.9, 9, 9).fill(CROWN.spain.secondary);
+        if (st.mission) ring.moveTo(HEX_R * 0.75, -HEX_R * 1.0).lineTo(HEX_R * 0.75, -HEX_R * 0.55).moveTo(HEX_R * 0.6, -HEX_R * 0.85).lineTo(HEX_R * 0.9, -HEX_R * 0.85).stroke({ width: 2, color: INK_HEX });
+        ring.position.set(g.cx(n.siteHex), g.cy(n.siteHex));
+        this.nationLayer.addChild(ring);
+      }
     }
   }
 
