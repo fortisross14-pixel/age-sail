@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.19
+## Now playing: v0.20
 
-Phase 5, interface depth (first part): keyboard handling rebuilt on one table, so keys act on what is in front of you and never behind it; a Realm tab beside the map listing every fleet, party, colony and threat; a ledger that accounts for every ducat of the turn; one card for the turn's news; a Diplomacy screen for peoples, rival crowns and Europe; and a hover line that says what a foreign ship or army is and where it is going.
+Phase 5, interface depth (second part): words in the guide, goals and stories open for their meaning, and those meanings open in turn; markets show where a cargo sells best and a trade route what it earns; the map can show finds, peoples' regard or colonial loyalty; every city and colony in one sortable table; `Z` takes back your last order; three places to save, the last five turns kept, and saving to a file; fleets that explore, go home or patrol by themselves; research drawn as a tree with a queue; keys you can change; and a size setting for text and panels.
+
+From v0.19, interface depth (first part): keyboard handling rebuilt on one table, so keys act on what is in front of you and never behind it; a Realm tab beside the map listing every fleet, party, colony and threat; a ledger that accounts for every ducat of the turn; one card for the turn's news; a Diplomacy screen for peoples, rival crowns and Europe; and a hover line that says what a foreign ship or army is and where it is going.
 
 From v0.18, depth (second half): slavery as the period had it, with its costs and a law that ends it; three races to win beside the score; three scenarios with a goal and a year; favours bought with prestige; fights at sea in three rounds with a report; five more buildings at home; and a late game in which colonies that break away must be recognised, retaken or lost to a rival's protection. A fourth scenario begins in 1690 with an empire to hold together; free states form leagues and send militia against your colonies; and an ally at war asks you to choose.
 

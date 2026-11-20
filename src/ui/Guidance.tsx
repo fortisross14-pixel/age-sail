@@ -9,6 +9,7 @@ import { activeAmbitions, objectiveDone, objectiveProgress, rewardOf, rewardText
 import { portById } from '../sim/game';
 import { scenarioProgress } from '../sim/victory';
 import { scenarioById } from '../data/scenarios';
+import { Gloss } from './Gloss';
 import { crownSpec } from '../data/rivals';
 import { difficultySpec } from '../data/difficulty';
 import { fmt } from './format';
@@ -65,7 +66,7 @@ export function ObjectivesBody() {
         {isOpen && (
           <div className="obj-body">
             {o.from && <div className="obj-from">{o.from} asks</div>}
-            <p>{o.id === 'south' ? OPENINGS[game.crown]?.south ?? o.how : o.how}</p>
+            <p><Gloss text={o.id === 'south' ? OPENINGS[game.crown]?.south ?? o.how : o.how} /></p>
             <div className="obj-foot">
               {paid && <span className="obj-reward">Reward: {paid}</span>}
               <button className="small-btn" onClick={() => goTo(targetOf(o, game))}>Show me</button>

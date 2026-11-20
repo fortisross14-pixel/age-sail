@@ -105,13 +105,13 @@ export function MapCanvas() {
       let last: unknown[] = [];
       const push = () => {
         const s = useStore.getState();
-        const deps = [s.game, s.map, s.selectedFleet, s.selectedParty, s.preview, s.landing, s.showWind, s.showGrid, s.highlightAll];
+        const deps = [s.game, s.map, s.selectedFleet, s.selectedParty, s.preview, s.landing, s.showWind, s.showGrid, s.highlightAll, s.mapMode];
         if (deps.length === last.length && deps.every((d, i) => d === last[i])) return;
         last = deps;
         if (s.game) view!.update(s.game, {
           map: s.map, selectedFleet: s.selectedFleet, selectedParty: s.selectedParty, preview: s.preview && { ...s.preview },
           landing: s.landing ? landingHexes(s) : null,
-          showWind: s.showWind, showGrid: s.showGrid, highlightAll: s.highlightAll,
+          showWind: s.showWind, showGrid: s.showGrid, highlightAll: s.highlightAll, mode: s.mapMode,
         });
       };
       push();

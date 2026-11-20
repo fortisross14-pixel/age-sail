@@ -3,7 +3,7 @@ import { useStore, type DrawerId } from '../store';
 import { factoryAt, factoryCost, factoryPace, demandFactor, shocksIn, shockTitle } from '../sim/trade';
 import { FACTORY, REGION_NAME, type Region } from '../data/trade';
 import { turnLabel } from '../sim/types';
-import type { GameState } from '../sim/types';
+import type { GameState, World } from '../sim/types';
 import { realmSpec } from '../data/realms';
 import { Frame } from './theme/Frame';
 import { Medal, CrestArt } from './theme/Art';
@@ -19,6 +19,7 @@ import { Fleets } from './FleetsDrawer';
 import { Cities } from './CityScreen';
 import { Court, Diplomacy, Research, Chronicle } from './CourtDrawer';
 import { StepHint } from './Guidance';
+import { FirstHint } from './More';
 import { CaptivesRow } from './Late';
 
 const HEADS: Record<Exclude<DrawerId, 'cities'>, { title: string; icon: IconName; sub: (g: GameState) => string }> = {
@@ -30,6 +31,9 @@ const HEADS: Record<Exclude<DrawerId, 'cities'>, { title: string; icon: IconName
   chronicle: { title: 'Chronicle', icon: 'chronicle', sub: () => 'What has happened in your reign' },
 };
 
+/** Which first-time hint belongs to the screen and tab in view. */
+const hintFor = (shown: DrawerId, s: { courtTab: string; researchTab: string }) => (shown === 'diplomacy' ? 'diplomacy' : shown === 'court' && s.courtTab === 'dynasty' ? 'dynasty' : shown === 'research' && s.researchTab !== 'subjects' ? s.researchTab : null);
+
 /** A screen over everything (HUD included): one at a time; closing returns to the map. */
 export function Drawer() {
   const drawer = useStore((s) => s.drawer);
@@ -39,6 +43,9 @@ export function Drawer() {
   const [leaving, setLeaving] = useState(false);
   const [shine, setShine] = useState(0);
   const [entering, setEntering] = useState(true);
+  useStore((s) => `${s.courtTab}|${s.researchTab}`); // the hint follows the tab
+  // the keyboard goes with the screen: focus moves into it when it opens
+  useEffect(() => { if (drawer) setTimeout(() => document.querySelector<HTMLElement>('.drawer .adm-close')?.focus({ preventScroll: true }), 80); }, [drawer]);
   useEffect(() => {
     if (drawer && drawer !== shown) {
       sfx(shown ? 'page' : 'open');
@@ -68,6 +75,7 @@ export function Drawer() {
         </header>
       )}
       <StepHint screen={shown} />
+      <FirstHint id={hintFor(shown, useStore.getState())} />
       <div className="drawer-body" key={shown}>
         {shown === 'fleets' && <Fleets />}
         {shown === 'markets' && <Markets />}
@@ -145,6 +153,17 @@ function Markets() {
   );
 }
 
+/** Where a good sells for most among the ports you know on a map, at today's prices. */
+function bestPort(game: GameState, world: World, good: GoodId, map: string) {
+  let out: { id: string; name: string; price: number } | null = null;
+  for (const p of allPorts(world)) {
+    if (p.map !== map || p.inland || (p.kind === 'native' && !game.discovered.includes(p.id))) continue;
+    const m = game.markets[p.id]?.[good];
+    if (m && (!out || unitPrice(m) > out.price)) out = { id: p.id, name: p.name, price: unitPrice(m) };
+  }
+  return out;
+}
+
 const hexColor = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 function PortMarket({ portId }: { portId: string }) {
@@ -196,6 +215,7 @@ function PortMarket({ portId }: { portId: string }) {
           const buyQ = Math.max(1, Math.min(qty, Math.floor(m.stock), free));
           const sellQ = Math.max(1, Math.min(qty, have));
           const hist = m.history;
+          const best = have > 0 ? bestPort(game, world, good, port.map) : null;
           const falling = hist.length > 1 && hist[hist.length - 1] < hist[hist.length - 2];
           const fill = m.stock / Math.max(1, m.ref);
           const taste = port.kind !== 'native' ? demandFactor(game, port.realm, good) : 1;
@@ -205,7 +225,7 @@ function PortMarket({ portId }: { portId: string }) {
           return (
             <div key={good} className="good-row" title={GOOD_INFO[good].blurb}>
               <GoodIcon good={good} size={40} />
-              <span className="g-name"><b>{GOOD_INFO[good].name}{tag && <em className={`tag ${tag[0]}`} title={tag[1]}>{tag[0]}</em>}</b><span className="stock" title={`${fmt(m.stock)} in stock`}><i style={{ width: `${Math.min(100, fill * 100)}%` }} /></span></span>
+              <span className="g-name"><b>{GOOD_INFO[good].name}{tag && <em className={`tag ${tag[0]}`} title={tag[1]}>{tag[0]}</em>}</b>{best && best.id !== port.id && best.price > unitPrice(m) * 1.05 && <span className="best-port" title="The port you know where this cargo sells for most, at today’s prices">best in {best.name}: {Math.round(best.price)}</span>}<span className="stock" title={`${fmt(m.stock)} in stock`}><i style={{ width: `${Math.min(100, fill * 100)}%` }} /></span></span>
               <span className="g-price"><b>{fmt(unitPrice(m) * (1 - sp))}</b><span>sell</span></span>
               <span className="g-price buy"><b>{fmt(unitPrice(m) * (1 + sp))}</b><span>buy</span></span>
               <span className={`g-trend ${falling ? 'down' : 'up'}`}><Sparkline values={hist} /></span>

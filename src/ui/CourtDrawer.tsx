@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { SKILL_INFO, TRAIT_INFO, RANK_INFO, UNIT_INFO } from '../data/court';
-import { TECHS, BRANCH_NAMES, techById, type Branch } from '../data/tech';
-import { has, basePoints, techAvailable, portById } from '../sim/game';
+import { TECHS } from '../data/tech';
+import { portById } from '../sim/game';
 import { ageOf, salary, hireCost } from '../sim/court';
 import { SKILLS, dateLabel, yearOf, type Person, type UnitType } from '../sim/types';
 import { fmt } from './format';
@@ -18,8 +18,8 @@ import { rivalsOf, crownSpec } from '../data/rivals';
 import { rivalScore, rivalDoing, friendOf } from '../sim/rivals';
 import { Dynasty, CourtierStanding, ReignHistory } from './Dynasty';
 import { Europe, LawsAndExpedition } from './Europe';
+import { TechTree } from './More';
 import { Races } from './Late';
-import { BRANCHES } from '../data/tech';
 import { RIVAL_ECON, rivalSpec } from '../data/rivals';
 import { score } from '../sim/colony';
 import { CROWN } from '../render/palette';
@@ -249,53 +249,14 @@ function Petitioners() {
 
 export function Research() {
   const game = useStore((s) => s.game)!;
-  const run = useStore((s) => s.run);
   const r = game.research;
-  const cur = r.current ? techById(r.current) : null;
-  const learned = game.people.filter((p) => p.alive && p.trait === 'learned' && p.fleet == null).length;
   const tab = useStore((s) => s.researchTab);
   const set = useStore((s) => s.set);
   return (
     <div className="research">
       <Tabs value={tab} onChange={(t) => set({ researchTab: t })} tabs={[['subjects', `Subjects (${r.known.length} of ${TECHS.length})`], ['laws', `Laws (${game.laws.length})`], ['expedition', `Expedition${game.expedition ? ' (in the field)' : ''}`]]} />
       {tab !== 'subjects' && <LawsAndExpedition show={tab} />}
-      {tab === 'subjects' && <>
-      <div className="research-now">
-        {cur ? (
-          <>
-            <div>Studying <b>{cur.name}</b>: {Math.floor(r.progress)} of {cur.cost}</div>
-            <div className="bar"><div style={{ width: `${Math.min(100, (r.progress / cur.cost) * 100)}%` }} /></div>
-          </>
-        ) : <div>The scholars are idle. Choose a subject below.</div>}
-        <div className="muted small">
-          The court yields {basePoints(game) + learned} points a season{learned ? ` (${learned} from learned courtiers)` : ''}. New coasts, peoples and lands charted by your explorers add more.
-        </div>
-      </div>
-      <div className="tech-columns">
-      {BRANCHES.map((b: Branch) => (
-        <section key={b}>
-          <h3><Icon name={b === 'navigation' ? 'navigation' : b === 'commerce' ? 'commerce' : b === 'war' ? 'military' : 'court'} size={22} tone="ink" />{BRANCH_NAMES[b]}</h3>
-          <div className="techs">
-            {TECHS.filter((t) => t.branch === b).map((t) => {
-              const known = has(game, t.id);
-              const open = techAvailable(game, t.id);
-              const now = r.current === t.id;
-              return (
-                <div key={t.id} className={`tech ${known ? 'known' : open ? 'open' : 'locked'} ${now ? 'now' : ''}`}>
-                  <div className="tech-head"><b>{t.name}</b><span className="muted small">{known ? 'known' : `${t.cost} points`}</span></div>
-                  <div className="small">{t.effect}</div>
-                  <div className="muted small"><i>{t.blurb}</i></div>
-                  {!known && t.requires.length > 0 && <div className="muted small">Needs {t.requires.map((x) => techById(x).name).join(' and ')}.</div>}
-                  {!known && open && !now && <button onClick={() => void run({ kind: 'research', tech: t.id })}>Study this</button>}
-                  {now && <div className="small"><b>Being studied</b></div>}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-      </div>
-      </>}
+      {tab === 'subjects' && <TechTree />}
     </div>
   );
 }

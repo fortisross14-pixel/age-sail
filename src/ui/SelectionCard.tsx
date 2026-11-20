@@ -79,6 +79,13 @@ export function SelectionCard() {
           </>
         )}
         {!preview && fleet.order && <button onClick={() => void run({ kind: 'cancelOrder', fleet: fleet.id })}>Stop</button>}
+        {!preview && (fleet.standing
+          ? <button className="on" title="The fleet is acting by itself. Click to take the order back." onClick={() => void run({ kind: 'standing', fleet: fleet.id, mode: null })}>{fleet.standing.mode === 'explore' ? 'Exploring' : fleet.standing.mode === 'home' ? 'Going home' : 'On patrol'} · stop</button>
+          : <>
+            {leaderOf(game, fleet)?.rank === 'explorer' && <button title="Chart unknown coasts by itself, and come home to resupply when the stores are half gone" onClick={() => void run({ kind: 'standing', fleet: fleet.id, mode: 'explore' })}>Explore</button>}
+            {!fleet.at && <button title="Make for the nearest of your ports and resupply" onClick={() => void run({ kind: 'standing', fleet: fleet.id, mode: 'home' })}>Go home</button>}
+            {!fleet.at && <button title="Cruise between this station and the nearest of your ports, resupplying there" onClick={() => void run({ kind: 'standing', fleet: fleet.id, mode: 'patrol' })}>Patrol here</button>}
+          </>)}
         {isPortal(world, fleet) && !preview && (
           <button className="primary" disabled={fleet.moves <= 0 || !canCross(game, fleet)} onClick={() => void run({ kind: 'cross', fleet: fleet.id })}>
             {fleet.map === 'old' ? 'Cross ⟵' : 'To Europe ⟶'}

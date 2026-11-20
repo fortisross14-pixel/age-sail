@@ -17,7 +17,7 @@ import * as Vic from './victory';
 import { CRISIS, scenarioById, type FavourId, type ScenarioId } from '../data/scenarios';
 import { VOYAGE } from '../data/objectives';
 import { SLAVERY } from '../data/slavery';
-import type { Treaty } from '../data/diplomacy';
+import { TREATY_INFO, type Treaty } from '../data/diplomacy';
 import { courtYear, onPromotion } from './court';
 import { DEFAULT_DIFFICULTY, difficultySpec, type Difficulty } from '../data/difficulty';
 import type { CrownId } from '../data/rivals';
@@ -61,6 +61,25 @@ export function setResearch(s: GameState, t: TechId): CommandResult {
   return { ok: true, message: `The court’s scholars turn to ${techById(t).name.toLowerCase()}.` };
 }
 
+/** Everything a subject rests on that is not yet known, in the order it must be studied, ending with the subject. */
+export function studyPath(s: GameState, t: TechId): TechId[] {
+  const out: TechId[] = [];
+  const visit = (id: TechId) => { if (has(s, id) || out.includes(id)) return; for (const r of techById(id).requires) visit(r); out.push(id); };
+  visit(t);
+  return out;
+}
+/** Put a subject, and whatever it rests on, in the queue; or take it out again. */
+export function queueResearch(s: GameState, t: TechId): CommandResult {
+  if (!TECHS.some((x) => x.id === t)) return fail('No such subject.');
+  if (has(s, t)) return fail('Already known.');
+  const r = s.research;
+  r.queue ??= [];
+  if (r.queue.includes(t)) { r.queue = r.queue.filter((x) => x !== t); return { ok: true, message: `${techById(t).name} is struck from the list.` }; }
+  for (const id of studyPath(s, t)) if (id !== r.current && !r.queue.includes(id)) r.queue.push(id);
+  if (!r.current) { const first = r.queue.find((x) => techAvailable(s, x)); if (first) { r.queue = r.queue.filter((x) => x !== first); r.current = first; r.progress = 0; } }
+  return { ok: true, message: `${techById(t).name} will be studied in its turn.` };
+}
+
 function addResearch(s: GameState, pts: number) {
   s.research.pending += pts;
 }
@@ -79,6 +98,7 @@ export function discover(s: GameState, pts: number) {
   addResearch(s, EXPEDITION.bonus);
   s.prestige += EXPEDITION.prestige;
   log(s, 'discovery', `The scientific expedition is complete: its charts, specimens and journals fill a hall at court. +${EXPEDITION.bonus} research, +${EXPEDITION.prestige} prestige.`);
+  event(s, { kind: 'tech', title: 'The expedition returns', map: 'old', hex: 0, family: 'eras', text: `Your cosmographers, botanist and draughtsman are home after ${Math.max(1, Math.round((s.turn - e.since) / 4))} year${s.turn - e.since >= 6 ? 's' : ''} in the field. Their charts, specimens and journals fill a hall at court, and your scholars will be busy with them for a long time: +${EXPEDITION.bonus} research, +${EXPEDITION.prestige} prestige. Another expedition can be funded in Research.` });
 }
 
 /** Pay for a scientific expedition: until it has found enough, everything your explorers discover counts three times. */
@@ -420,6 +440,105 @@ function inherit(world: World, s: GameState, year: number, rng: Rng) {
   checkObjectives(world, s);
   s.chronicle = s.chronicle.slice(-6);
   log(s, 'court', `${year}. You come to the throne of an empire you did not build: ${s.colonies.length} colonies across the ocean, none of them sure of you, and ${s.freeStates[s.freeStates.length - 1]?.name ?? 'one town'} already lost.`);
+}
+
+// ---------- standing orders ----------
+
+/** The nearest port on the fleet's own map where it is at home: one of your cities, or one of your colonies. */
+function friendlyPort(world: World, s: GameState, f: Fleet): PortDef | undefined {
+  const g = GRIDS[f.map];
+  const ports = [...world[f.map].ports.filter((p) => p.kind === 'home' && !p.inland), ...s.colonies.filter((c) => c.map === f.map).map((c) => Col.colonyPort(c))];
+  return ports.sort((a, b) => g.distance(a.hex, f.hex) - g.distance(b.hex, f.hex))[0];
+}
+
+/** Give a fleet a standing order, or (with null) take it back. */
+export function setStanding(world: World, s: GameState, fleetId: number, mode: 'explore' | 'home' | 'patrol' | null): CommandResult {
+  const f = fleetById(s, fleetId);
+  if (!f) return fail('No such fleet.');
+  if (!mode) { f.standing = null; return { ok: true, message: `${f.name} awaits your orders.` }; }
+  if (f.route?.active) return fail('This fleet is on a trade route: clear the route first.');
+  if (mode === 'explore' && !canExplore(s, f)) return fail('Only a fleet led by an explorer can be sent to explore.');
+  if (mode !== 'explore' && !friendlyPort(world, s, f)) return fail('There is no port of yours on this side of the ocean.');
+  f.standing = { mode, ...(mode === 'patrol' ? { anchor: f.hex } : {}) };
+  if (!f.order) standingOrder(world, s, f);
+  return { ok: true, message: mode === 'explore' ? `${f.name} will chart unknown coasts by itself, and come home when the stores run low.` : mode === 'home' ? `${f.name} makes for the nearest of your ports to resupply.` : `${f.name} will cruise between this station and the nearest of your ports.` };
+}
+
+/** What a fleet under a standing order does when it has nothing in hand. */
+function standingOrder(world: World, s: GameState, f: Fleet) {
+  const st = f.standing;
+  if (!st) return;
+  const g = GRIDS[f.map];
+  const port = friendlyPort(world, s, f);
+  const inPort = !!f.at && !!port && f.at === port.id;
+  const goHome = () => { if (port && !inPort) moveFleet(world, s, f.id, port.hex); };
+  if (inPort) provision(world, s, f.id);
+  if (st.mode === 'home') {
+    if (inPort || !port) { f.standing = null; if (inPort) log(s, 'voyage', `${f.name} is home in ${port!.name}, resupplied and waiting for orders.`); return; }
+    goHome();
+    return;
+  }
+  if (st.mode === 'patrol') {
+    if (!port) { f.standing = null; return; }
+    if (f.hex === st.anchor || (!inPort && f.supplies <= 2)) goHome();
+    else if (st.anchor != null) moveFleet(world, s, f.id, st.anchor);
+    return;
+  }
+  // explore: home when the stores are half gone, otherwise the nearest edge of the chart
+  if (!canExplore(s, f)) { f.standing = null; log(s, 'voyage', `${f.name} has no explorer aboard and stops exploring.`); return; }
+  if (!inPort && port && f.supplies <= Math.ceil(provisionsMax(f, s) / 2)) { goHome(); return; }
+  const fog = s.fog[f.map], m = world[f.map];
+  const edge: number[] = [];
+  const portals = new Set(m.portals);
+  // the edge of the chart along a coast: never the ocean road, and never the open ocean while it kills
+  for (let i = 0; i < g.N; i++) {
+    if (fog[i] < Fog.Charted || !isWater(m.terrain[i]) || portals.has(i) || (deepPeril(s) && m.deep[i])) continue;
+    if (!g.neighbors(i).some((j) => fog[j] === Fog.Unknown) || !g.within(i, 2).some((j) => !isWater(m.terrain[j]))) continue;
+    edge.push(i);
+  }
+  edge.sort((a, b) => g.distance(a, f.hex) - g.distance(b, f.hex));
+  for (const h of edge.slice(0, 40)) {
+    if (h === f.hex) continue;
+    const pv = previewMove(world, s, f.id, h);
+    if (!pv || pv.cross || pv.crossBlocked || (deepPeril(s) && pv.deep > 0)) continue;
+    if (moveFleet(world, s, f.id, h).ok) return;
+  }
+  f.standing = null;
+  log(s, 'voyage', `${f.name} has charted every coast it can reach from here, and waits for orders.`);
+}
+
+/** Roughly what a trade route earns in one round, at today's prices, and how many seasons a round takes. */
+export function routeEstimate(world: World, s: GameState, f: Fleet, route: TradeRoute): { profit: number; seasons: number } | null {
+  if (route.stops.length < 2) return null;
+  const sp = spreadFor(s, f);
+  const cargo: Partial<Record<GoodId, number>> = {};
+  const cap = cargoCapacity(f);
+  let profit = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    if (pass === 1) profit = 0; // the first round only fills the hold: count the second
+    for (const stop of route.stops) {
+      const col = Col.colonyById(s, stop.port);
+      const book = s.markets[stop.port];
+      for (const good of stop.sell) { const n = cargo[good] ?? 0; const m = book?.[good]; if (n && m && !col) profit += n * unitPriceOf(m) * (1 - sp); if (n && (col || m)) cargo[good] = 0; }
+      for (const b of stop.buy) {
+        const used = GOODS.reduce((t, x) => t + (cargo[x] ?? 0), 0);
+        const m = book?.[b.good];
+        const price = m ? unitPriceOf(m) : 0;
+        if (!col && (!m || (b.maxPrice != null && price > b.maxPrice))) continue;
+        const n = Math.max(0, Math.min(b.qty, cap - used, Math.floor(col ? col.stock[b.good] ?? 0 : m!.stock)));
+        cargo[b.good] = (cargo[b.good] ?? 0) + n;
+        if (!col) profit -= n * price * (1 + sp);
+      }
+    }
+  }
+  const g = GRIDS[f.map];
+  let seasons = 0;
+  for (let i = 0; i < route.stops.length; i++) {
+    const a = portById(world, route.stops[i].port, s), b = portById(world, route.stops[(i + 1) % route.stops.length].port, s);
+    if (!a || !b) return null;
+    seasons += Math.max(1, Math.ceil((g.distance(a.hex, b.hex) * waterScale(world, f.map, a.hex)) / Math.max(1, maxMoves(f, s))));
+  }
+  return { profit: Math.round(profit), seasons };
 }
 
 // ---------- commands ----------
@@ -815,7 +934,11 @@ export function engageRebels(world: World, s: GameState, partyId: number, rebelI
 export function recognise(s: GameState, freeId: string): CommandResult { return Emp.recognise(s, freeId, (k, t) => log(s, k, t)); }
 export function sendEnvoy(s: GameState, realm: string): CommandResult { return Eur.sendEnvoy(s, realm); }
 export function sendGift(s: GameState, realm: string): CommandResult { return Eur.sendGift(s, realm); }
-export function proposeTreaty(s: GameState, realm: string, t: Exclude<Treaty, 'none'>): CommandResult { return Eur.proposeTreaty(s, realm, t, (k, x) => log(s, k, x)); }
+export function proposeTreaty(s: GameState, realm: string, t: Exclude<Treaty, 'none'>): CommandResult {
+  const out = Eur.proposeTreaty(s, realm, t, (k, x) => log(s, k, x));
+  if (out.ok) event(s, { kind: 'tech', family: 'europe', title: out.message ?? 'A treaty', map: 'old', hex: 0, text: `${TREATY_INFO[t].blurb} A treaty lasts until you break it, and breaking one costs prestige and their regard. All your treaties are listed in Diplomacy, Europe.` });
+  return out;
+}
 export function breakTreaty(s: GameState, realm: string): CommandResult { return Eur.breakTreaty(s, realm, (k, x) => log(s, k, x)); }
 export function joinWar(s: GameState, war: number, side: string): CommandResult { return Eur.joinWar(s, war, side, (k, x) => log(s, k, x)); }
 export function setMarque(s: GameState, on: boolean): CommandResult { return Eur.setMarque(s, on); }
@@ -1427,7 +1550,10 @@ export function seasonTick(world: World, s: GameState): void {
     if (r.progress >= t.cost) {
       r.known.push(t.id);
       r.progress = 0;
-      r.current = TECHS.find((x) => techAvailable(s, x.id))?.id ?? null;
+      r.queue = (r.queue ?? []).filter((x) => !has(s, x));
+      const queued = r.queue.find((x) => techAvailable(s, x));
+      if (queued) r.queue = r.queue.filter((x) => x !== queued);
+      r.current = queued ?? TECHS.find((x) => techAvailable(s, x.id))?.id ?? null;
       log(s, 'court', `The court’s scholars master ${t.name.toLowerCase()}. ${t.effect}`);
       if (t.id === 'volta') {
         event(s, { kind: 'tech', title: 'Volta do mar', map: 'old', hex: portById(world, mainPort(s), s)!.hex,
@@ -1459,7 +1585,7 @@ export function seasonTick(world: World, s: GameState): void {
   tally(s, 'empire');
   Slv.slaverySeason(world, s, (k, t) => log(s, k, t));
   // Europe: regard, treaties, the wars of others, corsairs and the Levant trade
-  Eur.europeSeason(world, s, (k, t) => log(s, k, t), (f, why) => loseFleet(s, f, why));
+  Eur.europeSeason(world, s, (k, t) => log(s, k, t), (f, why) => loseFleet(s, f, why), (e) => event(s, e));
   tally(s, 'europe');
   // the ruling house: births, deaths, successions; and each spring the court takes stock of you
   Dyn.dynastySeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e), portById(world, mainPort(s), s)!.hex);
@@ -1501,6 +1627,8 @@ export function seasonTick(world: World, s: GameState): void {
     f.deepThisTurn = false;
     f.trail = [f.hex];
   }
+  // fleets under a standing order choose their own course
+  for (const f of [...s.fleets]) if (f.standing && !f.order && s.fleets.includes(f)) standingOrder(world, s, f);
   for (const f of [...s.fleets]) {
     if (!f.order || !s.fleets.includes(f)) continue;
     if (f.order.path.length <= 1 && f.order.cross) {

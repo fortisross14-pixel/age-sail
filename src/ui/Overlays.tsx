@@ -12,7 +12,8 @@ import { Art } from './theme/Art';
 import { ReignHistory } from './Dynasty';
 import { SeaReportView } from './Late';
 import { FAMILY_NAME } from '../data/stories/types';
-import { KEYS } from './keys';
+import { KeysEditor, ScaleSetting } from './More';
+import { Gloss } from './Gloss';
 import { pref, setPref } from './prefs';
 
 function FinalStandings() {
@@ -53,7 +54,7 @@ export function EventCard() {
         <h2>{ev.title}</h2>
         {ev.battle && <BattleReportView r={ev.battle} />}
         {ev.sea && <SeaReportView r={ev.sea} />}
-        <p className="event-text">{ev.text}</p>
+        <p className="event-text"><Gloss text={ev.text} /></p>
         {ev.kind === 'end' && <FinalStandings />}
         {ev.kind === 'end' && <ReignHistory open />}
         {naming && (
@@ -148,17 +149,9 @@ export function Help() {
         </div>
         <div className="help-page">
           {page ? (
-            <dl>{page.items.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}</dl>
+            <dl>{page.items.map(([t, d]) => <div key={t}><dt>{t}</dt><dd><Gloss text={d} /></dd></div>)}</dl>
           ) : (
-            <div className="key-table">
-              {(['The map', 'Turns and orders', 'Screens', 'Cards'] as const).map((group) => (
-                <section key={group}>
-                  <h4>{group}</h4>
-                  {KEYS.filter((k) => k.group === group).map((k) => <p key={k.label}><span className="key-caps">{k.show.map((c) => <kbd key={c}>{c}</kbd>)}</span>{k.label}</p>)}
-                </section>
-              ))}
-              <p className="muted small">Keys do nothing while you type in a field. With a screen open, Enter and Space belong to the button that has the focus, so a turn is never ended behind a screen.</p>
-            </div>
+            <KeysEditor />
           )}
         </div>
         <button className="primary" autoFocus onClick={() => set({ showHelp: false })}>Close</button>
@@ -194,6 +187,8 @@ export function Settings() {
       </label>
       <GuardSwitch />
       <NewsSwitches />
+      <ScaleSetting />
+      <button onClick={() => set({ showSettings: false, showSaves: true })}>Saved voyages</button>
       <button onClick={() => set({ showSettings: false, showHelp: true })}>How to play</button>
     </Frame>
   );

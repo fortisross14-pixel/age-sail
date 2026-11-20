@@ -14,7 +14,7 @@ import { envoy } from './natives';
 import { skill } from './court';
 import { realmMods } from './dynasty';
 import { fleetGuns } from './rivals';
-import type { EuroWar, Fleet, GameState, RealmState, World } from './types';
+import type { EuroWar, Fleet, GameEvent, GameState, RealmState, World } from './types';
 
 type Log = (kind: 'discovery' | 'peril' | 'court' | 'trade', text: string) => void;
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -180,7 +180,7 @@ function corsairs(w: World, s: GameState, rng: Rng, log: Log, onFleetLost: (f: F
 }
 
 /** One season of Europe: regard drifts, quarrels become wars, wars end, allies and enemies do their part. */
-export function europeSeason(w: World, s: GameState, log: Log, onFleetLost: (f: Fleet, why: string) => void) {
+export function europeSeason(w: World, s: GameState, log: Log, onFleetLost: (f: Fleet, why: string) => void, ev: (e: GameEvent) => void = () => {}) {
   const rng = mulberry32(hashSeed(s.seed, s.turn, 407));
   const regard = realmMods(s).regard;
   for (const [id, st] of Object.entries(s.europe)) {
@@ -219,6 +219,8 @@ export function europeSeason(w: World, s: GameState, log: Log, onFleetLost: (f: 
     if (!war.side) continue;
     if (war.side === win) { s.prestige += D.winPrestige; s.treasury += D.winDucats; adjust(s, win, 15); log('court', `You chose the winning side: +${D.winPrestige} prestige, and ${D.winDucats} ducats of the indemnity.`); }
     else { s.prestige -= D.losePrestige; log('court', `You chose the losing side: −${D.losePrestige} prestige.`); }
+    ev({ kind: 'tech', family: 'europe', title: war.side === win ? 'A war won' : 'A war lost', map: 'old', hex: 0,
+      text: `The war over ${war.cause} is ended after ${Math.max(1, Math.round((s.turn - war.since) / 4))} year${s.turn - war.since >= 6 ? 's' : ''}, and ${name(win)} has the better of ${name(lose)}. ${war.side === win ? `You stood with the victor: +${D.winPrestige} prestige and ${D.winDucats} ducats of the indemnity.` : `You stood with the beaten side: −${D.losePrestige} prestige.`} The ports of ${name(war.side === war.a ? war.b : war.a)} are open to you again.` });
     adjust(s, war.side === war.a ? war.b : war.a, 20); // the peace mends a little
   }
 

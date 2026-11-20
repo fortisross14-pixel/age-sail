@@ -128,6 +128,12 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   Chronicle. Beside the map, one panel with two tabs: Goals and Realm (the outliner, `Realm.tsx`).
   Anything that lists what the player owns belongs in the outliner's `rows()`; money belongs on a
   `LedgerLine`, tallied in `seasonTick` with `tally(s, line)` after the rule that moves it.
+- **Words with a meaning** are in `src/data/glossary.ts`; wrap prose the player reads in `<Gloss text>`
+  and they become tooltips, nested. A new term of art gets an entry there, not a sentence in the
+  guide.
+- **Undo** (`store.undo`): an order is undoable only if nothing in it is left to chance. A new
+  `Command` kind goes in `UNDOABLE` in `src/store.ts` only if that holds; one that cannot be taken
+  back and is easy to give by mistake goes in `CONFIRM`.
 - **What needs the player** is one list, `attention()` in `src/ui/attention.ts` (pure, no rules):
   End Turn's reminder, the count on its button and any future outliner read it. A new kind of
   reminder goes there, with a stable id so the player is asked once. Jump to things with

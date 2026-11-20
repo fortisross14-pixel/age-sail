@@ -117,6 +117,7 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
         c.pop = Math.max(1, c.pop - 1);
         c.loyalty += 10;
         log('peril', `The settlers of ${c.name} rise against you. The garrison puts the rising down; the ringleaders hang.`);
+        ev({ kind: 'lost', title: `A rising in ${c.name}`, map: c.map, hex: c.hex, text: `The settlers of ${c.name} took up arms against your officers. The garrison held and the ringleaders hang, but a colony that has risen once will rise again: its loyalty is ${Math.round(c.loyalty)}. A charter, lighter taxes, a festival or more soldiers would steady it.` });
       } else {
         s.colonies = s.colonies.filter((x) => x !== c);
         s.units = s.units.filter((u) => u.colony !== c.id);

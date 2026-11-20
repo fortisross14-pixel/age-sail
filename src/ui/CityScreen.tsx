@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
+import { CompareTable } from './More';
 import { COMBAT, MILITARY, isMilitary } from '../data/army';
 import { createPortal } from 'react-dom';
 import { useStore } from '../store';
@@ -366,6 +367,7 @@ function CityList({ onPick }: { onPick: (id: string) => void }) {
         <span className="adm-medal" aria-hidden><Medal name="cities" size={60} fallback={<Icon name="cities" size={26} />} /></span>
         <div><h2>Your cities</h2><div className="sub">{all.length} cities of {realmSpec(game.crown).name} · {game.colonies.length} colon{game.colonies.length === 1 ? 'y' : 'ies'}</div></div>
       </header>
+      <details className="compare-wrap"><summary>Compare every city and colony</summary><CompareTable /></details>
       <div className="tiles">
         {all.map((c) => (
           <button key={c.id} className="tile" onClick={() => onPick(c.id)} title={`${SIZE_NAME[c.size]}${c.inland ? ', inland' : ''} · +${cityTaxes(c)} a season`}>

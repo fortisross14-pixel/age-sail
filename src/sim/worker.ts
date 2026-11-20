@@ -75,6 +75,8 @@ export type Command =
   | { kind: 'joinWar'; war: number; side: string }
   | { kind: 'marque'; on: boolean }
   | { kind: 'tribute'; realm: string; on: boolean }
+  | { kind: 'queueResearch'; tech: TechId }
+  | { kind: 'standing'; fleet: number; mode: 'explore' | 'home' | 'patrol' | null }
   | { kind: 'fundExpedition' }
   | { kind: 'enactLaw'; law: LawId }
   | { kind: 'repealLaw'; law: LawId }
@@ -181,6 +183,8 @@ const api = {
       case 'joinWar': result = G.joinWar(state, c.war, c.side); break;
       case 'marque': result = G.setMarque(state, c.on); break;
       case 'tribute': result = G.setTribute(state, c.realm, c.on); break;
+      case 'queueResearch': result = G.queueResearch(state, c.tech); break;
+      case 'standing': result = G.setStanding(world, state, c.fleet, c.mode); break;
       case 'fundExpedition': result = G.fundExpedition(state); break;
       case 'enactLaw': result = G.enactLaw(state, c.law); break;
       case 'repealLaw': result = G.repealLaw(state, c.law); break;

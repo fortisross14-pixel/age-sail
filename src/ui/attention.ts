@@ -43,7 +43,7 @@ export function attention(g: GameState, world: World): Attention[] {
     out.push({ id: `leader-${p.id}`, urgent: true, go: { drawer: 'fleets' }, text: `${p.name}, ${p.rank}, is ready and has no fleet to lead.` });
   }
   for (const f of g.fleets) {
-    if (f.at || f.order || f.route?.active) continue;
+    if (f.at || f.order || f.route?.active || f.standing) continue;
     if (f.moves > 0) out.push({ id: `adrift-${f.id}`, urgent: true, go: { fleet: f.id }, text: `${f.name} is at sea without orders.` });
   }
   for (const p of g.parties) {

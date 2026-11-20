@@ -38,6 +38,8 @@ export interface SaveEnvelope {
   saveVersion: number;
   genVersion: number;
   state: GameState;
+  /** when it was written, for the list of saves */
+  at?: number;
 }
 
 export type LoadResult =
@@ -94,7 +96,7 @@ const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, 
 };
 
 export function wrap(state: GameState): SaveEnvelope {
-  return { saveVersion: SAVE_VERSION, genVersion: GEN_VERSION, state };
+  return { saveVersion: SAVE_VERSION, genVersion: GEN_VERSION, state, at: Date.now() };
 }
 
 /** Wrap a bare M8 state (the legacy v9 key) as a version-10 envelope. */

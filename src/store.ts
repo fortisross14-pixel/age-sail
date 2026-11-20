@@ -12,6 +12,7 @@ import { objectiveById, type ObjectiveId } from './data/objectives';
 import { rewardOf, rewardText } from './sim/objectives';
 import { attention, type Target } from './ui/attention';
 import { pref } from './ui/prefs';
+import { score } from './sim/colony';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import { prevTurnStart, type Stance } from './sim/types';
 import type { MovePreview } from './sim/game';
@@ -61,6 +62,11 @@ interface Store {
   /** the panel on the right of the map: what to do, or what you own */
   sideTab: 'goals' | 'realm';
   showLedger: boolean;
+  showSaves: boolean;
+  /** what the map shows over the chart */
+  mapMode: 'realms' | 'finds' | 'peoples' | 'loyalty';
+  /** the game as it stood before your last order, while that order can still be taken back */
+  undo: { state: GameState; what: string } | null;
   /** news the player has waved away */
   dismissed: string[];
   toast: { text: string; bad?: boolean; id: number } | null;
@@ -77,6 +83,11 @@ interface Store {
   goTo: (t: Target) => void;
   /** Jump to the next thing that needs the player, round and round. */
   nextAttention: () => void;
+  undoLast: () => Promise<void>;
+  saveSlot: (n: number) => Promise<void>;
+  loadKey: (key: string) => Promise<void>;
+  exportSave: () => void;
+  importSave: (text: string) => Promise<void>;
   selectFleet: (id: number | null) => void;
   selectParty: (id: number | null) => void;
   selectPort: (id: string | null) => void;
@@ -86,6 +97,37 @@ interface Store {
   say: (text: string, bad?: boolean) => void;
   set: (p: Partial<Store>) => void;
 }
+
+/** Three places to keep a voyage on purpose, and a ring of the last turns kept automatically. */
+export const SLOT_KEYS = [1, 2, 3].map((n) => `age-sail:slot:${n}`);
+const AUTO_KEY = 'age-sail:auto:';
+const AUTOS = 5;
+const IMPORT_KEY = 'age-sail:imported';
+export interface SaveInfo { key: string; crown: CrownId; year: number; score: number; at: number }
+/** What is in each place: read, checked against this build, and summed up for the list. */
+export async function listSaves(): Promise<SaveInfo[]> {
+  const keys = [...SLOT_KEYS, ...Array.from({ length: AUTOS }, (_, i) => `${AUTO_KEY}${i}`)];
+  const out: SaveInfo[] = [];
+  for (const key of keys) {
+    const raw = await idbGet(key).catch(() => undefined) as { at?: number } | undefined;
+    if (!raw) continue;
+    const r = readSave(raw);
+    if (r.ok) out.push({ key, crown: r.state.crown, year: 1492 + Math.floor(r.state.turn / 4), score: score(r.state).total, at: raw.at ?? 0 });
+  }
+  return out;
+}
+
+/** Orders with nothing left to chance: these can be taken back. Anything that rolled dice, sailed or fought cannot. */
+const UNDOABLE = new Set<Command['kind']>(['buy', 'sell', 'provision', 'repair', 'project', 'promote', 'relieve', 'hire', 'embark', 'disembark', 'merge', 'split', 'rename', 'research', 'queueResearch',
+  'tradeRoute', 'colonyTransfer', 'factoryOrder', 'factoryTransfer', 'openFactory', 'taxRate', 'charter', 'festival', 'walls', 'upgradeColony', 'renameColony', 'enactLaw', 'fundExpedition', 'standing', 'cancelOrder', 'assignLeader', 'gift', 'realmGift', 'tribute', 'marque', 'buyCaptives', 'sellCaptives', 'landCaptives', 'settle']);
+const UNDO_NAME: Partial<Record<Command['kind'], string>> = { buy: 'a purchase', sell: 'a sale', project: 'a project begun', promote: 'a commission', hire: 'a hiring', enactLaw: 'a law enacted', research: 'a change of subject', tradeRoute: 'a trade route', openFactory: 'a factory opened', gift: 'a gift', realmGift: 'a gift' };
+/** Orders that cannot be taken back and are easy to give by mistake: asked about first. */
+const CONFIRM: Partial<Record<Command['kind'], string>> = {
+  repealLaw: 'Repeal this law? It costs prestige, and enacting it again will cost ducats.',
+  recognise: 'Recognise this free state? It cannot be undone: the colony is given up for good.',
+  marry: 'Accept this offer of marriage? A consort is for life.',
+  relieve: 'Relieve them of their rank? The commission is not refunded.',
+};
 
 let toastId = 0;
 /** the reminder last jumped to, so the next press moves on */
@@ -149,7 +191,7 @@ export const useStore = create<Store>((set, get) => {
   return {
     phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, stance: 'assault', selectedPort: null, selectedColony: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false, showSettings: false, showWelcome: false, showGuard: false, guardSeen: [],
-    drawer: null, courtTab: 'people', diploTab: 'peoples', researchTab: 'subjects', sideTab: pref('sideTab'), showLedger: false, dismissed: [], toast: null, busy: false,
+    drawer: null, courtTab: 'people', diploTab: 'peoples', researchTab: 'subjects', sideTab: pref('sideTab'), showLedger: false, showSaves: false, mapMode: 'realms', undo: null, dismissed: [], toast: null, busy: false,
 
     set: (p) => set(p),
 
@@ -185,10 +227,14 @@ export const useStore = create<Store>((set, get) => {
     },
 
     async run(c) {
+      const ask = CONFIRM[c.kind];
+      if (ask && !window.confirm(ask)) return false;
+      const before = get().game;
       let out;
       try { out = await sim.command(c); } catch (e) { await recover('with that order', e); return false; }
       const { result, state, achieved } = out;
-      set({ game: state });
+      // an order with nothing left to chance can be taken back until the next one, or the end of the turn
+      set({ game: state, undo: result.ok && before && UNDOABLE.has(c.kind) ? { state: before, what: UNDO_NAME[c.kind] ?? 'your last order' } : null });
       follow(state);
       void save(state);
       if (!result.ok) { sfx('error'); get().say(result.error, true); }
@@ -204,7 +250,7 @@ export const useStore = create<Store>((set, get) => {
       const urgent = attention(g, w).filter((a) => a.urgent).map((a) => a.id);
       const seen = get().guardSeen.filter((id) => urgent.includes(id));
       if (!force && pref('guard') && urgent.some((id) => !seen.includes(id))) { sfx('open'); set({ showGuard: true, guardSeen: seen }); return; }
-      set({ busy: true, preview: null, showGuard: false, guardSeen: urgent });
+      set({ busy: true, preview: null, showGuard: false, guardSeen: urgent, undo: null });
       sfx('season');
       let state: GameState;
       try { state = await sim.endTurn(); } catch (e) { await recover('while ending the turn', e); return; }
@@ -216,8 +262,56 @@ export const useStore = create<Store>((set, get) => {
       set({ game: state, busy: false, selectedFleet: keep ? sel : null, selectedParty: psel != null && state.parties.some((p) => p.id === psel) ? psel : null, landing: null, dismissed: [...new Set([...get().dismissed.slice(-200), ...old])] });
       follow(state);
       void save(state);
+      void idbSet(`${AUTO_KEY}${Math.floor(state.turn / 2) % AUTOS}`, wrap(state)).catch(() => {});
       const fresh = (Object.keys(state.objectives.done) as ObjectiveId[]).filter((id) => g.objectives.done[id] == null);
       if (fresh.length) announce(state, fresh);
+    },
+
+    async undoLast() {
+      const u = get().undo;
+      if (!u) { get().say('There is nothing to take back.', true); return; }
+      let loaded;
+      try { loaded = await sim.load(u.state); } catch (e) { await recover('taking that back', e); return; }
+      set({ game: loaded.state, undo: null, preview: null });
+      void save(loaded.state);
+      sfx('close');
+      get().say(`Taken back: ${u.what}.`);
+    },
+
+    async saveSlot(n) {
+      const g = get().game;
+      if (!g) return;
+      try { await idbSet(SLOT_KEYS[n], wrap(g)); get().say(`Saved in place ${n + 1}.`); } catch { get().say('That could not be saved.', true); }
+    },
+
+    async loadKey(key) {
+      const r = readSave(await idbGet(key).catch(() => undefined));
+      if (!r.ok) { get().say(r.reason, true); return; }
+      set({ phase: 'loading', showSaves: false, showSettings: false });
+      let loaded;
+      try { loaded = await sim.load(r.state); } catch (e) { startFailed(e); return; }
+      const { world, state } = loaded;
+      await save(state);
+      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedParty: null, selectedPort: null, preview: null, drawer: null, undo: null, showWelcome: false, showGuard: false, guardSeen: [], dismissed: state.chronicle.filter((c) => c.turn < prevTurnStart(state.turn)).map(newsKey) });
+    },
+
+    exportSave() {
+      const g = get().game;
+      if (!g) return;
+      const url = URL.createObjectURL(new Blob([JSON.stringify(wrap(g))], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `age-of-sail-${g.crown}-${1492 + Math.floor(g.turn / 4)}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+
+    async importSave(text) {
+      let raw: unknown;
+      try { raw = JSON.parse(text); } catch { get().say('That file is not a saved voyage.', true); return; }
+      const r = readSave(raw);
+      if (!r.ok) { get().say(r.reason, true); return; }
+      await idbSet(IMPORT_KEY, wrap(r.state));
+      await get().loadKey(IMPORT_KEY);
     },
 
     nextAttention() {

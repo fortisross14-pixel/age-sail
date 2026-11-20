@@ -406,6 +406,8 @@ export interface Fleet {
   /** hexes moved through most recently, for animation */
   trail: number[];
   movedThisTurn: boolean;
+  /** a standing order the fleet carries out by itself, season after season */
+  standing?: { mode: 'explore' | 'home' | 'patrol'; /** where a patrol keeps station */ anchor?: number } | null;
   /** captives carried in the hold: people, counted, not a named unit and not a good */
   captives?: number;
   /** sailed through deep ocean this season */
@@ -587,6 +589,8 @@ export interface GameState {
     progress: number;
     /** points earned from discoveries this season, added at the end of the turn */
     pending: number;
+    /** subjects to study next, in order */
+    queue?: TechId[];
   };
 }
 

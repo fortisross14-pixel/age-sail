@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useStore } from './store';
-import { keyDef, SCREEN_KEYS } from './ui/keys';
+import { keyDef } from './ui/keys';
+import { Saves, MapModeChip, applyScale } from './ui/More';
+import { pref } from './ui/prefs';
 import { SidePanel, Ledger, TurnSummary } from './ui/Realm';
 import { Menu } from './ui/Menu';
 import { MapCanvas, getView } from './ui/MapCanvas';
@@ -47,6 +49,7 @@ function useKeys() {
         return;
       }
       if (s.showHelp) { if (k === 'escape' || k === 'enter' || k === 'h') { e.preventDefault(); s.set({ showHelp: false }); } return; }
+      if (s.showSaves) { if (k === 'escape') { e.preventDefault(); s.set({ showSaves: false }); } return; }
       if (s.showLedger) { if (k === 'escape' || k === 'enter' || k === 'l') { e.preventDefault(); s.set({ showLedger: false }); } return; }
       const def = keyDef(k, s.drawer ? 'screen' : 'map');
       if (!def) return; // with a screen open, Enter and Space belong to the control that has the focus
@@ -63,8 +66,10 @@ function useKeys() {
           else if (s.preview) s.set({ preview: null });
           else { s.selectFleet(null); s.selectParty(null); }
           break;
-        case 'screen': { const d = SCREEN_KEYS[k]; s.set({ drawer: s.drawer === d ? null : d }); break; }
+        case 'screen': { const d = def.screen!; s.set({ drawer: s.drawer === d ? null : d }); break; }
         case 'ledger': s.set({ showLedger: true }); break;
+        case 'undo': void s.undoLast(); break;
+        case 'mode': { const order = ['realms', 'finds', 'peoples', 'loyalty'] as const; s.set({ mapMode: order[(order.indexOf(s.mapMode) + 1) % order.length] }); break; }
         case 'help': s.set({ showHelp: true }); break;
         case 'nextNeed': s.nextAttention(); break;
         case 'wind': s.set({ showWind: !s.showWind }); break;
@@ -107,7 +112,8 @@ export function App() {
   const phase = useStore((s) => s.phase);
   const drawer = useStore((s) => s.drawer);
   useKeys();
-  if (phase !== 'playing') return <Menu />;
+  useEffect(() => applyScale(pref('uiScale')), []);
+  if (phase !== 'playing') return <><Menu /><Saves /></>;
   return (
     <div className={`game ${drawer ? 'screen-open' : ''}`}>
       <GoldDefs />
@@ -127,6 +133,8 @@ export function App() {
       <EventCard />
       <Help />
       <Ledger />
+      <Saves />
+      <MapModeChip />
       <Welcome />
       <EndTurnGuard />
     </div>

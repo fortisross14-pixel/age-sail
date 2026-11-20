@@ -121,8 +121,8 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | Phase 2 | **A world that pushes back** (v0.15): rivals with a treasury, ships that sail out and home, colonies that live on convoys, and plans chosen by what they want and can afford; crowns that fight each other; peoples who judge every crown and fight their own wars; soldiers that come by sea where you can see them. Items P2-01 to P2-15 below | done |
 | Phase 3 | **Stories and dynasty** (v0.16): 114 stories as data with chains, written for any crown; a ruling house with heirs, regencies, successions and royal marriages; courtiers who remember, want and can be lost to a rival; three historical set pieces per crown; eras that open with a choice of path; the land and colonies named by the player; the reign told back. Items P3-01 to P3-14 below | done |
 | Phase 4 | **Depth** (v0.18): a research tree of 32 subjects, ten laws, scientific expeditions; European diplomacy, wars to join, corsairs and the Levant trade; slavery, with what it costs and a law that ends it; three races to win beside the score; four scenarios, one of which begins in 1690; uses for prestige; fights at sea in three rounds; five more buildings; free states to recognise or retake, and ambitions for the later ages. Items P4-01 to P4-20 below | done |
-| Phase 5 | **Interface depth** (v0.19, first part): keys rebuilt on one table; a Realm tab listing everything you own; the ledger; one card for the turn's news; a Diplomacy screen and tabs in Research; a hover line for what is not yours; the guide brought up to date. Still to come: nested tooltips, trade help, map modes, the comparison table, undo, save slots, standing orders, the research tree drawn, report cards, accessibility, rebinding. Items P5-01 to P5-20 below | in progress: 8 of 20 done |
-| Phase 6 | Balance (was Pass 3): numbers in one place, autoplay harness, retune the five crowns. Deliberately late | deferred |
+| Phase 5 | **Interface depth** (v0.20): keys on one table, and changeable; a Realm tab listing everything you own; the ledger; one card for the turn's news; a Diplomacy screen; nested tooltips; trade help; map modes; a comparison table; undo; saved voyages; standing fleet orders; research drawn as a tree with a queue; report cards; a size setting. Items P5-01 to P5-20 below | done |
+| Phase 6 | Balance (was Pass 3): numbers in one place, autoplay harness, retune the five crowns. Deliberately late | next, when the owner says |
 | Phase 7 | Technical and visual polish: music, portraits, event paintings, a living map, the open engineering items. Deliberately last | deferred |
 
 The phases come from the production audit ([PRODUCTION-AUDIT.md](PRODUCTION-AUDIT.md)) and replace
@@ -205,7 +205,7 @@ phase; nothing is renumbered.
 | 2 | A world that pushes back | 15 | 15 |
 | 3 | Stories and dynasty | 14 | 14 |
 | 4 | Depth | 20 | 20 |
-| 5 | Interface depth | 20 | 8 |
+| 5 | Interface depth | 20 | 20 |
 | 6 | Balance (deferred) | 10 | 0 |
 | 7 | Technical and visual polish (deferred) | 14 | 0 |
 
@@ -321,25 +321,25 @@ Function only: looks are Phase 7.
 | Id | Action item | Answers | Status |
 |---|---|---|---|
 | P5-01 | The Realm tab in the panel beside the map: every threat, fleet, party, colony and working city with a line of state, coloured when something is wrong; click to go there. The panel's other tab holds the goals | U3 | done |
-| P5-02 | Nested tooltips: game terms in any text (stores, seasoning, loyalty, spread) open a tooltip that can itself be hovered | U4 | open |
+| P5-02 | Nested tooltips (`Gloss`, `Term`; 28 words in `src/data/glossary.ts`): the game's own words in the guide, in goals, in story cards and in first-time hints open for their meaning, and a meaning's own words open in turn | U4 | done |
 | P5-03 | The ledger (`L`, or click the treasury): every ducat of the last turn by line, your own orders included, and what the next turn brings before you do anything; the HUD shows that figure under the treasury | U3 | done |
 | P5-04 | One card for the turn that has passed, in place of stacked news: its news in groups (perils first), the treasury's change, and the way to the Chronicle | U5, G5 | done |
 | P5-05 | Settings choose which kinds of news the turn's card shows; the Chronicle keeps everything | U5 | done |
-| P5-06 | Trade help: profit per hold at each known port for the cargo aboard, and a preview of a route's yearly profit before it is set | G5 | open |
-| P5-07 | Map modes: realms, resources found, peoples' attitudes, colonial loyalty | U3 | open |
-| P5-08 | Undo for the last order when nothing random came of it, and a confirmation for orders that cannot be taken back | U10 | open |
-| P5-09 | Three save slots, the last five autosaves, and export and import of a voyage as a file | U10 | open |
-| P5-10 | Accessibility left from AUDIT.md finding 8: a UI scale setting, no text under 14 px, focus moved into a screen when it opens | - | open |
+| P5-06 | Trade help: in a market, each good aboard shows the port you know where it sells for most; a trade route shows about what one round earns at today's prices and how many seasons it takes, before it is started | G5 | done |
+| P5-07 | Map modes (`O`, or the rail): the plain chart, finds (what was surveyed and what is still to survey), peoples by their regard for you, colonies by their loyalty; a chip says which is on | U3 | done |
+| P5-08 | Undo (`Z`): the last order can be taken back if nothing was left to chance in it (buying, selling, building, commissioning, laws, routes and the like), until the next order or the end of the turn. Four orders that cannot be taken back ask first | U10 | done |
+| P5-09 | Saved voyages (Settings, or the menu): three places to keep a voyage, the last five turns kept automatically, and saving to and loading from a file | U10 | done |
+| P5-10 | Accessibility: a size setting for text and panels (the map is not scaled), no text under 14 px in either style sheet, and the keyboard focus moves into a screen when it opens | - | done |
 | P5-11 | One key table (`src/ui/keys.ts`) read by both the handler and the guide's Controls page. Keys act on the topmost layer only: Enter and Space no longer end a turn or sail behind an open screen, cards and reminders answer to the keyboard without needing the focus, a clicked button no longer fires again on Space, and Ctrl or Cmd shortcuts are left to the browser. Rebinding is P5-19 | U6 | done |
-| P5-12 | Compare cities and colonies in one table (people, output, loyalty, needs), sortable | U3 | open |
-| P5-13 | Standing fleet orders: explore by itself, go home and resupply, patrol a coast | G5 | open |
+| P5-12 | Cities, All cities and colonies: every colony and city in one table (people, room, loyalty and where it is heading, food, what it makes, garrison, state; taxes, buildings, work in hand), sorted by any column, a click to go there | U3 | done |
+| P5-13 | Standing fleet orders on the selection card: explore (chart unknown coast by itself, home to resupply when the stores are half gone, never onto the ocean road), go home and resupply, and patrol (cruise between a station and the nearest of your ports) | G5 | done |
 | P5-14 | The guide has three new pages (Europe and the dynasty, Research and law, Empire) and a Controls page drawn from the key table. First-time hints for the later systems are P5-20 | G3 | done |
 | P5-15 | Screens regrouped: a seventh screen, Diplomacy, holds Peoples, Rival crowns and Europe; Court keeps People, Petitioners and Dynasty; Research has tabs for Subjects, Laws and the Expedition | U3 | done |
 | P5-16 | The hover line names what is not yours and where it is going: rival ships and armies, militia on the march, free states. Selecting them is left for the outliner's Threats | U4 | done |
-| P5-17 | The research tree drawn as a tree, with lines from each subject to what it opens, what each subject unlocks shown as icons, and a queue of subjects to study next | U3 | open |
-| P5-18 | A report card for every kind of outcome the player now meets only as a line of news: a rising, a succession, a treaty, a war's end, an expedition's return | U5 | open |
-| P5-19 | Rebinding keys in Settings, kept with the player's other choices | U6 | open |
-| P5-20 | First-time hints inside the screens added since Phase 1: Diplomacy, Dynasty, Laws, the ledger, captives | G3 | open |
+| P5-17 | Research drawn as a tree: a column for each branch, a line from each subject to what rests on it, what a subject opens shown as pictures and tags, an estimate of seasons, and a queue that adds whatever a subject rests on | U3 | done |
+| P5-18 | Cards for outcomes that were only a line of news: a rising put down, a treaty signed, the end of a war you joined, an expedition's return (successions, risings that succeed and battles had theirs already) | U5 | done |
+| P5-19 | Keys can be changed on the guide's Controls page, each row at a time, with a refusal when another key in the same place already does that; the choice is kept with the player's other preferences | U6 | done |
+| P5-20 | First-time hints at the top of Diplomacy, Dynasty, Laws and the Expedition, each closed once and for all | G3 | done |
 
 ### Phase 6: Balance (deferred)
 

@@ -5,7 +5,7 @@ import { GOOD_INFO, GOODS, type GoodId } from '../data/goods';
 import { RANK_INFO, UNIT_INFO, SKILL_INFO } from '../data/court';
 import {
   cargoUsed, cargoCapacity, crewNeeded, provisionCost, repairCost, portById, provisionsMax, maxMoves, leaderOf, isPortal, canCross,
-  slotsMax, slotsUsed, unitsAboard, allPorts, mainPort,
+  slotsMax, slotsUsed, unitsAboard, allPorts, mainPort, routeEstimate,
 } from '../sim/game';
 import { SKILLS, type Fleet, type TradeRoute, type TradeStop } from '../sim/types';
 import { fmt } from './format';
@@ -247,6 +247,7 @@ function RouteEditor({ fleet }: { fleet: Fleet }) {
       })}
       <div className="row">
         <button onClick={() => setDraft({ ...draft, stops: [...draft.stops, emptyStop(known[0].id)] })}>Add a stop</button>
+        {(() => { const e = routeEstimate(world, game, fleet, draft); return e && <span className={`small ${e.profit < 0 ? 'bad' : ''}`} title="One round of the stops as set, at today’s prices, once the hold is turning over. Prices move as you trade.">About {e.profit >= 0 ? '+' : '−'}{fmt(Math.abs(e.profit))} ducats a round · {e.seasons} season{e.seasons > 1 ? 's' : ''}</span>; })()}
         <span className="spacer" />
         {fleet.route?.active
           ? <button onClick={() => save(false)}>Pause route</button>
