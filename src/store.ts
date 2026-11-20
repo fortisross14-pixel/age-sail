@@ -20,7 +20,7 @@ const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.me
 
 export interface Preview extends MovePreview { fleet: number; dest: number; map: MapId; party?: number }
 
-export type DrawerId = 'cities' | 'markets' | 'fleets' | 'court' | 'research' | 'chronicle';
+export type DrawerId = 'cities' | 'markets' | 'fleets' | 'court' | 'diplomacy' | 'research' | 'chronicle';
 
 /** A chronicle entry's identity, stable across saves. */
 export const newsKey = (c: ChronicleEntry) => `${c.turn}|${c.text}`;
@@ -55,7 +55,12 @@ interface Store {
   /** things the player has already ended a turn past: End Turn does not ask about them again */
   guardSeen: string[];
   drawer: DrawerId | null;
-  courtTab: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'dynasty' | 'europe' | 'research' | 'chronicle';
+  courtTab: 'people' | 'petitioners' | 'dynasty';
+  diploTab: 'peoples' | 'crowns' | 'europe';
+  researchTab: 'subjects' | 'laws' | 'expedition';
+  /** the panel on the right of the map: what to do, or what you own */
+  sideTab: 'goals' | 'realm';
+  showLedger: boolean;
   /** news the player has waved away */
   dismissed: string[];
   toast: { text: string; bad?: boolean; id: number } | null;
@@ -144,7 +149,7 @@ export const useStore = create<Store>((set, get) => {
   return {
     phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, stance: 'assault', selectedPort: null, selectedColony: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false, showSettings: false, showWelcome: false, showGuard: false, guardSeen: [],
-    drawer: null, courtTab: 'people', dismissed: [], toast: null, busy: false,
+    drawer: null, courtTab: 'people', diploTab: 'peoples', researchTab: 'subjects', sideTab: pref('sideTab'), showLedger: false, dismissed: [], toast: null, busy: false,
 
     set: (p) => set(p),
 
@@ -243,7 +248,14 @@ export const useStore = create<Store>((set, get) => {
       }
       if (t.drawer) {
         sfx('open');
-        set({ drawer: t.drawer, ...(t.courtTab ? { courtTab: t.courtTab } : {}), ...(t.colony ? { selectedColony: t.colony, selectedPort: t.colony } : {}) });
+        // peoples, crowns and Europe live in Diplomacy; laws and the expedition in Research
+        const diplo = t.courtTab === 'peoples' || t.courtTab === 'crowns' || t.courtTab === 'europe' ? t.courtTab : null;
+        set({
+          drawer: diplo ? 'diplomacy' : t.drawer, showLedger: false,
+          ...(diplo ? { diploTab: diplo } : t.courtTab ? { courtTab: t.courtTab as Store['courtTab'] } : {}),
+          ...(t.researchTab ? { researchTab: t.researchTab } : {}),
+          ...(t.colony ? { selectedColony: t.colony, selectedPort: t.colony } : {}),
+        });
       }
     },
 

@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.18
+## Now playing: v0.19
 
-Phase 4, depth (second half): slavery as the period had it, with its costs and a law that ends it; three races to win beside the score; three scenarios with a goal and a year; favours bought with prestige; fights at sea in three rounds with a report; five more buildings at home; and a late game in which colonies that break away must be recognised, retaken or lost to a rival's protection. A fourth scenario begins in 1690 with an empire to hold together; free states form leagues and send militia against your colonies; and an ally at war asks you to choose.
+Phase 5, interface depth (first part): keyboard handling rebuilt on one table, so keys act on what is in front of you and never behind it; a Realm tab beside the map listing every fleet, party, colony and threat; a ledger that accounts for every ducat of the turn; one card for the turn's news; a Diplomacy screen for peoples, rival crowns and Europe; and a hover line that says what a foreign ship or army is and where it is going.
+
+From v0.18, depth (second half): slavery as the period had it, with its costs and a law that ends it; three races to win beside the score; three scenarios with a goal and a year; favours bought with prestige; fights at sea in three rounds with a report; five more buildings at home; and a late game in which colonies that break away must be recognised, retaken or lost to a rival's protection. A fourth scenario begins in 1690 with an empire to hold together; free states form leagues and send militia against your colonies; and an ally at war asks you to choose.
 
 From v0.17, depth (first half): a research tree of 32 subjects in four branches that unlock ships, soldiers, the star fort, laws and alliances; nine laws, of which a realm keeps only a few; funded scientific expeditions; and Europe as a place to act in (Court, Europe): envoys, gifts, trade treaties, pacts and alliances with fourteen realms, their wars to join or stand aside from, letters of marque, corsairs and tribute, and a Levant spice trade that an Ottoman war can cut.
 
@@ -68,8 +70,9 @@ npm run build      # production build in dist/
 
 Controls: WASD, the arrow keys, dragging, or resting the pointer at a screen edge pans; wheel or
 pinch zooms. Click the sea or a port to plan, click again or press `Space` to sail, right-click to
-sail at once. `Enter` ends the turn (and asks first if something urgent is undone), `1`–`6` open Cities, Markets,
-Fleets, Court, Research and Chronicle, `H` opens the guide, `M`
+sail at once. `Enter` ends the turn (and asks first if something urgent is undone), `1`–`7` open Cities, Markets,
+Fleets, Court, Diplomacy, Research and Chronicle, `L` the ledger, `N` the next thing that needs you,
+`H` the guide (its Controls page lists every key), `M`
 switches map, `V` shows winds, `Tab` cycles fleets, `Esc` closes, hold `Alt` to highlight
 everything you can click.
 

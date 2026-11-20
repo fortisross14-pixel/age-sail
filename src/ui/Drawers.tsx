@@ -17,13 +17,14 @@ import { GoodIcon } from './Icon';
 import { Sparkline } from './Sparkline';
 import { Fleets } from './FleetsDrawer';
 import { Cities } from './CityScreen';
-import { Court, Research, Chronicle } from './CourtDrawer';
+import { Court, Diplomacy, Research, Chronicle } from './CourtDrawer';
 import { StepHint } from './Guidance';
 import { CaptivesRow } from './Late';
 
 const HEADS: Record<Exclude<DrawerId, 'cities'>, { title: string; icon: IconName; sub: (g: GameState) => string }> = {
   markets: { title: 'Markets', icon: 'markets', sub: () => 'Prices in every port you know' },
   fleets: { title: 'Fleets', icon: 'fleets', sub: (g) => `${g.fleets.length} fleet${g.fleets.length === 1 ? '' : 's'} · ${g.parties.length} part${g.parties.length === 1 ? 'y' : 'ies'} ashore` },
+  diplomacy: { title: 'Diplomacy', icon: 'diplomacy', sub: (g) => `${Object.values(g.natives).filter((n) => n.met).length} peoples met · ${Object.values(g.europe).filter((r) => r.treaty !== 'none').length} treaties · ${g.euroWars.length} war${g.euroWars.length === 1 ? '' : 's'} in Europe` },
   court: { title: 'Court', icon: 'court', sub: (g) => `${g.people.filter((p) => p.alive).length} courtiers · ${g.petitioners.length} petitioner${g.petitioners.length === 1 ? '' : 's'} waiting` },
   research: { title: 'Research', icon: 'research', sub: (g) => `${g.research.known.length} subject${g.research.known.length === 1 ? '' : 's'} mastered` },
   chronicle: { title: 'Chronicle', icon: 'chronicle', sub: () => 'What has happened in your reign' },
@@ -72,6 +73,7 @@ export function Drawer() {
         {shown === 'markets' && <Markets />}
         {shown === 'cities' && <Cities />}
         {shown === 'court' && <Court />}
+        {shown === 'diplomacy' && <Diplomacy />}
         {shown === 'research' && <Research />}
         {shown === 'chronicle' && <Chronicle />}
       </div>

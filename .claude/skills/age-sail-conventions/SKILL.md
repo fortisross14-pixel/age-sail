@@ -119,6 +119,15 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   icons) and `Art` slots for painted pictures (`src/ui/theme/Art.tsx`, list in `art/PROMPTS.md`).
 - Sounds go through `sfx()` in `src/ui/sound.ts` (synthesized, no files). Game orders get their
   sound in `store.run`; panels, tabs and pickers play their own.
+- **Keys** live in one table, `src/ui/keys.ts`: the handler in `App.tsx` and the guide's Controls page
+  both read it. A new shortcut is a row there and a case in the handler. Keys act on the topmost
+  layer only (card, welcome, reminder, guide, ledger, screen, map); with a screen open, Enter and
+  Space are left to the focused control.
+- **Where things live.** Seven screens: Cities, Markets, Fleets, Court (People, Petitioners,
+  Dynasty), Diplomacy (Peoples, Rival crowns, Europe), Research (Subjects, Laws, Expedition),
+  Chronicle. Beside the map, one panel with two tabs: Goals and Realm (the outliner, `Realm.tsx`).
+  Anything that lists what the player owns belongs in the outliner's `rows()`; money belongs on a
+  `LedgerLine`, tallied in `seasonTick` with `tally(s, line)` after the rule that moves it.
 - **What needs the player** is one list, `attention()` in `src/ui/attention.ts` (pure, no rules):
   End Turn's reminder, the count on its button and any future outliner read it. A new kind of
   reminder goes there, with a stable id so the player is asked once. Jump to things with

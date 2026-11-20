@@ -12,6 +12,8 @@ import { Art } from './theme/Art';
 import { ReignHistory } from './Dynasty';
 import { SeaReportView } from './Late';
 import { FAMILY_NAME } from '../data/stories/types';
+import { KEYS } from './keys';
+import { pref, setPref } from './prefs';
 
 function FinalStandings() {
   const game = useStore((s) => s.game)!;
@@ -104,6 +106,24 @@ const GUIDE: { id: string; name: string; items: [string, string][] }[] = [
     ['The peoples.', 'Every coast belongs to someone. In Court, Peoples: send gifts, make alliances, or pay a people to turn on its rivals. Dock to build a trading post; land a missionary to found a mission. You can also conquer, and every people will remember it. Colonies on a people’s land anger them; angry peoples raid.'],
     ['Rival crowns.', 'The other Atlantic crowns race you for the same coasts: their ships appear on the map, their colonies claim land you can no longer settle, their trading posts thin out the native trade. Settle too close and they grow hostile; at war, their privateers hunt your ships. Court, Crowns shows the standings.'],
   ] },
+  { id: 'world', name: 'Europe and the dynasty', items: [
+    ['Diplomacy.', 'The Diplomacy screen holds everyone outside your realm: the peoples overseas, the rival crowns, and the realms of Europe. Envoys and gifts win regard; regard wins a trade treaty (better prices in their ports), a pact (they will not attack you) and an alliance.'],
+    ['Wars in Europe.', 'Realms fight over old quarrels. You may take a side: the other side’s ports close to you and it costs money each season. An ally at war will ask you to choose. Corsairs out of Ottoman and Moroccan ports take ships near them until you pay tribute or win a pact.'],
+    ['The dynasty.', 'Court, Dynasty shows your ruler, whose gift helps the realm, the heirs, and offers of marriage. A child on the throne means a regency; no heir means a costly succession. Prestige buys favours there.'],
+    ['Courtiers.', 'They remember what you do, want commissions and commands, have rivals and friends, and can be tempted away by another crown when their loyalty runs out.'],
+  ] },
+  { id: 'learning', name: 'Research and law', items: [
+    ['Subjects.', 'Research has four branches. Some subjects improve the realm; others open ships, soldiers, the star fort, laws and alliances. Universities and observatories speed your scholars.'],
+    ['Expeditions.', 'A funded scientific expedition makes everything your explorers chart, meet and survey count three times until it has found enough.'],
+    ['Laws.', 'Research opens laws. A realm keeps only a few, and some cannot stand together. Enacting costs ducats; repealing costs prestige.'],
+    ['The ages.', 'Each new age offers three paths: a lasting advantage and a goal, judged when the age ends.'],
+  ] },
+  { id: 'empire', name: 'Empire', items: [
+    ['Ways to win.', 'The highest score when the age ends wins, and beside it there are three races: trade, empire and prestige (Diplomacy, Rival crowns). A scenario adds a goal and a year.'],
+    ['Free states.', 'A disloyal colony may break away. A free state unsettles its neighbours until you recognise it or retake it; two or more form a league and send militia against you; left alone, a rival crown takes it under protection.'],
+    ['Captives.', 'Trading grounds on the African coast sell prisoners of their wars, and your soldiers take captives when a village falls. They can be put to work in a colony or sold. Many die; some flee; they may rise; the peoples they came from remember. The law of abolition ends it.'],
+    ['The ledger and the Realm tab.', 'L opens the ledger: what came in and went out last turn, line by line. The Realm tab beside the map lists every fleet, party and colony with its state; click one to go there.'],
+  ] },
   { id: 'realm', name: 'Your realm', items: [
     ['Build and trade at home.', 'Cities have room for a few buildings (docks, barracks, church, university, market) and train colonists, soldiers and missionaries; a governor with construction skill speeds them up. A merchant can run a fleet on a trade route between European ports by itself.'],
     ['The court.', 'People age, and new petitioners come to court each spring. Stories ask for your decisions.'],
@@ -130,12 +150,15 @@ export function Help() {
           {page ? (
             <dl>{page.items.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}</dl>
           ) : (
-            <ul className="keys">
-              <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows, drag, or rest the pointer at the screen edge to pan · <kbd>Wheel</kbd>/<kbd>Pinch</kbd> zoom</li>
-              <li><kbd>Space</kbd> sail · <kbd>Enter</kbd> end the turn · <kbd>Tab</kbd> next fleet · <kbd>Esc</kbd> cancel or close · <kbd>M</kbd> switch map</li>
-              <li><kbd>1</kbd> Cities · <kbd>2</kbd> Markets · <kbd>3</kbd> Fleets · <kbd>4</kbd> Court · <kbd>5</kbd> Research · <kbd>6</kbd> Chronicle</li>
-              <li><kbd>V</kbd> winds · <kbd>G</kbd> hex grid · <kbd>N</kbd> next thing that needs you · <kbd>H</kbd> this guide · hold <kbd>Alt</kbd> to highlight everything you can click</li>
-            </ul>
+            <div className="key-table">
+              {(['The map', 'Turns and orders', 'Screens', 'Cards'] as const).map((group) => (
+                <section key={group}>
+                  <h4>{group}</h4>
+                  {KEYS.filter((k) => k.group === group).map((k) => <p key={k.label}><span className="key-caps">{k.show.map((c) => <kbd key={c}>{c}</kbd>)}</span>{k.label}</p>)}
+                </section>
+              ))}
+              <p className="muted small">Keys do nothing while you type in a field. With a screen open, Enter and Space belong to the button that has the focus, so a turn is never ended behind a screen.</p>
+            </div>
           )}
         </div>
         <button className="primary" autoFocus onClick={() => set({ showHelp: false })}>Close</button>
@@ -170,7 +193,22 @@ export function Settings() {
         <input type="range" min={0} max={1} step={0.05} value={vol} disabled={!on} onChange={(e) => { const v = Number(e.target.value); setVol(v); setSound(on, v); }} onPointerUp={() => sfx('select')} />
       </label>
       <GuardSwitch />
+      <NewsSwitches />
       <button onClick={() => set({ showSettings: false, showHelp: true })}>How to play</button>
     </Frame>
+  );
+}
+
+const NEWS_KINDS: [string, string][] = [['peril', 'Perils'], ['discovery', 'Discoveries'], ['voyage', 'Voyages'], ['trade', 'Trade'], ['court', 'Court and realm']];
+/** Which kinds of news the turn's card shows; the Chronicle keeps everything. */
+function NewsSwitches() {
+  const [news, setNews] = useState(pref('news'));
+  return (
+    <div className="news-switches">
+      <b>News on the map</b>
+      {NEWS_KINDS.map(([k, name]) => (
+        <label key={k}><input type="checkbox" checked={news[k] !== false} onChange={(e) => { const v = { ...news, [k]: e.target.checked }; setNews(v); setPref('news', v); useStore.getState().set({ dismissed: [...useStore.getState().dismissed] }); }} />{name}</label>
+      ))}
+    </div>
   );
 }

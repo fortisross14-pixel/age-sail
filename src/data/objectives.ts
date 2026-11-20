@@ -12,6 +12,7 @@ export type ObjectiveId =
 /** Where "Show me" takes the player. Plain strings so the data layer stays free of UI types. */
 export interface ObjectiveGoto {
   screen?: 'cities' | 'markets' | 'fleets' | 'court' | 'research' | 'chronicle';
+  researchTab?: 'subjects' | 'laws' | 'expedition';
   courtTab?: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'dynasty' | 'europe';
   /** select the first fleet (or the first with a leader) and look at it */
   fleet?: 'any' | 'led';
@@ -83,7 +84,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
     how: 'Send an explorer west with full stores. Ride the trade winds out in the south and come home on the westerlies in the north.',
     goto: { fleet: 'led' }, reward: { ducats: 800, prestige: 15 } },
   { id: 'ally', chain: 'ambition', from: 'Your chancellor', title: 'An alliance with a people', after: ['meet'],
-    how: 'In Court, Peoples: trade, send gifts, and when they think well of you, propose an alliance. Allies fight beside you and trade more.',
+    how: 'In Diplomacy, Peoples: trade, send gifts, and when they think well of you, propose an alliance. Allies fight beside you and trade more.',
     goto: { screen: 'court', courtTab: 'peoples' }, reward: { ducats: 300, prestige: 5 } },
   { id: 'factory', chain: 'ambition', from: 'Your treasurer', title: 'A factory in a foreign port', after: ['sale'],
     how: 'In Markets, pick a foreign port and open a factory. Your factor sells what you leave there slowly, so the price holds.',
@@ -104,15 +105,15 @@ export const OBJECTIVES: ObjectiveDef[] = [
     how: 'Colonies grow slowly by births. Most settlers must be trained at home and shipped across.',
     goto: { screen: 'cities' }, reward: { ducats: 1000, prestige: 12 } },
   { id: 'first', chain: 'ambition', from: 'Your chancellor', title: 'First among the crowns', after: ['colonies3'],
-    how: 'Lead the standings in Court, Crowns: colonists, territory and commerce all count.',
+    how: 'Lead the standings in Diplomacy, Crowns: colonists, territory and commerce all count.',
     goto: { screen: 'court', courtTab: 'crowns' }, reward: { prestige: 20 } },
 
   // ---- ambitions of the later ages ----
   { id: 'laws3', chain: 'ambition', from: 'Your chancellor', title: 'Three laws in force', fromYear: 1520,
-    how: 'Research opens laws (Research, at the foot of the tree). A realm keeps two, and one more for every three subjects of state.',
-    goto: { screen: 'research' }, reward: { prestige: 10 } },
+    how: 'Research opens laws (Research, Laws). A realm keeps two, and one more for every three subjects of state.',
+    goto: { screen: 'research', researchTab: 'laws' }, reward: { prestige: 10 } },
   { id: 'treaties3', chain: 'ambition', from: 'Your chancellor', title: 'Three treaties in Europe', fromYear: 1520,
-    how: 'In Court, Europe: envoys and gifts win regard, and regard wins trade treaties, pacts and alliances.',
+    how: 'In Diplomacy, Europe: envoys and gifts win regard, and regard wins trade treaties, pacts and alliances.',
     goto: { screen: 'court', courtTab: 'europe' }, reward: { ducats: 600, prestige: 10 } },
   { id: 'city', chain: 'ambition', from: 'Your governor', title: 'A city overseas', after: ['town'], fromYear: 1550,
     how: 'A full town with timber, tools and stone in its warehouse can become a city, the seat of a province.',

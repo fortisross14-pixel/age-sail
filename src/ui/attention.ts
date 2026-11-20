@@ -14,6 +14,7 @@ export interface Target {
   fleet?: number;
   party?: number;
   colony?: string;
+  researchTab?: 'subjects' | 'laws' | 'expedition';
 }
 
 export interface Attention {

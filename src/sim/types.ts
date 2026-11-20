@@ -142,6 +142,10 @@ export interface EuroWar { id: number; a: string; b: string; cause: string; sinc
 /** Militia of a free state marching overland to raise, or take, one of your colonies. */
 export interface RebelArmy { id: number; free: string; name: string; map: MapId; hex: number; target: number; path: number[]; strength: number; trail: number[] }
 
+export type LedgerLine = 'orders' | 'taxes' | 'factories' | 'routes' | 'peoples' | 'upkeep' | 'wages' | 'interest' | 'empire' | 'europe' | 'sea' | 'events';
+/** `mark` is the treasury when it was last accounted for: whatever has changed since belongs to the next line tallied. */
+export interface Ledger { mark: number; lines: Partial<Record<LedgerLine, number>>; last: { turn: number; lines: Partial<Record<LedgerLine, number>>; total: number } | null }
+
 /** One of the ruling house. */
 export interface Royal { id: number; name: string; numeral?: number; sex: 'm' | 'f'; born: number; gift: Gift; from?: string; frail?: number }
 export interface MarriageOffer { id: number; realm: string; name: string; sex: 'm' | 'f'; born: number; gift: Gift; dowry: number }
@@ -540,6 +544,8 @@ export interface GameState {
   euroWars: EuroWar[];
   /** letters of marque are out */
   marque: boolean;
+  /** the treasury's account: what each kind of thing brought in or cost, this turn so far and last turn */
+  ledger: Ledger;
   /** armed men of the free states on the march against your colonies */
   rebels: RebelArmy[];
   /** the first crown to win one of the races, and which */

@@ -84,20 +84,20 @@ export function Europe() {
 }
 
 /** Research: the laws of the realm and the scientific expedition. */
-export function LawsAndExpedition() {
+export function LawsAndExpedition({ show }: { show: 'laws' | 'expedition' }) {
   const game = useStore((s) => s.game)!;
   const run = useStore((s) => s.run);
   const e = game.expedition;
   return (
     <div className="laws">
-      <section>
+      {show === 'expedition' && <section>
         <h3>A scientific expedition</h3>
         {e
           ? <p>In the field: {Math.floor(e.done)} of {e.need} points of discovery. Everything your explorers chart, meet and survey counts {EXPEDITION.multiplier} times until it is done; finishing it brings {EXPEDITION.bonus} research and {EXPEDITION.prestige} prestige.</p>
           : <p>Send cosmographers, a botanist and a draughtsman with your explorers. Until they have found enough, every coast charted, people met and land surveyed counts {EXPEDITION.multiplier} times for your scholars; finishing brings {EXPEDITION.bonus} research and {EXPEDITION.prestige} prestige.</p>}
         {!e && <button disabled={game.treasury < EXPEDITION.cost} onClick={() => void run({ kind: 'fundExpedition' })}>Fund an expedition · {fmt(EXPEDITION.cost)}</button>}
-      </section>
-      <section>
+      </section>}
+      {show === 'laws' && <section>
         <h3>Laws <span className="muted small">{game.laws.length} of {lawPlaces(game)} places</span></h3>
         <p className="muted small">Research opens laws; a realm keeps only a few, and one more for every three subjects of state mastered. Repealing a law costs prestige.</p>
         <div className="law-grid">
@@ -117,7 +117,7 @@ export function LawsAndExpedition() {
             );
           })}
         </div>
-      </section>
+      </section>}
     </div>
   );
 }

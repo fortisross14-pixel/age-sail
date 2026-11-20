@@ -11,6 +11,7 @@ import { Icon, Crest } from './theme/icons';
 import { Medal, CrestArt } from './theme/Art';
 import { sfx } from './sound';
 import { attention } from './attention';
+import { forecast } from './Realm';
 import { styled } from '../sim/dynasty';
 
 const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th'];
@@ -25,6 +26,8 @@ export function Hud() {
   const set = useStore((s) => s.set);
   const endTurn = useStore((s) => s.endTurn);
   const nextAttention = useStore((s) => s.nextAttention);
+  const goTo = useStore((s) => s.goTo);
+  const coming = forecast(game);
   const sc = score(game, world);
   const rank = 1 + rivalsOf(game.crown).filter((r) => rivalScore(game, r.id).total > sc.total).length;
   const waiting = attention(game, world).filter((a) => a.urgent);
@@ -43,25 +46,25 @@ export function Hud() {
         <div className="era">{era.name}</div>
       </div>
       <span className="hud-sep" />
-      <div className="stat" title="Treasury, in ducats">
+      <button className="stat plain" title="Treasury, in ducats. Under it: what a turn brings before you do anything, going by the last one. Click for the ledger (L)." onClick={() => set({ showLedger: true })}>
         <Medal name="coins" size={44} fallback={<img src={spriteUrl('goods/gold')} alt="" />} />
-        <div><div className="stat-value">{fmt(game.treasury)}</div><div className="stat-label">ducats</div></div>
-      </div>
+        <div><div className="stat-value">{fmt(game.treasury)}</div><div className="stat-label">{coming == null ? 'ducats' : `${coming >= 0 ? '+' : '−'}${fmt(Math.abs(Math.round(coming)))} a turn`}</div></div>
+      </button>
       <span className="hud-sep" />
       <div className="stat" title="Prestige: from discoveries, victories and great deeds">
         <Medal name="star" size={44} fallback={<Icon name="star" size={30} />} />
         <div><div className="stat-value">{fmt(game.prestige)}</div><div className="stat-label">prestige</div></div>
       </div>
       <span className="hud-sep" />
-      <button className="stat plain" onClick={() => set({ drawer: 'court', courtTab: 'crowns' })}
+      <button className="stat plain" onClick={() => goTo({ drawer: 'court', courtTab: 'crowns' })}
         title={`Score: ${sc.pop} colonists ×10, ${sc.territory} hexes of territory ×2, ${sc.commerce} from ${fmt(game.revenue)} ducats of sales`}>
         <Medal name="court" size={44} fallback={<Icon name="court" size={30} />} />
         <div><div className="stat-value">{fmt(sc.total)}</div><div className="stat-label">score ({ORDINAL[rank - 1]} of 5)</div></div>
       </button>
       <div className="spacer" />
       <div className="hud-tools">
-        <button className={`adm-square ${drawer === 'chronicle' ? 'on' : ''}`} onClick={() => toggle('chronicle')} title="Chronicle (6)" aria-label="Chronicle"><Medal name="chronicle" size={50} fallback={<Icon name="chronicle" size={26} />} /></button>
-        <button className={`adm-square ${drawer === 'research' ? 'on' : ''}`} onClick={() => toggle('research')} title="Research (5)" aria-label="Research"><Medal name="research" size={50} fallback={<Icon name="research" size={26} />} /></button>
+        <button className={`adm-square ${drawer === 'chronicle' ? 'on' : ''}`} onClick={() => toggle('chronicle')} title="Chronicle (7)" aria-label="Chronicle"><Medal name="chronicle" size={50} fallback={<Icon name="chronicle" size={26} />} /></button>
+        <button className={`adm-square ${drawer === 'research' ? 'on' : ''}`} onClick={() => toggle('research')} title="Research (6)" aria-label="Research"><Medal name="research" size={50} fallback={<Icon name="research" size={26} />} /></button>
         <button className={`adm-square ${drawer === 'court' ? 'on' : ''}`} onClick={() => toggle('court')} title="Court (4)" aria-label="Court"><Medal name="people" size={50} fallback={<Icon name="units" size={26} />} /></button>
         <button className={`adm-square ${showSettings ? 'on' : ''}`} onClick={() => { sfx(showSettings ? 'close' : 'open'); set({ showSettings: !showSettings }); }} title="Settings" aria-label="Settings"><Medal name="settings" size={50} fallback={<Icon name="settings" size={26} />} /></button>
       </div>

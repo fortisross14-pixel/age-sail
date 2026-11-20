@@ -36,7 +36,7 @@ import { RANK_INFO, UNIT_INFO } from '../data/court';
 import { WALLS, isMilitary } from '../data/army';
 import {
   Fog, dateLabel, seasonOf, yearOf, nextTurnStart, emptyAccount,
-  type Colony, type Fleet, type GameState, type World, type PortDef, type ChronicleEntry, type MapData, type ProjectKind, type GameEvent,
+  type Colony, type LedgerLine, type Fleet, type GameState, type World, type PortDef, type ChronicleEntry, type MapData, type ProjectKind, type GameEvent,
   type Person, type UnitType, type TradeRoute, type Rank, type City, type Stance,
 } from './types';
 export { leaderOf };
@@ -334,7 +334,7 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
     surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
     rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0, natives: Nat.initNatives(world), rivals: Riv.initRivals(crown), rivalColonies: [], rivalShips: [],
     freeStates: [], endTurn: (until - 1492) * 4, ended: false, taxRate: 'normal', loans: [], told: {},
-    rebels: [], victory: null, scenario: scenario ? { id: scenario, done: null } : null, europe: Eur.initEurope(crown), euroWars: [], marque: false, laws: [], expedition: null, flags: {}, pending: [], dynasty: Dyn.initialDynasty(crown, (() => { let k = 0; return () => -(++k); })()), eraPath: null, land: null,
+    ledger: { mark: 0, lines: {}, last: null }, rebels: [], victory: null, scenario: scenario ? { id: scenario, done: null } : null, europe: Eur.initEurope(crown), euroWars: [], marque: false, laws: [], expedition: null, flags: {}, pending: [], dynasty: Dyn.initialDynasty(crown, (() => { let k = 0; return () => -(++k); })()), eraPath: null, land: null,
     adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
     chronicle: [], events: [], factories: [], shocks: [], nextId: 1, newWorldFound: false,
     research: { known: [...(spec.edge.startTechs ?? [])], current: null, progress: 0, pending: 0 },
@@ -355,6 +355,7 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
   log(state, 'court', 'Your pilots warn that no ship that sails far into the open Mar Océano has come back.');
   const sc = scenarioById(scenario ?? undefined);
   if (sc?.from) inherit(world, state, sc.from, rng);
+  state.ledger = { mark: state.treasury, lines: {}, last: null };
   return { world, state };
 }
 
@@ -1271,12 +1272,25 @@ function advance(world: World, s: GameState, f: Fleet) {
  */
 export function endTurn(world: World, s: GameState): void {
   const until = nextTurnStart(s.turn);
+  const from = s.turn;
   while (s.turn < until) seasonTick(world, s);
+  // close the turn's account and open the next
+  const lines = s.ledger.lines;
+  s.ledger = { mark: s.treasury, lines: {}, last: { turn: from, lines, total: Object.values(lines).reduce((a, b) => a + (b ?? 0), 0) } };
 }
 
 /** One season of the world: voyages, projects, rivals, natives, colonies, markets, research, the court. */
+/** Whatever the treasury has gained or lost since it was last accounted for goes on this line of the ledger. */
+function tally(s: GameState, line: LedgerLine) {
+  const d = s.treasury - s.ledger.mark;
+  if (d) s.ledger.lines[line] = (s.ledger.lines[line] ?? 0) + d;
+  s.ledger.mark = s.treasury;
+}
+
 export function seasonTick(world: World, s: GameState): void {
   const rng = mulberry32(hashSeed(s.seed, s.turn, 7));
+  // what you bought, sold, hired and built since the last season was by your own order
+  tally(s, 'orders');
 
   // life at sea: food and water, foraging along a shore, scurvy
   for (const f of [...s.fleets]) {
@@ -1348,10 +1362,12 @@ export function seasonTick(world: World, s: GameState): void {
 
   // rival crowns sail, settle, trade and fight
   Riv.rivalsSeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e), (f, why) => loseFleet(s, f, why));
+  tally(s, 'sea');
   // native peoples: missions, trade, encroachment, sickness, raids
   Nat.nativesSeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e));
   // the colonies: work, eat, grow; they pay a little tax
   for (const c of s.colonies) Col.colonySeason(world, s, c, colLog(s));
+  tally(s, 'peoples');
   // taxes and market dues; universities feed the scholars
   let taxes = s.colonies.reduce((t, c) => t + Emp.colonyTaxes(s, c), 0);
   for (const c of Object.values(s.cities)) {
@@ -1361,6 +1377,7 @@ export function seasonTick(world: World, s: GameState): void {
   }
   const mods = Dyn.realmMods(s);
   s.treasury += Math.round(taxes * mods.taxes);
+  tally(s, 'taxes');
 
   // the court: commissions take effect, salaries, a learned court helps the scholars
   for (const p of s.people) {
@@ -1422,20 +1439,28 @@ export function seasonTick(world: World, s: GameState): void {
   // wages and upkeep
   const upkeep = s.fleets.reduce((t, f) => t + f.ships.reduce((u, sh) => u + SHIPS[sh.type].upkeep, 0), 0)
     + s.units.reduce((t, u) => t + UNIT_SPECS[u.type].upkeep, 0);
-  s.treasury -= Math.round(upkeep * mods.upkeep) + wages;
+  tally(s, 'factories');
+  s.treasury -= Math.round(upkeep * mods.upkeep);
+  tally(s, 'upkeep');
+  s.treasury -= wages;
+  tally(s, 'wages');
   if (s.treasury < 0) {
     const interest = Math.ceil(-s.treasury * (has(s, 'banking') ? 0.02 : 0.05));
     s.treasury -= interest;
     log(s, 'court', `The treasury is in debt. The bankers charge ${interest} ducats in interest.`);
   }
 
+  tally(s, 'interest');
+
   s.turn++;
 
   // the long game: eras, loyalty and independence, loans, the end of the age; and perhaps a story
   Emp.empireSeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e));
+  tally(s, 'empire');
   Slv.slaverySeason(world, s, (k, t) => log(s, k, t));
   // Europe: regard, treaties, the wars of others, corsairs and the Levant trade
   Eur.europeSeason(world, s, (k, t) => log(s, k, t), (f, why) => loseFleet(s, f, why));
+  tally(s, 'europe');
   // the ruling house: births, deaths, successions; and each spring the court takes stock of you
   Dyn.dynastySeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e), portById(world, mainPort(s), s)!.hex);
   if (seasonOf(s.turn) === 0) {
@@ -1450,6 +1475,7 @@ export function seasonTick(world: World, s: GameState): void {
   Vic.checkScenario(s, (k, t) => log(s, k, t), (e) => event(s, e), portById(world, mainPort(s), s)!.hex);
   Vic.checkVictory(world, s, (k, t) => log(s, k, t), (e) => event(s, e), portById(world, mainPort(s), s)!.hex);
   Story.maybeStory(world, s, (e) => event(s, e));
+  tally(s, 'events');
 
   // each spring the court grows a year older, and new faces ask to join it
   if (seasonOf(s.turn) === 0) {
@@ -1493,7 +1519,9 @@ export function seasonTick(world: World, s: GameState): void {
   const notes: string[] = [];
   for (const f of [...s.fleets]) if (s.fleets.includes(f)) runRoute(world, s, f, notes);
   if (notes.length) log(s, 'trade', notes.join(' '));
+  tally(s, 'routes');
   checkObjectives(world, s);
+  tally(s, 'events');
   s.prestige = Math.round(s.prestige * 100) / 100;
 }
 

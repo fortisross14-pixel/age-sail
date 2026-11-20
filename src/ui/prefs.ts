@@ -8,9 +8,12 @@ interface Prefs {
   objectivesFolded: boolean;
   /** first-voyage steps whose in-screen hint the player has closed */
   hintsSeen: string[];
+  sideTab: 'goals' | 'realm';
+  /** kinds of news shown on the map; the rest are only in the Chronicle */
+  news: Record<string, boolean>;
 }
 
-const DEFAULTS: Prefs = { guard: true, objectivesFolded: false, hintsSeen: [] };
+const DEFAULTS: Prefs = { guard: true, objectivesFolded: false, hintsSeen: [], sideTab: 'goals', news: { discovery: true, trade: true, voyage: true, peril: true, court: true } };
 
 let prefs: Prefs = { ...DEFAULTS };
 try {

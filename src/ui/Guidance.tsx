@@ -30,24 +30,26 @@ function targetOf(o: ObjectiveDef, g: GameState): Target {
 }
 
 /**
- * The first voyage and your advisers' ambitions, on the right of the map: what to do next, how,
- * and what it pays. Folds away to its title.
+ * The first voyage and your advisers' ambitions: what to do next, how, and what it pays. Shown in
+ * the Goals tab of the panel on the right of the map (`SidePanel` in Realm.tsx).
  */
-export function ObjectivesPanel() {
+/** What the goals tab is called just now, and its count. */
+export function objectivesTitle(game: GameState) {
+  const voyage = !voyageDone(game);
+  return { name: voyage ? 'First voyage' : 'Goals', tally: voyage ? `${VOYAGE.filter((o) => objectiveDone(game, o.id)).length} / ${VOYAGE.length}` : String(activeAmbitions(game).length || '') };
+}
+
+export function ObjectivesBody() {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const goTo = useStore((s) => s.goTo);
-  const [folded, setFolded] = useState(pref('objectivesFolded'));
   const [picked, setPicked] = useState<string | null>(null);
   const voyage = !voyageDone(game);
   const ambitions = activeAmbitions(game);
   const sc = scenarioProgress(game);
-  if (!voyage && !ambitions.length && !(sc && !sc.done)) return null;
+  if (!voyage && !ambitions.length && !sc) return <p className="muted small out-empty">Every goal your advisers set is met. New ambitions come with the years; the Realm tab shows what you hold.</p>;
   const next = VOYAGE.find((o) => !objectiveDone(game, o.id));
   const open = picked && (VOYAGE.some((o) => o.id === picked && !objectiveDone(game, o.id)) || ambitions.some((o) => o.id === picked)) ? picked : next?.id ?? ambitions[0]?.id;
-  const done = VOYAGE.filter((o) => objectiveDone(game, o.id)).length;
-  const fold = () => { const v = !folded; setFolded(v); setPref('objectivesFolded', v); sfx(v ? 'close' : 'open'); };
-
   const row = (o: ObjectiveDef, n?: number) => {
     const isDone = objectiveDone(game, o.id);
     const isOpen = !isDone && open === o.id;
@@ -75,14 +77,7 @@ export function ObjectivesPanel() {
   };
 
   return (
-    <aside className={`objectives ${folded ? 'folded' : ''}`} aria-label="Objectives">
-      <button className="obj-fold" onClick={fold} aria-expanded={!folded} title={folded ? 'Show objectives' : 'Fold away'}>
-        <Icon name="chronicle" size={18} />
-        <span>{voyage ? 'First voyage' : 'Ambitions'}</span>
-        <span className="obj-tally">{voyage ? `${done} / ${VOYAGE.length}` : ambitions.length}</span>
-      </button>
-      {!folded && (
-        <div className="obj-scroll">
+    <>
           {sc && (
             <div className={`obj scenario ${sc.done ?? ''}`}>
               <div className="obj-from">{sc.scenario.name}</div>
@@ -97,9 +92,7 @@ export function ObjectivesPanel() {
               <ul className="obj-list">{ambitions.map((o) => row(o))}</ul>
             </>
           )}
-        </div>
-      )}
-    </aside>
+    </>
   );
 }
 

@@ -34,16 +34,30 @@ export function Court() {
       <Tabs value={tab} onChange={(t) => set({ courtTab: t })} tabs={[
         ['people', `People (${game.people.filter((p) => p.alive).length})`],
         ['petitioners', `Petitioners${game.petitioners.length ? ` (${game.petitioners.length})` : ''}`],
-        ['peoples', `Peoples${Object.values(game.natives).filter((n) => n.met).length ? ` (${Object.values(game.natives).filter((n) => n.met).length})` : ''}`],
-        ['crowns', 'Crowns'],
-        ['europe', `Europe${game.euroWars.length ? ` (${game.euroWars.length})` : ''}`],
         ['dynasty', `Dynasty${game.dynasty.offers.length ? ` (${game.dynasty.offers.length})` : ''}`],
       ]} />
       {tab === 'people' && <People />}
       {tab === 'petitioners' && <Petitioners />}
+      {tab === 'dynasty' && <Dynasty />}
+    </>
+  );
+}
+
+/** Everyone outside your realm: the peoples overseas, the rival crowns, and the realms of Europe. */
+export function Diplomacy() {
+  const game = useStore((s) => s.game)!;
+  const tab = useStore((s) => s.diploTab);
+  const set = useStore((s) => s.set);
+  const met = Object.values(game.natives).filter((n) => n.met).length;
+  return (
+    <>
+      <Tabs value={tab} onChange={(t) => set({ diploTab: t })} tabs={[
+        ['peoples', `Peoples${met ? ` (${met})` : ''}`],
+        ['crowns', 'Rival crowns'],
+        ['europe', `Europe${game.euroWars.length ? ` (${game.euroWars.length} at war)` : ''}`],
+      ]} />
       {tab === 'peoples' && <Peoples />}
       {tab === 'crowns' && <Crowns />}
-      {tab === 'dynasty' && <Dynasty />}
       {tab === 'europe' && <Europe />}
     </>
   );
@@ -239,8 +253,13 @@ export function Research() {
   const r = game.research;
   const cur = r.current ? techById(r.current) : null;
   const learned = game.people.filter((p) => p.alive && p.trait === 'learned' && p.fleet == null).length;
+  const tab = useStore((s) => s.researchTab);
+  const set = useStore((s) => s.set);
   return (
     <div className="research">
+      <Tabs value={tab} onChange={(t) => set({ researchTab: t })} tabs={[['subjects', `Subjects (${r.known.length} of ${TECHS.length})`], ['laws', `Laws (${game.laws.length})`], ['expedition', `Expedition${game.expedition ? ' (in the field)' : ''}`]]} />
+      {tab !== 'subjects' && <LawsAndExpedition show={tab} />}
+      {tab === 'subjects' && <>
       <div className="research-now">
         {cur ? (
           <>
@@ -276,7 +295,7 @@ export function Research() {
         </section>
       ))}
       </div>
-      <LawsAndExpedition />
+      </>}
     </div>
   );
 }

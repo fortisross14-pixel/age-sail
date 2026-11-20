@@ -45,6 +45,16 @@ export function HoverInfo() {
   if (rc) parts.push(`${rc.hex === hex ? rc.name : `lands of ${rc.name}`}, a colony of ${RIVAL_NAME[rc.crown]}`);
   const nat = fog !== Fog.Unknown && !isWater(m.terrain[hex]) ? nationAt(world, map, hex) : undefined;
   if (nat && game.natives[nat.id]?.met) parts.push(`lands of the ${nat.people} (${moodOf(game.natives[nat.id])})`);
+  if (fog >= Fog.Charted) {
+    const KIND: Record<string, string> = { settlers: 'a ship with settlers', trader: 'a merchantman', supply: 'a supply ship', privateer: 'a privateer', raid: 'a troopship', army: 'soldiers on the march' };
+    for (const x of game.rivalShips.filter((v) => v.map === map && v.hex === hex)) {
+      const to = x.homeward ? 'bound for home' : x.kind === 'privateer' ? 'hunting your ships' : (() => { const c = [...game.colonies, ...game.rivalColonies].find((v) => v.map === map && v.hex === x.target); const p = m.ports.find((v) => v.hex === x.target); return c ? `making for ${c.name}` : p ? `making for ${p.name}` : 'making for an empty coast'; })();
+      parts.push(`${x.kind === 'army' ? '' : `the ${x.name}, `}${KIND[x.kind]} of ${RIVAL_NAME[x.crown]}, ${to}`);
+    }
+    for (const r of game.rebels.filter((v) => v.map === map && v.hex === hex)) parts.push(`${r.name}, about ${r.strength} companies, marching on ${game.colonies.find((c) => c.map === map && c.hex === r.target)?.name ?? 'a colony'}`);
+    const fs = game.freeStates.find((f) => f.map === map && f.hex === hex);
+    if (fs) parts.push(`${fs.name}, a free state of ${fs.pop} people${fs.recognised ? ', recognised by you' : fs.by ? `, protected by ${RIVAL_NAME[fs.by]}` : ''}`);
+  }
   if (m.portals.includes(hex)) parts.push(map === 'old' ? 'edge of the chart: the Mar Océano lies beyond' : 'edge of the chart: Europe lies beyond');
   return <div className="hover-line">{parts.join(' · ')}</div>;
 }

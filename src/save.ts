@@ -26,8 +26,9 @@ import { initEurope } from './sim/europe';
  * treaties, the wars of Europe and letters of marque. Subjects already mastered keep their names.
  * Version 19 (Phase 4, second half) adds five buildings to every city, the first victory won and the scenario.
  * Version 20 adds the free states' militia on the march.
+ * Version 21 (Phase 5) adds the ledger.
  */
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 export const SAVE_KEY = 'age-sail:save';
 /** Keys used before the envelope. v9 is migrated; older ones can't be read and are removed. */
 export const LEGACY_KEY = 'age-sail:save:v9';
@@ -71,6 +72,7 @@ const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, 
     rivalShips: (s.rivalShips as Record<string, unknown>[]).map((x, i) => ({ ...x, name: `Ship ${i + 1}`, homeward: false, cargo: null })),
     natives: Object.fromEntries(Object.entries(s.natives as Record<string, Record<string, unknown>>).map(([id, st]) => [id, { ...st, crowns: {}, feud: null }])),
   }),
+  20: (s) => ({ ...s, ledger: { mark: s.treasury as number, lines: {}, last: null } }),
   19: (s) => ({ ...s, rebels: [] }),
   18: (s) => ({
     ...s, victory: null, scenario: null,

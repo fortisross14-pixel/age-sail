@@ -112,7 +112,7 @@ export function SelectionCard() {
             <>
               {!st.post && <button title="Needs 20 timber and 10 tools in the hold, and a people who are not wary" onClick={() => void run({ kind: 'tradingPost', fleet: fleet.id })}>Trading post</button>}
               {!st.mission && hasMissionary && <button onClick={() => void run({ kind: 'mission', fleet: fleet.id })}>Found mission</button>}
-              <button onClick={() => set({ drawer: 'court', courtTab: 'peoples' })}>The {n.people}</button>
+              <button onClick={() => useStore.getState().goTo({ drawer: 'court', courtTab: 'peoples' })}>The {n.people}</button>
             </>
           );
         })()}
