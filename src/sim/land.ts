@@ -216,6 +216,7 @@ export function boardParty(s: GameState, p: Party, f: Fleet): Result {
   if (units.length + (leader ? 1 : 0) > room) return fail(`Not enough room aboard ${f.name}.`);
   for (const u of units) { u.party = null; u.fleet = f.id; }
   if (leader) { f.leader = leader.id; leader.fleet = f.id; }
+  if (p.captives) f.captives = (f.captives ?? 0) + p.captives;
   const food = Math.floor(p.food ?? 0);
   if (food > 0) f.cargo.food = (f.cargo.food ?? 0) + food;
   s.parties = s.parties.filter((x) => x !== p);

@@ -8,12 +8,23 @@ import { rivalsOf, rivalSpec } from '../data/rivals';
 import { fight, casualties, recordLosses, blood, partyForce, type Force } from './battle';
 import { isMilitary } from '../data/army';
 import { realmMods, judgeEra, eraCard } from './dynasty';
+import { BUILDING_FX } from '../data/city';
 import { yearOf, emptyAccount, type Stance, type Colony, type GameEvent, type GameState, type World, type Party } from './types';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
 type Log = (kind: 'discovery' | 'peril' | 'court' | 'trade', text: string) => void;
 type Ev = (e: GameEvent) => void;
+
+/** Colonies that have broken away. Provisional numbers. */
+export const FREE = {
+  /** how far their example carries, and how much it lowers a neighbour's loyalty (two count) */
+  reach: 10, example: 6,
+  /** recognising one costs prestige, and it then trades with you: ducats a season for each of its people */
+  recognisePrestige: 8, trade: 4,
+  /** seasons before a rival crown may recognise one you have neither retaken nor recognised, and the chance each season after */
+  foreignAfter: 24, foreignChance: 0.05,
+};
 
 export const TAX = { low: { per: 3, loyalty: 8 }, normal: { per: 5, loyalty: 0 }, high: { per: 8, loyalty: -12 } } as const;
 
@@ -36,6 +47,11 @@ export function loyaltyFactors(s: GameState, c: Colony): { label: string; value:
   if (garrison) f.push({ label: `Garrison (${garrison})`, value: Math.min(15, garrison * 4) });
   if (c.last.hungry || c.last.discontent) f.push({ label: 'Needs not met', value: -15 });
   if (c.last.luxuries) f.push({ label: 'Luxuries', value: 4 });
+  // a colony that has broken away, and that you have not come to terms with, is an example to its neighbours
+  const free = s.freeStates.filter((x) => !x.recognised && x.map === c.map && GRIDS[c.map].distance(x.hex, c.hex) <= FREE.reach).length;
+  if (free) f.push({ label: free > 1 ? 'Free states nearby' : 'A free state nearby', value: -FREE.example * Math.min(2, free) });
+  const cathedrals = Math.min(BUILDING_FX.cathedralsCount, Object.values(s.cities).filter((x) => x.buildings.cathedral).length);
+  if (cathedrals) f.push({ label: cathedrals > 1 ? 'The cathedrals at home' : 'The cathedral at home', value: cathedrals * BUILDING_FX.cathedralLoyalty });
   const realm = realmMods(s).loyalty;
   if (realm) f.push({ label: s.dynasty.regency ? 'A regency, and the path of the age' : 'Your rule, and the path of the age', value: realm });
   return f;
@@ -106,6 +122,14 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
       }
     }
   }
+  // free states: those you recognise trade with you; the others, in time, find a protector among your rivals
+  for (const f of s.freeStates) {
+    if (f.recognised) { s.treasury += f.pop * FREE.trade; continue; }
+    if (f.by || s.turn - f.since < FREE.foreignAfter || rng() >= FREE.foreignChance) continue;
+    const patron = [...rivalsOf(s.crown)].sort((a, b) => s.rivals[a.id].attitude - s.rivals[b.id].attitude)[0];
+    f.by = patron.id;
+    log('court', `${patron.name} recognises ${f.name} as a free state and promises to defend it. To retake it now would mean war.`);
+  }
   // free states grow slowly
   for (const f of s.freeStates) if ((s.turn - f.since) % 6 === 5 && f.pop < LEVELS[f.level].cap) f.pop++;
   // the end of the age
@@ -134,6 +158,17 @@ export function standings(w: World, s: GameState) {
   ].sort((a, b) => b.total - a.total);
 }
 
+/** Come to terms with a colony that broke away: it stops stirring up its neighbours, and trades with you. */
+export function recognise(s: GameState, freeId: string, log: Log): Result {
+  const f = s.freeStates.find((x) => x.id === freeId);
+  if (!f) return fail('No such place.');
+  if (f.recognised) return fail(`${f.name} is recognised already.`);
+  f.recognised = true;
+  s.prestige -= FREE.recognisePrestige;
+  log('court', `You recognise ${f.name} as a free state. Its merchants are welcome in your ports, and yours in theirs.`);
+  return { ok: true, message: `${f.name} is recognised. −${FREE.recognisePrestige} prestige; it will trade with you.` };
+}
+
 /** Retake a colony that broke away: its settlers fight for their freedom behind whatever walls they have. */
 export function retake(w: World, s: GameState, p: Party, freeId: string, log: Log, ev: (e: GameEvent) => void, stance: Stance = 'assault'): Result {
   const f = s.freeStates.find((x) => x.id === freeId);
@@ -142,6 +177,7 @@ export function retake(w: World, s: GameState, p: Party, freeId: string, log: Lo
   if (f.map !== p.map || (f.hex !== p.hex && !g.neighbors(p.hex).includes(f.hex))) return fail('The party must stand beside it.');
   const mine = partyForce(s, p);
   if (!mine.units.length) return fail('The party has no one who can fight.');
+  if (f.by && s.rivals[f.by].relation !== 'war') { s.rivals[f.by].relation = 'war'; s.rivals[f.by].warSince = s.turn; s.rivals[f.by].attitude = Math.min(s.rivals[f.by].attitude, -70); log('peril', `The attack on ${f.name} means war with ${rivalSpec(f.by).name}, its protector.`); }
   const rng = mulberry32(hashSeed(s.seed, s.turn, f.hex, 92));
   const theirs = freeForce(f);
   const out = fight(rng, mine, theirs, w[f.map].terrain[f.hex], stance);

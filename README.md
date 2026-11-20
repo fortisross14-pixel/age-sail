@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.17
+## Now playing: v0.18
 
-Phase 4, depth (first half): a research tree of 32 subjects in four branches that unlock ships, soldiers, the star fort, laws and alliances; nine laws, of which a realm keeps only a few; funded scientific expeditions; and Europe as a place to act in (Court, Europe): envoys, gifts, trade treaties, pacts and alliances with fourteen realms, their wars to join or stand aside from, letters of marque, corsairs and tribute, and a Levant spice trade that an Ottoman war can cut.
+Phase 4, depth (second half): slavery as the period had it, with its costs and a law that ends it; three races to win beside the score; three scenarios with a goal and a year; favours bought with prestige; fights at sea in three rounds with a report; five more buildings at home; and a late game in which colonies that break away must be recognised, retaken or lost to a rival's protection.
+
+From v0.17, depth (first half): a research tree of 32 subjects in four branches that unlock ships, soldiers, the star fort, laws and alliances; nine laws, of which a realm keeps only a few; funded scientific expeditions; and Europe as a place to act in (Court, Europe): envoys, gifts, trade treaties, pacts and alliances with fourteen realms, their wars to join or stand aside from, letters of marque, corsairs and tribute, and a Levant spice trade that an Ottoman war can cut.
 
 From v0.16, stories and dynasty: 114 stories written as data, with choices that come back years later and three historical set pieces for each crown; a ruling house with heirs, regencies, successions and royal marriages (Court, Dynasty); courtiers who remember what you did, want things, and can be tempted away by a rival; eras that open with a choice of path; a land you name; and the history of your reign told back in the Chronicle. Also the last of Phase 2: armies that march overland, rival ships you can attack, rivals who pay to learn the ocean crossing, and pacts between peoples.
 

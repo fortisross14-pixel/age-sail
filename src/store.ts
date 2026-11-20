@@ -7,6 +7,7 @@ import { SAVE_KEY, LEGACY_KEY, STALE_KEYS, wrap, fromLegacy, readSave, type Load
 import type { SimApi, Command } from './sim/worker';
 import type { CrownId } from './data/rivals';
 import type { Difficulty } from './data/difficulty';
+import type { ScenarioId } from './data/scenarios';
 import { objectiveById, type ObjectiveId } from './data/objectives';
 import { rewardOf, rewardText } from './sim/objectives';
 import { attention, type Target } from './ui/attention';
@@ -61,7 +62,7 @@ interface Store {
   busy: boolean;
 
   checkSave: () => Promise<void>;
-  newGame: (seed: number, until?: number, crown?: CrownId, difficulty?: Difficulty) => Promise<void>;
+  newGame: (seed: number, until?: number, crown?: CrownId, difficulty?: Difficulty, scenario?: ScenarioId | null) => Promise<void>;
   continueGame: () => Promise<void>;
   quitToMenu: () => void;
   run: (c: Command) => Promise<boolean>;
@@ -154,10 +155,10 @@ export const useStore = create<Store>((set, get) => {
       } catch { set({ hasSave: false, saveProblem: null }); }
     },
 
-    async newGame(seed, until = DEFAULT_UNTIL, crown = 'spain', difficulty = 'captain') {
+    async newGame(seed, until = DEFAULT_UNTIL, crown = 'spain', difficulty = 'captain', scenario = null) {
       set({ phase: 'loading', saveProblem: null });
       let r;
-      try { r = await sim.newGame(seed, until, crown, difficulty); } catch (e) { startFailed(e); return; }
+      try { r = await sim.newGame(seed, until, crown, difficulty, scenario); } catch (e) { startFailed(e); return; }
       const { world, state } = r;
       await save(state);
       set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: [], showHelp: false, showWelcome: true, showGuard: false, guardSeen: [] });

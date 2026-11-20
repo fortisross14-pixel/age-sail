@@ -1,5 +1,6 @@
 /** Colonies: founding them, working the land around them, feeding and clothing the settlers, growing. */
 import { GOODS, GOOD_INFO, NEEDS, LUXURIES, LUXURY_NEED, type GoodId } from '../data/goods';
+import { SLAVERY } from '../data/slavery';
 import { knowledgeMods } from './dynasty';
 import { cityById } from '../data/europe';
 import { RESOURCE_IDS } from '../data/city';
@@ -91,8 +92,10 @@ export function workPlan(world: World, s: GameState, c: Colony) {
   let food = 2; // the colony's own fields
   const used = new Set<number>();
   // feed everyone first: settlers, newcomers, and the soldiers and friars of the garrison
-  const mouths = (c.pop + c.newcomers) * NEEDS.food + s.units.filter((u) => u.colony === c.id).length * GARRISON_FOOD;
-  while (worked.length < c.pop && food < mouths) {
+  const held = c.enslaved ?? 0;
+  const hands = c.pop + held;
+  const mouths = (c.pop + c.newcomers) * NEEDS.food + held * NEEDS.food * SLAVERY.food + s.units.filter((u) => u.colony === c.id).length * GARRISON_FOOD;
+  while (worked.length < hands && food < mouths) {
     let best: { h: number; amount: number } | null = null;
     for (const t of tiles) {
       if (used.has(t.h)) continue;
@@ -106,7 +109,7 @@ export function workPlan(world: World, s: GameState, c: Colony) {
   }
   // then for the most valuable goods; building materials count double while the colony needs them
   const next = LEVELS[c.level].next ? LEVELS[c.level].needs : {};
-  while (worked.length < c.pop) {
+  while (worked.length < hands) {
     let best: { h: number; good: GoodId; amount: number; v: number } | null = null;
     for (const t of tiles) {
       if (used.has(t.h)) continue;
@@ -171,6 +174,12 @@ export function colonySeason(world: World, s: GameState, c: Colony, log: (text: 
     const gone = garrison[garrison.length - 1];
     s.units = s.units.filter((u) => u !== gone);
     log(`There is no bread for the garrison of ${c.name}. A ${gone.type === 'infantry' ? 'company of soldiers' : 'friar'} gives up and leaves.`, 'peril');
+  }
+  // the enslaved are fed after the garrison and before nobody: when there is no food, they die or run first
+  const held = c.enslaved ?? 0;
+  if (held && !take('food', held * NEEDS.food * SLAVERY.food)) {
+    c.enslaved = held - 1;
+    log(`There is no food for the enslaved of ${c.name}. One dies; the others will not last.`, 'peril');
   }
   const fed = take('food', c.pop * NEEDS.food);
   const clothed = take('cloth', c.pop * NEEDS.cloth);

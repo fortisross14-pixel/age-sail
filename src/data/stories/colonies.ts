@@ -162,6 +162,16 @@ export const COLONIES: StoryDef[] = [
     ],
   },
   {
+    id: 'sermon', family: 'colonies', about: { colony: 'any', courtier: 'pious' }, when: [['flag', 'slaving']],
+    title: 'A sermon',
+    text: 'On the fourth Sunday of Advent a friar climbed the pulpit in {colony} and asked the settlers by what right they hold people as beasts: “Are these not men? Have they not rational souls?” Half the congregation walked out. {courtier} brings you his words, written down.',
+    choices: [
+      { label: 'Let him preach', effects: [['loyalty', -5], ['opinion', 'courtier', 4, 'A preacher left free to speak']], text: 'He preaches it again the next Sunday, to a smaller and angrier church.' },
+      { label: 'Put the question to the doctors of {school}', effects: [['research', 8], ['flag', 'debate'], ['opinion', 'courtier', 6, 'A hard question put to the learned']], text: 'The doctors will argue it for years. That it is argued at all is noticed.' },
+      { label: 'Recall him', effects: [['prestige', -5], ['opinion', 'courtier', -8, 'A preacher silenced']], text: 'He is put on the next ship home. He writes the whole voyage.' },
+    ],
+  },
+  {
     id: 'tavern_riot', family: 'colonies', again: 30, about: { colony: 'garrison big' },
     title: 'A night of broken heads',
     text: 'A soldier and a settler quarrelled over dice in {colony}; by morning there was a dead man on each side and the garrison had shut itself in the fort.',

@@ -100,7 +100,7 @@ export function judgeEra(w: World, s: GameState, log: Log) {
   const pr = eraProgress(w, s);
   if (!pr) return;
   const era = ERAS.find((e) => e.id === s.eraPath!.era);
-  if (pr.have >= pr.need) { s.prestige += ERA_REWARD; log('court', `The ${era?.name ?? 'age'} closes with its promise kept: ${pr.path.name.toLowerCase()} brought ${pr.have.toLocaleString('en-US')} ${GOAL_WORD[pr.path.goal.kind]}. +${ERA_REWARD} prestige.`); }
+  if (pr.have >= pr.need) { s.flags.era_kept = s.turn; s.prestige += ERA_REWARD; log('court', `The ${era?.name ?? 'age'} closes with its promise kept: ${pr.path.name.toLowerCase()} brought ${pr.have.toLocaleString('en-US')} ${GOAL_WORD[pr.path.goal.kind]}. +${ERA_REWARD} prestige.`); }
   else log('court', `The ${era?.name ?? 'age'} closes with its promise unkept: ${pr.path.name.toLowerCase()} asked for ${pr.need.toLocaleString('en-US')} ${GOAL_WORD[pr.path.goal.kind]}, and brought ${pr.have.toLocaleString('en-US')}.`);
   s.eraPath = null;
 }

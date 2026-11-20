@@ -6,6 +6,7 @@ import type { CrownId } from '../data/rivals';
 import { DEFAULT_DIFFICULTY, type Difficulty } from '../data/difficulty';
 import type { ObjectiveId } from '../data/objectives';
 import type { LawId } from '../data/laws';
+import type { FavourId, ScenarioId } from '../data/scenarios';
 import { generateWorld } from './mapgen';
 import { previewParty } from './land';
 import * as G from './game';
@@ -61,6 +62,11 @@ export type Command =
   | { kind: 'retake'; party: number; free: string; stance?: Stance }
   | { kind: 'rivalPeace'; crown: CrownId }
   | { kind: 'storm'; party: number; colony: string; stance?: Stance }
+  | { kind: 'buyCaptives'; fleet: number; qty: number }
+  | { kind: 'sellCaptives'; fleet: number; qty: number }
+  | { kind: 'landCaptives'; fleet: number }
+  | { kind: 'favour'; favour: FavourId }
+  | { kind: 'recognise'; free: string }
   | { kind: 'envoy'; realm: string }
   | { kind: 'realmGift'; realm: string }
   | { kind: 'treaty'; realm: string; treaty: 'trade' | 'pact' | 'alliance' }
@@ -87,8 +93,8 @@ function need() {
 }
 
 const api = {
-  newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain', difficulty: Difficulty = DEFAULT_DIFFICULTY) {
-    const g = G.newGame(seed, until, crown, difficulty);
+  newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain', difficulty: Difficulty = DEFAULT_DIFFICULTY, scenario: ScenarioId | null = null) {
+    const g = G.newGame(seed, until, crown, difficulty, scenario);
     world = g.world;
     state = g.state;
     return g;
@@ -161,6 +167,11 @@ const api = {
       case 'retake': result = G.retakeFree(world, state, c.party, c.free, c.stance); break;
       case 'rivalPeace': result = G.rivalPeace(state, c.crown); break;
       case 'storm': result = G.stormColony(world, state, c.party, c.colony, c.stance); break;
+      case 'buyCaptives': result = G.buyCaptives(world, state, c.fleet, c.qty); break;
+      case 'sellCaptives': result = G.sellCaptives(world, state, c.fleet, c.qty); break;
+      case 'landCaptives': result = G.landCaptives(state, c.fleet); break;
+      case 'favour': result = G.favour(state, c.favour); break;
+      case 'recognise': result = G.recognise(state, c.free); break;
       case 'envoy': result = G.sendEnvoy(state, c.realm); break;
       case 'realmGift': result = G.sendGift(state, c.realm); break;
       case 'treaty': result = G.proposeTreaty(state, c.realm, c.treaty); break;

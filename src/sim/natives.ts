@@ -11,6 +11,7 @@ import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { personById, skill } from './court';
 import type { Colony, Fleet, GameEvent, GameState, NationDef, NativeState, Party, World, MapId, Person, Stance, Unit } from './types';
 import { NATIVE, NATIVE_FEUD } from '../data/colony';
+import { takeCaptives } from './slavery';
 import { seasonOf } from './types';
 import { COMBAT } from '../data/army';
 import { fight, battleOdds, casualties, recordLosses, blood, partyForce, colonyForce, assaultColony, type Force } from './battle';
@@ -297,6 +298,8 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
     blood(s.units.filter((u) => u.party === p.id));
     st.lost.push(hex);
     remember(s, st, 'You burned their villages', -40);
+    const taken = takeCaptives(s, n, rng);
+    if (taken) { p.captives = (p.captives ?? 0) + taken; log('peril', `${taken} of the villagers are taken as captives and marched with ${p.name}.`); }
     const all = [n.siteHex, ...n.villages].every((h) => st.lost.includes(h));
     if (hex === n.siteHex || all || st.warriors < 3) {
       st.relation = 'subject';

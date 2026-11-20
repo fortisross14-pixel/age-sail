@@ -5,7 +5,7 @@
  */
 import { TECHS, type Mods, type TechId } from './tech';
 
-export type LawId = 'free_ports' | 'land_grants' | 'monopoly' | 'navigation_acts' | 'census' | 'tolerance' | 'orthodoxy' | 'charters' | 'conscription';
+export type LawId = 'abolition' | 'free_ports' | 'land_grants' | 'monopoly' | 'navigation_acts' | 'census' | 'tolerance' | 'orthodoxy' | 'charters' | 'conscription';
 
 export interface Law {
   id: LawId;
@@ -35,6 +35,8 @@ export const LAWS: Law[] = [
     effect: 'Colonies more loyal; 2 fewer research points a season.', blurb: 'One faith in every city of the realm, and a tribunal to see to it.' },
   { id: 'charters', name: 'Municipal charters', cost: 700, mods: { loyalty: 6, taxes: 0.95 },
     effect: 'Colonies more loyal; a little less in taxes.', blurb: 'Towns overseas choose their own councils, under your governor.' },
+  { id: 'abolition', name: 'Abolition', cost: 800, mods: { loyalty: 3 },
+    effect: 'The trade in people is forbidden, and everyone held in your colonies and ships is freed.', blurb: 'No one shall be bought, sold or held as property in any land under your crown.' },
   { id: 'conscription', name: 'Conscription', cost: 700, mods: { upkeep: 0.8, loyalty: -3 },
     effect: 'Soldiers and ships cost much less to keep; colonies resent the levy.', blurb: 'Every parish owes you men, whether or not they wish to go.' },
 ];

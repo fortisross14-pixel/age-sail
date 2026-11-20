@@ -67,6 +67,8 @@ export function newPetitioners(s: GameState, rng: Rng, nextId: () => number) {
     const taken = [...s.people.map((p) => p.name), ...s.petitioners.map((x) => x.person.name)];
     const person = makePerson(rng, nextId(), yearOf(s.turn), taken, undefined, s.crown, crownSpec(s.crown).home);
     person.born = yearOf(s.turn) - int(rng, 19, 40);
+    // a court with a great name draws better people
+    if (rng() < Math.min(0.6, Math.max(0, s.prestige) / 200)) { const best = [...SKILLS].sort((a, b) => person.skills[b] - person.skills[a])[0]; person.skills[best] = Math.min(5, person.skills[best] + 1); }
     s.petitioners.push({ person, cost: Math.round(hireCost(person) * range(rng, 0.85, 1.15)) });
   }
 }

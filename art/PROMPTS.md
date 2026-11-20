@@ -238,3 +238,32 @@ below, and each name is added to `PAINTED`.
 
 File names, in the same order: `sea`, `court`, `colonies`, `peoples`, `crowns`, `europe`, `eras`,
 `dynasty`, `history`.
+
+---
+
+## Asked for: three more buildings (P4-11)
+
+The arsenal, the observatory and the cathedral have no painting yet and show an ink sprite. The
+warehouses and the fortress already use `warehouse-1` and `fortress-1` from the buildings sheet.
+Save the result as `art/source/ui/buildings-2.png`; the tiles are cut to
+`public/sprites/art/building/` as `arsenal-1`, `observatory-1` and `cathedral-1`, and each name is
+added to `PAINTED` in `src/ui/theme/Art.tsx`.
+
+> **Style:** full-colour, hand-painted illustrations for a premium
+> historical strategy game, like detailed painted miniatures. Warm natural colours (terracotta
+> roofs, pale stone, weathered timber, green grass, blue water, red pennants), soft daylight from
+> the top left, a fine dark outline, rich but readable detail. No text, letters, numbers or
+> labels anywhere.
+>
+> A sheet of **three buildings in one row (1 row × 3 columns)** on a flat navy background
+> (#0e1c28). Each building sits alone in its own identical square tile with a thin gold frame and
+> an equal navy gutter between tiles, seen from the same raised three-quarter view, on a small
+> patch of ground, filling most of its tile. Nothing crosses a frame. Southern Europe around the
+> year 1500. Left to right:
+>
+> (1) *An arsenal:* a long covered shipbuilding shed open at the water's edge with the hull of a
+> ship on the slip inside, a ropewalk beside it, bronze cannon lined up on the quay.
+> (2) *An observatory:* a round stone tower on a university roof, an open gallery at the top with
+> a large brass armillary sphere and a quadrant, a scholar looking up.
+> (3) *A cathedral:* a great Gothic cathedral with two towers, a rose window and flying
+> buttresses, scaffolding still on one tower, tiny figures on the steps.

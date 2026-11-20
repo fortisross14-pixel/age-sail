@@ -119,6 +119,7 @@ function FleetDetail({ fleet }: { fleet: Fleet }) {
 
       <div className="slots">
         <b>Aboard</b> <span className="muted small">{slotsUsed(game, fleet)} of {slotsMax(fleet)} places (caravel 1, carrack 2, galleon 4; the leader takes one)</span>
+        {(fleet.captives ?? 0) > 0 && <div className="small">{fleet.captives} captives in the hold. About one in ten dies each season at sea.</div>}
         <div className="row">
           {leader && <span className="chip">✦ {leader.name.split(' ')[0]}</span>}
           {unitsAboard(game, fleet).map((u) => (

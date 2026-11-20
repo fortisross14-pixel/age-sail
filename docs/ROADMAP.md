@@ -93,6 +93,11 @@ other. Later: wars with rival crowns for space, and independence wars against in
   were open from the start before: the opening is a little poorer in soldiers until the war branch is begun.
   Treaty thresholds (20, 40, 60) and the price of envoys and wars are first guesses.
 
+- Phase 4, second half: with no player, the Netherlands' trade passed 200,000 ducats by about 1575 in three
+  games, so the trade race is set at 520,000 for a standard game and the empire race at 260 colonists and 420
+  hexes (rivals reach about 0.4 to 0.7 of that by 1650). Whether a player's sales are on the same scale as a
+  rival's is not known: for P6-09. Slavery's prices and death rates are first numbers. A season costs about 6 ms.
+
 ## Milestones
 
 | # | Milestone | Status |
@@ -115,8 +120,8 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | Phase 1 | **The first hour** (v0.14): objectives (a first voyage of eight steps, then advisers' ambitions with rewards), an objectives panel with "Show me", a short welcome in place of the help wall, a tabbed guide, End Turn reminders with a count on the button, three difficulty levels, and small interface fixes. Items P1-01 to P1-23 below | 22 of 23 done; P1-20 (watching new players) needs people |
 | Phase 2 | **A world that pushes back** (v0.15): rivals with a treasury, ships that sail out and home, colonies that live on convoys, and plans chosen by what they want and can afford; crowns that fight each other; peoples who judge every crown and fight their own wars; soldiers that come by sea where you can see them. Items P2-01 to P2-15 below | done |
 | Phase 3 | **Stories and dynasty** (v0.16): 114 stories as data with chains, written for any crown; a ruling house with heirs, regencies, successions and royal marriages; courtiers who remember, want and can be lost to a rival; three historical set pieces per crown; eras that open with a choice of path; the land and colonies named by the player; the reign told back. Items P3-01 to P3-14 below | done |
-| Phase 4 | **Depth.** First half (v0.17): a research tree of 32 subjects in four branches, nine laws, funded scientific expeditions; European diplomacy with fourteen realms, treaties, wars to join, letters of marque, corsairs and the Levant trade. Still to come: slavery, victory paths, scenarios, a use for prestige, sea battles, more buildings, the late game. Items P4-01 to P4-17 below | 7 of 17 done |
-| Phase 5 | Interface depth: outliner, nested tooltips, ledger, turn summary, map modes, save slots | |
+| Phase 4 | **Depth** (v0.18): a research tree of 32 subjects, ten laws, scientific expeditions; European diplomacy, wars to join, corsairs and the Levant trade; slavery, with what it costs and a law that ends it; three races to win beside the score; three scenarios; uses for prestige; fights at sea in three rounds; five more buildings; free states to recognise or retake, and ambitions for the later ages. Items P4-01 to P4-20 below | 17 of 20 done |
+| Phase 5 | Interface depth: outliner, nested tooltips, ledger, turn summary, map modes, save slots | next |
 | Phase 6 | Balance (was Pass 3): numbers in one place, autoplay harness, retune the five crowns. Deliberately late | deferred |
 | Phase 7 | Technical and visual polish: music, portraits, event paintings, a living map, the open engineering items. Deliberately last | deferred |
 
@@ -199,7 +204,7 @@ phase; nothing is renumbered.
 | 1 | The first hour | 23 | 22 |
 | 2 | A world that pushes back | 15 | 15 |
 | 3 | Stories and dynasty | 14 | 14 |
-| 4 | Depth | 17 | 7 |
+| 4 | Depth | 20 | 17 |
 | 5 | Interface depth | 13 | 0 |
 | 6 | Balance (deferred) | 10 | 0 |
 | 7 | Technical and visual polish (deferred) | 14 | 0 |
@@ -293,17 +298,20 @@ Goal: enough to decide for a 200-turn game, and more than one way to win it.
 | P4-04 | European diplomacy (Court, Europe): every other realm has a regard for you, moved by envoys, gifts, marriages and what you do; regard wins a trade treaty (better prices in their ports), a pact (they will not attack you) and an alliance (a rival crown fights your enemies overseas, another realm pays toward your wars) | M2 | done |
 | P4-05 | The realms of Europe go to war over old quarrels and make peace; a war raises prices where it is fought, and you may take a side: the other side's ports close to you, it costs money each season, and the winner's friends share the indemnity. Letters of marque bring prize money while you have an enemy, and now and then a protest | M2 | done |
 | P4-06 | The Mediterranean: corsairs out of Ottoman and Moroccan ports take ships that pass near them, until you pay tribute, win a pact or win their regard; Venice and Genoa keep Italy's spice markets full, and an Ottoman war with either makes pepper scarce there | M2 | done |
-| P4-07 | Victory paths beside the score: trade hegemony, empire and prestige, each with a visible race in Court, Crowns | D7, G2 | open |
-| P4-08 | Scenarios with goals: three to start (the old Crown's charge of 20,000 ducats by 1502, a spice race, an independence crisis) | G2 | open |
-| P4-09 | Give prestige a use: it opens better petitioners, royal marriages and treaties, and is spent on favours | G6 | open |
-| P4-10 | Sea battles on the three-round model of land battles (gunnery, boarding, pursuit), with a report | M3 | open |
-| P4-11 | More to build at home: five more Old World buildings, and buildings that depend on each other | M4 | open |
+| P4-07 | Three races beside the score (`src/sim/victory.ts`): mastery of trade, an empire overseas, the first court of Europe. The first crown to finish one is remembered for it, you or a rival; the game goes on. Progress shows in Court, Crowns | D7, G2 | done |
+| P4-08 | Three scenarios chosen on the menu, each a goal and a year: the treasurer's charge (20,000 ducats by 1502), the spice race (30,000 ducats of sales by 1515), beyond the ocean (a colony across the Mar Océano by 1510). Won or lost, the voyage goes on as a free game. The independence crisis first planned as the third is P4-18 | G2 | done |
+| P4-09 | Prestige has uses: it raises dowries, draws better petitioners, makes treaties easier to win, and is spent on three favours (summon a renowned captain, a day of honours, a grand embassy) in Court, Dynasty | G6 | done |
+| P4-10 | Fights at sea in three rounds (gunnery, boarding, the chase) with a report on the card, for privateers that attack you and for ships you attack; the chase decides whether the beaten side is taken or gets away battered | M3 | done |
+| P4-11 | Five more buildings at home, each resting on an older one: warehouses (market), arsenal (docks II), fortress (barracks), observatory (university), cathedral (church) | M4 | done |
 | P4-12 | Decide how the game treats slavery and the plantation economy. **Decided: it is in**, as a hybrid of a good and a unit (see "Systems decisions") | M5 | done (decision) |
-| P4-13 | A late game worth reaching: independence wars as a campaign, and objectives for the last two eras | G2 | open |
-| P4-14 | Enslaved people in the game state: counted in a fleet's hold and in a colony (not a named unit, not a plain cargo), with a price in the markets that deal in them and food to be found for them aboard and ashore | M5 | open |
-| P4-15 | How they are acquired: bought at trading grounds on the African coast and from other crowns' ports, and taken as captives in battles and when a village or colony falls | M5 | open |
-| P4-16 | How they are used: put to work on a colony's hexes beside colonists (plantation goods first), without the settlers' needs for cloth, wine and luxuries, and sold on in colonial and European markets | M5 | open |
-| P4-17 | What it costs: deaths at sea and in the fields, flight and risings in colonies where they outnumber the settlers, what it does to the peoples they were taken from and to your standing with them, and, in the later eras, laws that restrict or end the trade (P4-03). No objective or ambition rewards it; the game states what happens and leaves the judgment to the player | M5 | open |
+| P4-13 | The late game: a colony that has broken away unsettles its neighbours until you recognise it (it then trades with you) or retake it; left alone, a rival crown takes it under protection, and retaking it means war. Six ambitions wait for the later ages (laws, treaties, a city overseas, twenty subjects, an age's promise kept, a hundred colonists). Free states that arm and band together are P4-19 | G2 | done |
+| P4-14 | Enslaved people in the game state: a count of captives in a fleet's hold (each takes the room of two units of cargo) and a count of enslaved people in a colony, up to twice the settlers its size allows; they are fed and given nothing else | M5 | done |
+| P4-15 | How they are acquired: bought at trading grounds on the African coast, which offer the prisoners of that people's own wars (more while it is at war), and taken when one of your parties storms a village | M5 | done |
+| P4-16 | How they are used: put ashore at a colony, where they work its land beside the colonists, or sold in the ports of Iberia, Italy and the Maghreb. The money goes to the treasury and is not counted as commerce | M5 | done |
+| P4-17 | What it costs: about one in ten dies each season at sea and one in fourteen each year in the fields; some flee; where they far outnumber the settlers they rise unless soldiers hold them down; the peoples they were taken from remember it. The law of abolition (natural philosophy) forbids the trade and frees everyone, half of whom stay as settlers. No objective, ambition or score counts any of it, and a test says so | M5 | done |
+| P4-18 | A fourth scenario that starts late: an empire in 1690 with restless colonies, to be held together (needs a way to start a game from a prepared state) | G2 | open |
+| P4-19 | Free states that raise armies, band together and carry a war of independence to your loyal colonies | G2 | open |
+| P4-20 | An ally's call to war that matters: answering it or refusing it changes the alliance | M2 | open |
 
 ### Phase 5: Interface depth
 

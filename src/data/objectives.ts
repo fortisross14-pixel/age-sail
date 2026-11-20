@@ -6,12 +6,13 @@
 export type ObjectiveId =
   | 'explorer' | 'cargo' | 'command' | 'south' | 'meet' | 'sale' | 'ashore' | 'colony'
   | 'route' | 'post' | 'volta' | 'crossing' | 'ally' | 'factory' | 'university' | 'town'
-  | 'colonies3' | 'treasury' | 'settlers25' | 'first';
+  | 'colonies3' | 'treasury' | 'settlers25' | 'first'
+  | 'laws3' | 'subjects20' | 'treaties3' | 'city' | 'promise' | 'settlers100';
 
 /** Where "Show me" takes the player. Plain strings so the data layer stays free of UI types. */
 export interface ObjectiveGoto {
   screen?: 'cities' | 'markets' | 'fleets' | 'court' | 'research' | 'chronicle';
-  courtTab?: 'people' | 'petitioners' | 'peoples' | 'crowns';
+  courtTab?: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'dynasty' | 'europe';
   /** select the first fleet (or the first with a leader) and look at it */
   fleet?: 'any' | 'led';
 }
@@ -33,6 +34,8 @@ export interface ObjectiveDef {
   reward: { ducats?: number; prestige?: number };
   /** ambitions wait until these are done */
   after?: ObjectiveId[];
+  /** ambitions of the later ages wait for this year */
+  fromYear?: number;
 }
 
 export const OBJECTIVES: ObjectiveDef[] = [
@@ -103,6 +106,26 @@ export const OBJECTIVES: ObjectiveDef[] = [
   { id: 'first', chain: 'ambition', from: 'Your chancellor', title: 'First among the crowns', after: ['colonies3'],
     how: 'Lead the standings in Court, Crowns: colonists, territory and commerce all count.',
     goto: { screen: 'court', courtTab: 'crowns' }, reward: { prestige: 20 } },
+
+  // ---- ambitions of the later ages ----
+  { id: 'laws3', chain: 'ambition', from: 'Your chancellor', title: 'Three laws in force', fromYear: 1520,
+    how: 'Research opens laws (Research, at the foot of the tree). A realm keeps two, and one more for every three subjects of state.',
+    goto: { screen: 'research' }, reward: { prestige: 10 } },
+  { id: 'treaties3', chain: 'ambition', from: 'Your chancellor', title: 'Three treaties in Europe', fromYear: 1520,
+    how: 'In Court, Europe: envoys and gifts win regard, and regard wins trade treaties, pacts and alliances.',
+    goto: { screen: 'court', courtTab: 'europe' }, reward: { ducats: 600, prestige: 10 } },
+  { id: 'city', chain: 'ambition', from: 'Your governor', title: 'A city overseas', after: ['town'], fromYear: 1550,
+    how: 'A full town with timber, tools and stone in its warehouse can become a city, the seat of a province.',
+    goto: { screen: 'cities' }, reward: { ducats: 1200, prestige: 15 } },
+  { id: 'subjects20', chain: 'ambition', from: 'Your pilot major', title: 'Twenty subjects mastered', fromYear: 1570,
+    how: 'Universities, observatories, learned courtiers and funded expeditions all bring research.',
+    goto: { screen: 'research' }, reward: { prestige: 15 } },
+  { id: 'promise', chain: 'ambition', from: 'Your chancellor', title: 'An age that kept its promise', fromYear: 1570,
+    how: 'Each age opens with a choice of path and a goal (Court, Dynasty). Meet the goal before the age ends.',
+    goto: { screen: 'court', courtTab: 'dynasty' }, reward: { ducats: 1000 } },
+  { id: 'settlers100', chain: 'ambition', from: 'Your governor', title: 'A hundred colonists overseas', after: ['settlers25'], fromYear: 1620,
+    how: 'Towns and cities hold more people. Keep them fed, clothed and loyal, and keep sending settlers.',
+    goto: { screen: 'cities' }, reward: { ducats: 2000, prestige: 20 } },
 ];
 
 /**

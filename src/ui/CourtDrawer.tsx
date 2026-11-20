@@ -18,6 +18,7 @@ import { rivalsOf, crownSpec } from '../data/rivals';
 import { rivalScore, rivalDoing, friendOf } from '../sim/rivals';
 import { Dynasty, CourtierStanding, ReignHistory } from './Dynasty';
 import { Europe, LawsAndExpedition } from './Europe';
+import { Races } from './Late';
 import { BRANCHES } from '../data/tech';
 import { RIVAL_ECON, rivalSpec } from '../data/rivals';
 import { score } from '../sim/colony';
@@ -396,6 +397,7 @@ function Crowns() {
           ))}
         </tbody>
       </table>
+      <Races />
       <ul className="realm-cards">
         {rivalsOf(game.crown).map((r) => {
           const st = game.rivals[r.id];

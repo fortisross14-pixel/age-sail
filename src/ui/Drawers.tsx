@@ -19,6 +19,7 @@ import { Fleets } from './FleetsDrawer';
 import { Cities } from './CityScreen';
 import { Court, Research, Chronicle } from './CourtDrawer';
 import { StepHint } from './Guidance';
+import { CaptivesRow } from './Late';
 
 const HEADS: Record<Exclude<DrawerId, 'cities'>, { title: string; icon: IconName; sub: (g: GameState) => string }> = {
   markets: { title: 'Markets', icon: 'markets', sub: () => 'Prices in every port you know' },
@@ -185,6 +186,7 @@ function PortMarket({ portId }: { portId: string }) {
           <span className="muted small">A factor and a warehouse here: they sell what you leave a little at a time, so the price holds, and buy what you need when it is cheap.</span>
         </div>
       ))}
+      <CaptivesRow port={port} fleet={fleet} free={free} />
       <div className="goods-list">
         {GOODS.filter((g) => book[g]).map((good) => {
           const m = book[good]!;

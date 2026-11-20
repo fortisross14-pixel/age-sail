@@ -27,9 +27,12 @@ const SIZE_NAME = { 3: 'Great city', 2: 'City', 1: 'Town' } as const;
 /** ink sprites that stand in for the painted building art */
 const BUILDING_SPRITE: Record<BuildingId, string> = {
   docks: 'colonies/port-town', barracks: 'colonies/fort-town', church: 'colonies/mission-town', university: 'colonies/mission-city', market: 'colonies/trading-post-town',
+  warehouse: 'colonies/trading-post-city', arsenal: 'colonies/port-city', fortress: 'colonies/fort-city', observatory: 'colonies/mission-city', cathedral: 'colonies/mission-city',
 };
-const ROLE: Record<BuildingId, string> = { docks: 'Shipyard', barracks: 'Military centre', church: 'Mission seat', university: 'Seat of learning', market: 'Trade centre' };
-const ROLE_LONG: Record<BuildingId, string> = { docks: 'a shipyard', barracks: 'a military centre', church: 'a mission seat', university: 'a seat of learning', market: 'a trade centre' };
+/** the line icon that stands for each building */
+const BUILDING_ICON: Record<BuildingId, IconName> = { docks: 'docks', barracks: 'barracks', church: 'church', university: 'university', market: 'market', warehouse: 'market', arsenal: 'docks', fortress: 'barracks', observatory: 'university', cathedral: 'church' };
+const ROLE: Record<BuildingId, string> = { docks: 'Shipyard', barracks: 'Military centre', church: 'Mission seat', university: 'Seat of learning', market: 'Trade centre', warehouse: 'Entrepôt', arsenal: 'Arsenal', fortress: 'Fortress', observatory: 'Observatory', cathedral: 'Cathedral city' };
+const ROLE_LONG: Record<BuildingId, string> = { docks: 'a shipyard', barracks: 'a military centre', church: 'a mission seat', university: 'a seat of learning', market: 'a trade centre', warehouse: 'an entrepôt', arsenal: 'an arsenal', fortress: 'a fortress', observatory: 'an observatory', cathedral: 'a cathedral city' };
 
 const buildingArt = (b: BuildingId, lv = 1) => {
   const slot = buildingSlot(b, lv);
@@ -112,7 +115,7 @@ function Overview({ city }: { city: City }) {
       <div className="sec">What {port.name} is</div>
       <div className="roles">
         {city.id === mainPort(game) && <span className="role-chip"><Medal name="court" size={26} fallback={<Icon name="court" size={18} tone="ink" />} />Capital and main port</span>}
-        {roles.map((b) => <span key={b} className="role-chip"><Medal name={b} size={26} fallback={<Icon name={b as IconName} size={18} tone="ink" />} />{ROLE[b]} {ROMAN[city.buildings[b]]}</span>)}
+        {roles.map((b) => <span key={b} className="role-chip"><Medal name={b} size={26} fallback={<Icon name={BUILDING_ICON[b]} size={18} tone="ink" />} />{ROLE[b]} {ROMAN[city.buildings[b]]}</span>)}
         {!roles.length && <span className="muted">Nothing built yet. What you build here decides what it becomes.</span>}
       </div>
       <div className="sec">At a glance</div>
@@ -190,7 +193,7 @@ function Buildings({ city }: { city: City }) {
           <h3>{BUILDINGS[sel].name} {lvSel ? ROMAN[lvSel] : ''}</h3>
           <div>{BUILDINGS[sel].blurb}</div>
           <div className="effects">
-            {lvSel > 0 && <div><Icon name={sel as IconName} size={20} tone="ink" />{BUILDINGS[sel].effect[lvSel]}</div>}
+            {lvSel > 0 && <div><Icon name={BUILDING_ICON[sel]} size={20} tone="ink" />{BUILDINGS[sel].effect[lvSel]}</div>}
             {BUILDINGS[sel].effect[lvSel + 1] && <div className="muted"><Icon name="nextArrow" size={20} tone="ink" />Level {ROMAN[lvSel + 1]}: {BUILDINGS[sel].effect[lvSel + 1]}</div>}
           </div>
           <div className="foot" style={{ gridColumn: '1 / -1' }}>

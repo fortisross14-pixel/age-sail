@@ -1,6 +1,8 @@
 import type { GoodId } from '../data/goods';
 import type { Difficulty } from '../data/difficulty';
 import type { LawId } from '../data/laws';
+import type { ScenarioId, VictoryKind } from '../data/scenarios';
+import type { SeaReport } from './seafight';
 import type { Treaty } from '../data/diplomacy';
 import type { Gift } from '../data/dynasty';
 import type { Family } from '../data/stories/types';
@@ -179,6 +181,8 @@ export interface Party {
   trail: number[];
   /** food carried, in rations (a company eats one a season, half of it foraged) */
   food: number;
+  /** captives taken when a village fell, marched with the party */
+  captives?: number;
 }
 
 export type ColonyLevel = 'outpost' | 'town' | 'city';
@@ -192,6 +196,8 @@ export interface Colony {
   founded: number;
   /** colonists living and working here */
   pop: number;
+  /** enslaved people held here, who work the land beside the colonists */
+  enslaved?: number;
   level: ColonyLevel;
   /** goods in the colony's warehouse */
   stock: Partial<Record<GoodId, number>>;
@@ -266,6 +272,8 @@ export interface NativeState {
   crowns: Partial<Record<CrownId, number>>;
   /** a war with another people, which keeps their warriors busy */
   feud: { with: string; since: number } | null;
+  /** captives of their own wars, offered for sale at their trading ground (African coast) */
+  captives?: number;
   /** a people they are allied with against a common enemy */
   pact: string | null;
 }
@@ -391,6 +399,8 @@ export interface Fleet {
   /** hexes moved through most recently, for animation */
   trail: number[];
   movedThisTurn: boolean;
+  /** captives carried in the hold: people, counted, not a named unit and not a good */
+  captives?: number;
   /** sailed through deep ocean this season */
   deepThisTurn: boolean;
 }
@@ -423,6 +433,8 @@ export interface GameEvent {
   kind: 'landfall' | 'people' | 'lost' | 'tech' | 'story' | 'era' | 'end' | 'battle';
   /** for battles: the report */
   battle?: BattleReport;
+  /** for fights at sea: the report */
+  sea?: SeaReport;
   /** for stories with choices: which story, and what it is about */
   story?: string;
   /** which kind of story, for its picture */
@@ -503,7 +515,7 @@ export interface GameState {
   rumoursDone: Record<MapId, number[]>;
   colonies: Colony[];
   /** colonies that broke away from the Crown */
-  freeStates: { id: string; name: string; map: MapId; hex: number; pop: number; level: ColonyLevel; since: number }[];
+  freeStates: { id: string; name: string; map: MapId; hex: number; pop: number; level: ColonyLevel; since: number; /** you have recognised it: it trades with you and stirs up nobody */ recognised?: boolean; /** a rival crown that has recognised it and will defend it */ by?: CrownId }[];
   natives: Record<string, NativeState>;
   /** the game ends (with a final reckoning) after this season; play may go on */
   endTurn: number;
@@ -525,6 +537,10 @@ export interface GameState {
   euroWars: EuroWar[];
   /** letters of marque are out */
   marque: boolean;
+  /** the first crown to win one of the races, and which */
+  victory: { kind: VictoryKind; crown: CrownId; turn: number } | null;
+  /** a scenario chosen on the menu, and how it ended */
+  scenario: { id: ScenarioId; done: 'won' | 'lost' | null } | null;
   /** laws in force */
   laws: LawId[];
   /** a scientific expedition you have funded: what its explorers have found of what it was sent for */

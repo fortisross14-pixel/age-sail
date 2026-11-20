@@ -10,7 +10,7 @@ import { rivalsOf } from '../data/rivals';
 import { GRIDS } from './hex';
 import { score } from './colony';
 import { rivalScore } from './rivals';
-import type { GameState, World } from './types';
+import { yearOf, type GameState, type World } from './types';
 
 type Log = (kind: 'discovery' | 'peril' | 'court' | 'trade', text: string) => void;
 
@@ -24,6 +24,10 @@ const COUNTS: Partial<Record<ObjectiveId, (w: World, s: GameState) => Progress>>
   colonies3: (_w, s) => ({ have: s.colonies.length, need: 3 }),
   treasury: (_w, s) => ({ have: Math.max(0, Math.floor(s.treasury)), need: 10000 }),
   settlers25: (_w, s) => ({ have: settlers(s), need: 25 }),
+  settlers100: (_w, s) => ({ have: settlers(s), need: 100 }),
+  laws3: (_w, s) => ({ have: s.laws.length, need: 3 }),
+  subjects20: (_w, s) => ({ have: s.research.known.length, need: 20 }),
+  treaties3: (_w, s) => ({ have: Object.values(s.europe).filter((r) => r.treaty !== 'none').length, need: 3 }),
 };
 
 const MET: Record<ObjectiveId, (w: World, s: GameState) => boolean> = {
@@ -46,6 +50,12 @@ const MET: Record<ObjectiveId, (w: World, s: GameState) => boolean> = {
   colonies3: (_w, s) => s.colonies.length >= 3,
   treasury: (_w, s) => s.treasury >= 10000,
   settlers25: (_w, s) => settlers(s) >= 25,
+  laws3: (_w, s) => s.laws.length >= 3,
+  subjects20: (_w, s) => s.research.known.length >= 20,
+  treaties3: (_w, s) => Object.values(s.europe).filter((r) => r.treaty !== 'none').length >= 3,
+  city: (_w, s) => s.colonies.some((c) => c.level === 'city'),
+  promise: (_w, s) => s.flags.era_kept != null,
+  settlers100: (_w, s) => settlers(s) >= 100,
   first: (w, s) => { const mine = score(s, w).total; return mine > 0 && rivalsOf(s.crown).every((r) => rivalScore(s, r.id).total < mine); },
 };
 
@@ -58,7 +68,7 @@ export const voyageDone = (s: GameState) => VOYAGE.every((o) => objectiveDone(s,
 
 /** The ambitions your advisers press now: the first few, in order, whose time has come. */
 export function activeAmbitions(s: GameState): ObjectiveDef[] {
-  return AMBITIONS.filter((o) => !objectiveDone(s, o.id) && (o.after ?? []).every((a) => objectiveDone(s, a))).slice(0, AMBITIONS_AT_ONCE);
+  return AMBITIONS.filter((o) => !objectiveDone(s, o.id) && (o.after ?? []).every((a) => objectiveDone(s, a)) && (o.fromYear == null || yearOf(s.turn) >= o.fromYear)).slice(0, AMBITIONS_AT_ONCE);
 }
 
 /** What is being watched: every step of the first voyage still open, and the active ambitions. */

@@ -9,6 +9,7 @@ import { rivalSpec } from '../data/rivals';
 import { yearOf, type Person, type Royal } from '../sim/types';
 import { Art } from './theme/Art';
 import { fmt } from './format';
+import { Favours } from './Late';
 
 /** A painted face for one of the royal house, by sex and age. */
 function RoyalFace({ r, turn }: { r: Royal; turn: number }) {
@@ -78,6 +79,8 @@ export function Dynasty() {
       {era && eraName
         ? <p><b>{era.path.name}</b> ({eraName}). {era.path.blurb} Goal: {fmt(Math.min(era.have, era.need))} of {fmt(era.need)} more {GOAL_WORD[era.path.goal.kind]} before the age ends.</p>
         : <p className="muted">No path has been chosen yet. Each new age offers three.</p>}
+
+      <Favours />
 
       <h4>Reigns</h4>
       <p className="muted small">{d.reigns.map((r) => `${r.name}, ${r.from}–${r.to ?? ''}`).join(' · ')}</p>

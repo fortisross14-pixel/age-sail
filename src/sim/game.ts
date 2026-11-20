@@ -1,7 +1,7 @@
 import { DEFAULT_UNTIL } from '../data/eras';
 import { GOODS, GOOD_INFO, type GoodId } from '../data/goods';
 import { SHIPS, SHIP_NAMES, type ShipType } from '../data/ships';
-import { BUILDINGS, BUILDING_ORDER, CITY_SIZE, REALM_TAX_TARGET, REALM_TAX_RANGE, UNIT_SPECS, type BuildingId } from '../data/city';
+import { BUILDINGS, BUILDING_ORDER, BUILDING_FX, CITY_SIZE, REALM_TAX_TARGET, REALM_TAX_RANGE, UNIT_SPECS, type BuildingId } from '../data/city';
 import * as Land from './land';
 import * as Col from './colony';
 import * as Nat from './natives';
@@ -12,6 +12,10 @@ import * as Trade from './trade';
 import * as Obj from './objectives';
 import * as Dyn from './dynasty';
 import * as Eur from './europe';
+import * as Slv from './slavery';
+import * as Vic from './victory';
+import type { FavourId, ScenarioId } from '../data/scenarios';
+import { SLAVERY } from '../data/slavery';
 import type { Treaty } from '../data/diplomacy';
 import { courtYear, onPromotion } from './court';
 import { DEFAULT_DIFFICULTY, difficultySpec, type Difficulty } from '../data/difficulty';
@@ -28,7 +32,7 @@ import { mulberry32, hashSeed, int, type Rng } from './rng';
 import { maxMoves as baseMoves, crewNeeded, windwardOf as baseWindward, planRoute, stepCost, stormRisk, type RoutePlan } from './sailing';
 import { initialCourt, newPetitioners, leaderOf, personById, skill, salary, deathChance, ageOf } from './court';
 import { RANK_INFO, UNIT_INFO } from '../data/court';
-import { WALLS } from '../data/army';
+import { WALLS, isMilitary } from '../data/army';
 import {
   Fog, dateLabel, seasonOf, yearOf, nextTurnStart,
   type Fleet, type GameState, type World, type PortDef, type ChronicleEntry, type MapData, type ProjectKind, type GameEvent,
@@ -105,6 +109,7 @@ export function enactLaw(s: GameState, id: LawId): CommandResult {
   const l = lawById(id);
   s.treasury -= l.cost;
   s.laws.push(id);
+  if (id === 'abolition') Slv.abolish(s, (k, t) => log(s, k, t));
   log(s, 'court', `A new law is proclaimed: ${l.name.toLowerCase()}. ${l.effect}`);
   return { ok: true, message: `${l.name} is the law of the realm.` };
 }
@@ -168,7 +173,7 @@ export function nearestHomePort(w: World, from: PortDef): PortDef {
 }
 
 export function cargoUsed(f: Fleet): number {
-  return GOODS.reduce((t, g) => t + (f.cargo[g] ?? 0), 0);
+  return GOODS.reduce((t, g) => t + (f.cargo[g] ?? 0), 0) + (f.captives ?? 0) * SLAVERY.hold;
 }
 export function cargoCapacity(f: Fleet): number {
   return f.ships.reduce((t, s) => t + SHIPS[s.type].cargo, 0);
@@ -288,7 +293,7 @@ function initialOldFog(world: World): number[] {
   return fog;
 }
 
-export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain', difficulty: Difficulty = DEFAULT_DIFFICULTY): { world: World; state: GameState } {
+export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain', difficulty: Difficulty = DEFAULT_DIFFICULTY, scenario: ScenarioId | null = null): { world: World; state: GameState } {
   const world = generateWorld(seed, crown);
   const rng = mulberry32(hashSeed(seed, 99));
   const spec = crownSpec(crown);
@@ -328,7 +333,7 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
     surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
     rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0, natives: Nat.initNatives(world), rivals: Riv.initRivals(crown), rivalColonies: [], rivalShips: [],
     freeStates: [], endTurn: (until - 1492) * 4, ended: false, taxRate: 'normal', loans: [], told: {},
-    europe: Eur.initEurope(crown), euroWars: [], marque: false, laws: [], expedition: null, flags: {}, pending: [], dynasty: Dyn.initialDynasty(crown, (() => { let k = 0; return () => -(++k); })()), eraPath: null, land: null,
+    victory: null, scenario: scenario ? { id: scenario, done: null } : null, europe: Eur.initEurope(crown), euroWars: [], marque: false, laws: [], expedition: null, flags: {}, pending: [], dynasty: Dyn.initialDynasty(crown, (() => { let k = 0; return () => -(++k); })()), eraPath: null, land: null,
     adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
     chronicle: [], events: [], factories: [], shocks: [], nextId: 1, newWorldFound: false,
     research: { known: [...(spec.edge.startTechs ?? [])], current: null, progress: 0, pending: 0 },
@@ -454,7 +459,7 @@ export function repair(world: World, s: GameState, fleetId: number): CommandResu
 /** Building places used in a city: one per level of every building. */
 export const slotsUsedIn = (c: City) => BUILDING_ORDER.reduce((t, b) => t + c.buildings[b], 0);
 export const citySlots = (c: City) => CITY_SIZE[c.size].slots;
-export const cityTaxes = (c: City) => c.taxes + c.buildings.market * 60;
+export const cityTaxes = (c: City) => c.taxes + c.buildings.market * 60 + (c.buildings.warehouse ?? 0) * BUILDING_FX.warehouseDues;
 
 /** What a project costs in a city; a governor's construction skill makes it faster and cheaper. */
 export function projectCost(p: ProjectKind, city: City, governor?: Person, edge?: CrownEdge, realm?: { known: readonly TechId[]; unitCost: number }): { cost: number; build: number; allowed: boolean; why?: string } {
@@ -464,7 +469,7 @@ export function projectCost(p: ProjectKind, city: City, governor?: Person, edge?
   if (p.kind === 'ship') {
     const spec = SHIPS[p.ship];
     const ok = city.buildings.docks >= spec.port;
-    const cost = Math.round(spec.cost * (edge?.ships ?? 1));
+    const cost = Math.round(spec.cost * (edge?.ships ?? 1) * (city.buildings.arsenal ? BUILDING_FX.arsenalShips : 1));
     const t = lacks('ships', p.ship);
     if (t) return { ...adj(cost, spec.build), allowed: false, why: `Your shipwrights must first study ${t.name.toLowerCase()} (Research).` };
     return { ...adj(cost, spec.build), allowed: ok, why: ok ? undefined : `Needs docks level ${spec.port}.` };
@@ -483,7 +488,8 @@ export function projectCost(p: ProjectKind, city: City, governor?: Person, edge?
   const b = BUILDINGS[p.building];
   const next = city.buildings[p.building] + 1;
   const lv = b.levels[next];
-  if (!lv) return { cost: 0, build: 0, allowed: false, why: `${b.name} are as large as they can be.` };
+  if (!lv) return { cost: 0, build: 0, allowed: false, why: `${b.name} can be no larger.` };
+  if (b.needs && city.buildings[b.needs.building] < b.needs.level) return { ...adj(lv.cost, lv.build), allowed: false, why: `Needs ${BUILDINGS[b.needs.building].name.toLowerCase()}${b.needs.level > 1 ? ` level ${b.needs.level}` : ''} in this city.` };
   if (slotsUsedIn(city) >= citySlots(city)) return { ...adj(lv.cost, lv.build), allowed: false, why: 'No room left in the city.' };
   return { ...adj(lv.cost, lv.build), allowed: true };
 }
@@ -718,6 +724,23 @@ export function stormColony(world: World, s: GameState, partyId: number, colonyI
 export function grantCharter(s: GameState, colonyId: string): CommandResult { return Emp.charter(s, colonyId); }
 export function holdFestival(s: GameState, colonyId: string): CommandResult { return Emp.festival(s, colonyId); }
 export function setTaxRate(s: GameState, rate: GameState['taxRate']): CommandResult { return Emp.setTaxRate(s, rate); }
+export function buyCaptives(world: World, s: GameState, fleetId: number, qty: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  if (!f?.at) return fail('The fleet must be in port.');
+  return Slv.buyCaptives(world, s, f, qty, cargoCapacity(f) - cargoUsed(f), portById(world, f.at, s));
+}
+export function sellCaptives(world: World, s: GameState, fleetId: number, qty: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  if (!f?.at) return fail('The fleet must be in port.');
+  return Slv.sellCaptives(s, f, qty, portById(world, f.at, s));
+}
+export function landCaptives(s: GameState, fleetId: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  if (!f) return fail('No such fleet.');
+  return Slv.landCaptives(s, f, f.at ? Col.colonyById(s, f.at) : undefined);
+}
+export function favour(s: GameState, id: FavourId): CommandResult { return Vic.favour(s, id, (k, t) => log(s, k, t)); }
+export function recognise(s: GameState, freeId: string): CommandResult { return Emp.recognise(s, freeId, (k, t) => log(s, k, t)); }
 export function sendEnvoy(s: GameState, realm: string): CommandResult { return Eur.sendEnvoy(s, realm); }
 export function sendGift(s: GameState, realm: string): CommandResult { return Eur.sendGift(s, realm); }
 export function proposeTreaty(s: GameState, realm: string, t: Exclude<Treaty, 'none'>): CommandResult { return Eur.proposeTreaty(s, realm, t, (k, x) => log(s, k, x)); }
@@ -752,7 +775,7 @@ export function nameLand(s: GameState, name: string, map: MapId, hex: number): C
 export function intercept(world: World, s: GameState, fleetId: number, shipId: number): CommandResult {
   const f = fleetById(s, fleetId);
   if (!f) return fail('No such fleet.');
-  return Riv.intercept(world, s, f, shipId, mulberry32(hashSeed(s.seed, s.turn, shipId, 79)), (k, t) => log(s, k, t), (x, why) => loseFleet(s, x, why));
+  return Riv.intercept(world, s, f, shipId, mulberry32(hashSeed(s.seed, s.turn, shipId, 79)), (k, t) => log(s, k, t), (e) => event(s, e), (x, why) => loseFleet(s, x, why));
 }
 /** Meet a rival army in the field with a party beside it. */
 export function engage(world: World, s: GameState, partyId: number, shipId: number, stance: Stance = 'assault'): CommandResult {
@@ -1241,7 +1264,7 @@ export function seasonTick(world: World, s: GameState): void {
       log(s, 'court', `The ${SHIPS[p.ship].name.toLowerCase()} ${ship.name} is launched in ${port.name}.`);
     } else if (p.kind === 'unit') {
       const quay = city.inland ? nearestHomePort(world, port) : port;
-      s.units.push({ id: s.nextId++, type: p.unit, fleet: null, city: quay.id, party: null });
+      s.units.push({ id: s.nextId++, type: p.unit, fleet: null, city: quay.id, party: null, ...(city.buildings.fortress && isMilitary(p.unit) ? { vet: 1 } : {}) });
       log(s, 'court', city.inland
         ? `A ${UNIT_INFO[p.unit].name.toLowerCase()} trained in ${port.name} marches to ${quay.name} to wait for a ship.`
         : `A ${UNIT_INFO[p.unit].name.toLowerCase()} is ready in ${port.name}, waiting for a ship.`);
@@ -1262,7 +1285,8 @@ export function seasonTick(world: World, s: GameState): void {
   let taxes = s.colonies.reduce((t, c) => t + Emp.colonyTaxes(s, c), 0);
   for (const c of Object.values(s.cities)) {
     taxes += cityTaxes(c);
-    addResearch(s, c.buildings.university * 2);
+    addResearch(s, c.buildings.university * 2 + (c.buildings.observatory ?? 0) * BUILDING_FX.observatory);
+    if (c.buildings.cathedral) s.prestige += BUILDING_FX.cathedralPrestige;
   }
   const mods = Dyn.realmMods(s);
   s.treasury += Math.round(taxes * mods.taxes);
@@ -1338,6 +1362,7 @@ export function seasonTick(world: World, s: GameState): void {
 
   // the long game: eras, loyalty and independence, loans, the end of the age; and perhaps a story
   Emp.empireSeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e));
+  Slv.slaverySeason(world, s, (k, t) => log(s, k, t));
   // Europe: regard, treaties, the wars of others, corsairs and the Levant trade
   Eur.europeSeason(world, s, (k, t) => log(s, k, t), (f, why) => loseFleet(s, f, why));
   // the ruling house: births, deaths, successions; and each spring the court takes stock of you
@@ -1351,6 +1376,8 @@ export function seasonTick(world: World, s: GameState): void {
       if (to) s.pending.push({ story: 'defect', at: s.turn, ctx: { courtier: p.id, crown: to } });
     }
   }
+  Vic.checkScenario(s, (k, t) => log(s, k, t), (e) => event(s, e), portById(world, mainPort(s), s)!.hex);
+  Vic.checkVictory(world, s, (k, t) => log(s, k, t), (e) => event(s, e), portById(world, mainPort(s), s)!.hex);
   Story.maybeStory(world, s, (e) => event(s, e));
 
   // each spring the court grows a year older, and new faces ask to join it

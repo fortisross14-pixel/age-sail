@@ -18,6 +18,7 @@ import { GRIDS, type Grid } from './hex';
 import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { planRoute, stepCost } from './sailing';
 import { planLand } from './land';
+import { seaFight, type SeaSide } from './seafight';
 import { realmMods, tiedTo } from './dynasty';
 import { LEVELS } from './colony';
 import { personById, skill } from './court';
@@ -361,7 +362,7 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
       }
       // ships in your own home ports are safe under the harbour guns
       const safe = prey.at != null && !!s.cities[prey.at];
-      if (g.distance(prey.hex, ship.hex) <= 1 && !safe) seaBattle(s, prey, ship, rng, log, onFleetLost);
+      if (g.distance(prey.hex, ship.hex) <= 1 && !safe) seaBattle(s, prey, ship, rng, log, ev, onFleetLost);
       continue;
     }
     if (ship.kind === 'army') {
@@ -464,7 +465,7 @@ export function suitor(s: GameState, rng: Rng): CrownId | undefined {
 export const shipStrength = (x: RivalShip) => (x.kind === 'privateer' ? x.strength : x.kind === 'raid' ? x.strength + 3 : 2);
 
 /** One of your fleets falls on a rival ship beside it. Attacking a crown you are at peace with is war. */
-export function intercept(w: World, s: GameState, f: Fleet, shipId: number, rng: Rng, log: Log, onFleetLost: (f: Fleet, why: string) => void): Result {
+export function intercept(w: World, s: GameState, f: Fleet, shipId: number, rng: Rng, log: Log, ev: Ev, onFleetLost: (f: Fleet, why: string) => void): Result {
   const ship = s.rivalShips.find((x) => x.id === shipId);
   if (!ship || ship.kind === 'army') return fail('No such ship.');
   if (ship.map !== f.map || GRIDS[f.map].distance(f.hex, ship.hex) > 1) return fail('The fleet must be beside her.');
@@ -472,23 +473,29 @@ export function intercept(w: World, s: GameState, f: Fleet, shipId: number, rng:
   if (ship.map === 'old' && home && ship.hex === home.hex) return fail('She lies under the guns of her home port.');
   const r = s.rivals[ship.crown], spec = rivalSpec(ship.crown);
   if (r.relation !== 'war') { r.relation = 'war'; r.warSince = s.turn; r.attitude = Math.min(r.attitude, -70); log('peril', `The attack on the ${ship.name} means war with ${spec.name}.`); }
-  const a = fleetGuns(s, f), d = shipStrength(ship);
-  if (rng() < a / (a + d)) {
+  const report = seaFight(rng, fleetSide(s, f), shipSide(ship, shipStrength(ship)));
+  let text: string, message: string;
+  if (report.attackerWon && !report.escaped) {
     const prize = int(rng, 150, 500) + (ship.cargo ? ship.cargo.qty * 15 : 0) + (ship.kind === 'settlers' || ship.kind === 'supply' ? 200 : 0);
     loseShip(s, ship);
     s.treasury += prize;
     s.prestige += ship.kind === 'raid' ? 8 : 4;
-    for (const x of f.ships) x.hull = Math.max(10, x.hull - int(rng, 3, 18));
     const what = ship.kind === 'raid' ? ', with the soldiers she carried' : ship.kind === 'settlers' ? ', with her settlers' : ship.kind === 'supply' ? ', with the stores for their colony' : '';
-    log('peril', `${f.name} takes the ${ship.name} of ${spec.name}${what}. Prize money: ${prize} ducats.`);
-    return { ok: true, message: `The ${ship.name} strikes her colours. +${prize} ducats.` };
+    text = `${f.name} takes the ${ship.name} of ${spec.name}${what}. Prize money: ${prize} ducats.`;
+    message = `The ${ship.name} strikes her colours. +${prize} ducats.`;
+  } else if (report.attackerWon) {
+    // beaten, but she outsails you: her errand is over and she runs for home
+    turnHome(w, s, ship);
+    text = `${f.name} beats the ${ship.name} of ${spec.name}, but she outsails her pursuers and runs for home.`;
+    message = 'She is beaten, and gets away.';
+  } else {
+    text = fleetBeaten(f, report.escaped, rng, onFleetLost, `the ${ship.name} of ${spec.name}`);
+    message = report.escaped ? 'Beaten off: the fleet gets away, battered.' : 'The fight goes against you.';
   }
-  const lost = f.ships[int(rng, 0, f.ships.length - 1)];
-  f.ships = f.ships.filter((x) => x !== lost);
-  if (!f.ships.length) { onFleetLost(f, `${f.name} attacks the ${ship.name} of ${spec.name} and is lost.`); return { ok: true, message: 'The fight goes against you. The fleet is lost.' }; }
-  f.crew = Math.max(1, f.crew - SHIPS[lost.type].crew);
-  log('peril', `${f.name} attacks the ${ship.name} of ${spec.name} and is beaten off, losing the ${lost.name}.`);
-  return { ok: true, message: `Beaten off: the ${lost.name} is lost.` };
+  if (report.attackerWon) for (const x of f.ships) x.hull = Math.max(10, x.hull - int(rng, 3, 18));
+  log('peril', text);
+  ev({ kind: 'battle', title: report.attackerWon ? 'Victory at sea' : 'Beaten at sea', map: ship.map, hex: ship.hex, text, sea: report });
+  return { ok: true, message };
 }
 
 /** One of your parties meets a rival army in the field, before it reaches a colony. */
@@ -646,24 +653,45 @@ export function fleetGuns(s: GameState, f: Fleet) {
   return guns + 1 + skill(personById(s, f.leader), 'military');
 }
 
-function seaBattle(s: GameState, f: Fleet, ship: RivalShip, rng: Rng, log: Log, onFleetLost: (f: Fleet, why: string) => void) {
-  const spec = rivalSpec(ship.crown);
-  const a = fleetGuns(s, f), d = ship.strength;
-  if (rng() < a / (a + d)) {
-    loseShip(s, ship);
-    const prize = int(rng, 200, 700);
-    s.treasury += prize;
-    s.prestige += 5;
-    for (const x of f.ships) x.hull = Math.max(10, x.hull - int(rng, 5, 25));
-    log('peril', `A ${spec.name} privateer attacks ${f.name} and is taken. Prize money: ${prize} ducats.`);
-    return;
+/** A fleet of yours as it fights: its guns (and its leader), its crew, and its slowest ship. */
+function fleetSide(s: GameState, f: Fleet): SeaSide {
+  return { name: f.name, guns: fleetGuns(s, f), crew: f.crew, speed: Math.min(...f.ships.map((x) => SHIPS[x.type].moves)), crown: s.crown, yours: true };
+}
+function shipSide(ship: RivalShip, strength = ship.strength): SeaSide {
+  return { name: `the ${ship.name}`, guns: strength * 1.3, crew: strength * 12, speed: ship.kind === 'privateer' ? 17 : 14, crown: ship.crown };
+}
+
+/** What a lost fight costs your fleet: caught, a ship is taken; escaped, only hulls and some cargo. */
+function fleetBeaten(f: Fleet, escaped: boolean, rng: Rng, onFleetLost: (f: Fleet, why: string) => void, by: string): string {
+  if (escaped) {
+    for (const x of f.ships) x.hull = Math.max(10, x.hull - int(rng, 10, 30));
+    for (const k of Object.keys(f.cargo) as (keyof Fleet['cargo'])[]) f.cargo[k] = Math.floor((f.cargo[k] ?? 0) * 0.75);
+    return `${f.name} is beaten by ${by} but gets away, battered, with some cargo thrown overboard to lighten her.`;
   }
   const lost = f.ships[int(rng, 0, f.ships.length - 1)];
   f.ships = f.ships.filter((x) => x !== lost);
   for (const k of Object.keys(f.cargo) as (keyof Fleet['cargo'])[]) f.cargo[k] = Math.floor((f.cargo[k] ?? 0) / 2);
-  if (!f.ships.length) { onFleetLost(f, `A ${spec.name} privateer takes the ${lost.name}, the last ship of ${f.name}.`); return; }
+  if (!f.ships.length) { onFleetLost(f, `${Cap(by)} takes the ${lost.name}, the last ship of ${f.name}.`); return `${Cap(by)} takes the ${lost.name}, the last ship of ${f.name}.`; }
   f.crew = Math.max(1, f.crew - SHIPS[lost.type].crew);
-  log('peril', `A ${spec.name} privateer falls on ${f.name}, takes the ${lost.name} and half the cargo.`);
+  return `${Cap(by)} takes the ${lost.name} from ${f.name}, with half the cargo.`;
+}
+
+function seaBattle(s: GameState, f: Fleet, ship: RivalShip, rng: Rng, log: Log, ev: Ev, onFleetLost: (f: Fleet, why: string) => void) {
+  const spec = rivalSpec(ship.crown);
+  const report = seaFight(rng, shipSide(ship), fleetSide(s, f));
+  let text: string;
+  if (!report.attackerWon) {
+    if (report.escaped) { ship.strength = Math.max(1, ship.strength - 2); text = `A ${spec.name} privateer attacks ${f.name}, is beaten off and escapes.`; }
+    else {
+      loseShip(s, ship);
+      const prize = int(rng, 200, 700);
+      s.treasury += prize; s.prestige += 5;
+      text = `A ${spec.name} privateer attacks ${f.name} and is taken. Prize money: ${prize} ducats.`;
+    }
+    for (const x of f.ships) x.hull = Math.max(10, x.hull - int(rng, 5, 25));
+  } else text = fleetBeaten(f, report.escaped, rng, onFleetLost, `a ${spec.name} privateer`);
+  log('peril', text);
+  ev({ kind: 'battle', title: report.attackerWon ? 'Beaten at sea' : 'A privateer beaten', map: ship.map, hex: ship.hex, text, sea: report });
 }
 
 // ---------- commands ----------

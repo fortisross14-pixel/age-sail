@@ -7,6 +7,7 @@ import { attention, type Target } from './attention';
 import { VOYAGE, type ObjectiveDef } from '../data/objectives';
 import { activeAmbitions, objectiveDone, objectiveProgress, rewardOf, rewardText, voyageDone } from '../sim/objectives';
 import { portById } from '../sim/game';
+import { scenarioProgress } from '../sim/victory';
 import { crownSpec } from '../data/rivals';
 import { difficultySpec } from '../data/difficulty';
 import { fmt } from './format';
@@ -39,7 +40,8 @@ export function ObjectivesPanel() {
   const [picked, setPicked] = useState<string | null>(null);
   const voyage = !voyageDone(game);
   const ambitions = activeAmbitions(game);
-  if (!voyage && !ambitions.length) return null;
+  const sc = scenarioProgress(game);
+  if (!voyage && !ambitions.length && !(sc && !sc.done)) return null;
   const next = VOYAGE.find((o) => !objectiveDone(game, o.id));
   const open = picked && (VOYAGE.some((o) => o.id === picked && !objectiveDone(game, o.id)) || ambitions.some((o) => o.id === picked)) ? picked : next?.id ?? ambitions[0]?.id;
   const done = VOYAGE.filter((o) => objectiveDone(game, o.id)).length;
@@ -80,6 +82,13 @@ export function ObjectivesPanel() {
       </button>
       {!folded && (
         <div className="obj-scroll">
+          {sc && (
+            <div className={`obj scenario ${sc.done ?? ''}`}>
+              <div className="obj-from">{sc.scenario.name}</div>
+              <div className="obj-title">{sc.scenario.ask}</div>
+              <div className="obj-count">{sc.done === 'won' ? 'Achieved' : sc.done === 'lost' ? 'Not achieved' : `${fmt(Math.min(sc.have, sc.need))} / ${fmt(sc.need)} · by ${sc.scenario.by}`}</div>
+            </div>
+          )}
           {voyage && <ol className="obj-list">{VOYAGE.map((o, i) => row(o, i + 1))}</ol>}
           {ambitions.length > 0 && (
             <>

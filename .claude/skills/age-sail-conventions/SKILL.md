@@ -61,6 +61,12 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   one line in `add()` and one read at the rule it affects. `knowledgeMods(s)` is the same without
   ruler and age. A subject that makes something possible lists it in `unlocks`, and the rule that
   allows it asks `techFor` or `wallsTech`.
+- **Slavery** (`src/sim/slavery.ts`, numbers in `src/data/slavery.ts`) is in the game by the owner's
+  decision, as a count of captives in a hold and of enslaved people in a colony. Keep the rule the
+  file's header states: nothing in it feeds the score, `s.revenue`, an objective or an ambition, and
+  text states what happens without praise or lecture. `late.test.ts` checks the objectives.
+- **Fights at sea** go through `seaFight()` (`src/sim/seafight.ts`) and put a `sea` report on a
+  battle card, as land battles put a `battle` report.
 - **Europe** (`src/sim/europe.ts`, numbers in `src/data/diplomacy.ts`): a realm's regard for you is
   read with `regardOf` (a rival crown's lives in `s.rivals`, the rest in `s.europe`); treaties with
   `treatyWith`, `pacted`, `enemyOf`. A new quarrel is a line in `QUARRELS`.

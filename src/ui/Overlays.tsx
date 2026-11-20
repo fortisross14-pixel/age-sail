@@ -10,6 +10,7 @@ import { GuardSwitch } from './Guidance';
 import { BattleReportView } from './Battle';
 import { Art } from './theme/Art';
 import { ReignHistory } from './Dynasty';
+import { SeaReportView } from './Late';
 import { FAMILY_NAME } from '../data/stories/types';
 
 function FinalStandings() {
@@ -43,12 +44,13 @@ export function EventCard() {
   return (
     <div className="modal-back">
       <div className={`modal event ${ev.kind}`} role="dialog" aria-label={ev.title}>
-        {!ev.battle && (ev.family
+        {!ev.battle && !ev.sea && (ev.family
           ? <span className={`event-art family family-${ev.family}`} title={FAMILY_NAME[ev.family]}><Art slot={`story/${ev.family}`} fallback={<img src={spriteUrl(art)} alt="" />} /></span>
           : <img className="event-art" src={spriteUrl(art)} alt="" />)}
         {ev.family && <div className="event-family">{FAMILY_NAME[ev.family]}</div>}
         <h2>{ev.title}</h2>
         {ev.battle && <BattleReportView r={ev.battle} />}
+        {ev.sea && <SeaReportView r={ev.sea} />}
         <p className="event-text">{ev.text}</p>
         {ev.kind === 'end' && <FinalStandings />}
         {ev.kind === 'end' && <ReignHistory open />}

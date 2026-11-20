@@ -131,8 +131,8 @@ export const TECHS: Tech[] = [
     effect: 'Every crown thinks better of you. Alliances can be made in Europe.', blurb: 'An honest man sent to lie abroad for the good of his country.',
   },
   {
-    id: 'philosophy', name: 'Natural philosophy', branch: 'state', cost: 150, requires: ['humanism'], mods: { research: 3 },
-    effect: '3 more research points a season.', blurb: 'Measure it, weigh it, try it again, and write down what happened.',
+    id: 'philosophy', name: 'Natural philosophy', branch: 'state', cost: 150, requires: ['humanism'], mods: { research: 3 }, unlocks: { laws: ['abolition'] },
+    effect: '3 more research points a season. Opens the law of abolition.', blurb: 'Measure it, weigh it, try it again, and write down what happened.',
   },
   {
     id: 'arquebus', name: 'The arquebus', branch: 'war', cost: 25, requires: [], unlocks: { units: ['musketeer'] },

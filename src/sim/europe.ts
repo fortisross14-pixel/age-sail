@@ -100,7 +100,7 @@ export function proposeTreaty(s: GameState, realm: string, t: Exclude<Treaty, 'n
   const st = s.europe[realm];
   const rng = mulberry32(hashSeed(s.seed, s.turn, st.envoy, 401));
   st.envoy = s.turn;
-  const chance = 0.5 + (regardOf(s, realm) - TREATY_INFO[t].need) / 60 + 0.06 * skill(envoy(s), 'diplomacy');
+  const chance = 0.5 + (regardOf(s, realm) - TREATY_INFO[t].need) / 60 + 0.06 * skill(envoy(s), 'diplomacy') + Math.max(0, s.prestige) / 500;
   if (rng() >= chance) { adjust(s, realm, D.refused); return fail(`${Cap(name(realm))} declines, for now. Regard for you cools a little.`); }
   st.treaty = t;
   s.prestige += t === 'alliance' ? 6 : 2;
