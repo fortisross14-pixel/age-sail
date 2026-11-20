@@ -1,18 +1,21 @@
 # Art requests: the Admiralty interface
 
 **How to use these.** One prompt makes one image: paste one at a time, each in a new message.
-Attach the Admiralty concept image and `icons.png` (the medallion sheet) as style references
-every time. Save each result in `art/source/ui/` under its file name and I'll cut it in.
+Attach the Admiralty concept image (the Sevilla city screen) as the style reference every time,
+and only that. Save each result in `art/source/ui/` under its file name and I'll cut it in.
 
 **Why they look like this.** The icon sheet came out best when every item sat in its own framed
 cell on a plain background. So every prompt asks for a strict grid of framed tiles on flat navy:
 easy for ChatGPT to draw, easy for me to cut, no transparency needed.
 
-Every prompt starts with the same style paragraph, so the sheets match:
+Every prompt starts with the same style paragraph, describing the concept art's painted look
+(not the gold medallion look of the icons), so the sheets match each other and the concept:
 
-> **Style:** painted game-interface art for a historical strategy game, matching the attached
-> references: deep navy enamel, polished gold leaf with a soft top-left light, warm parchment,
-> rich but clean detail, crisp edges. No text, letters, numbers or labels anywhere.
+> **Style:** match the attached concept art: full-colour, hand-painted illustrations for a premium
+> historical strategy game, like detailed painted miniatures. Warm natural colours (terracotta
+> roofs, pale stone, weathered timber, green grass, blue water, red pennants), soft daylight from
+> the top left, a fine dark outline, rich but readable detail. No text, letters, numbers or
+> labels anywhere.
 
 ---
 
@@ -23,9 +26,11 @@ Every prompt starts with the same style paragraph, so the sheets match:
 
 ## 2. `buildings.png`
 
-> Style: painted game-interface art for a historical strategy game, matching the attached
-> references: deep navy enamel, polished gold leaf with a soft top-left light, warm parchment,
-> rich but clean detail, crisp edges. No text, letters, numbers or labels anywhere.
+> Style: match the attached concept art: full-colour, hand-painted illustrations for a premium
+> historical strategy game, like detailed painted miniatures. Warm natural colours (terracotta
+> roofs, pale stone, weathered timber, green grass, blue water, red pennants), soft daylight from
+> the top left, a fine dark outline, rich but readable detail. No text, letters, numbers or
+> labels anywhere.
 >
 > A landscape image with a strict grid of 4 columns and 3 rows of square tiles, all the same
 > size, separated by even gaps of flat plain navy. Each tile has a light parchment background and
@@ -43,8 +48,9 @@ Every prompt starts with the same style paragraph, so the sheets match:
 > Style: (the same paragraph)
 >
 > A landscape image with a strict grid of 5 columns and 3 rows on flat plain navy, evenly
-> spaced. Each cell holds one heraldic shield, all the same shape and size (a rounded heater
-> shield with a thin gold rim), simple and bold so each reads when small:
+> spaced. Each cell holds one painted heraldic shield like the red-and-gold crest in the
+> concept, all the same shape and size (a rounded heater shield with a thin gold rim), simple and
+> bold so each reads when small:
 > Castile (red and gold, a castle) · Portugal (white with small blue shields, red border) ·
 > England (red, gold lions) · France (blue, gold fleurs-de-lis) · the Netherlands (orange, a
 > lion) ·
@@ -59,7 +65,7 @@ Every prompt starts with the same style paragraph, so the sheets match:
 >
 > A landscape image with a strict grid of 4 columns and 3 rows on flat plain navy. Each cell
 > holds one oval portrait in a thin gold frame, all the same size: head and shoulders,
-> three-quarter view, a painted miniature with warm light. Men of a European royal court around
+> three-quarter view, painted in full colour like a small oil portrait. Men of a European royal court around
 > 1500–1600, ages rising from about 20 (top left) to about 70 (bottom right): a young courtier ·
 > a navigator in a cap · an explorer in a morion helmet · a soldier in a breastplate ·
 > a merchant in a fur-trimmed coat · a Dominican friar · a scholar with spectacles · a nobleman
@@ -72,7 +78,7 @@ Every prompt starts with the same style paragraph, so the sheets match:
 >
 > A landscape image with a strict grid of 4 columns and 3 rows on flat plain navy. Each cell
 > holds one oval portrait in a thin gold frame, all the same size: head and shoulders,
-> three-quarter view, a painted miniature with warm light. Women of a European royal court
+> three-quarter view, painted in full colour like a small oil portrait. Women of a European royal court
 > around 1500–1600, ages rising from about 20 (top left) to about 70 (bottom right): a young
 > heiress · a lady-in-waiting · a cartographer · a Dutch burgher's wife in a white cap ·
 > a noblewoman in a French hood · a woman scholar · a merchant's widow · an English lady with a
@@ -97,7 +103,8 @@ Every prompt starts with the same style paragraph, so the sheets match:
 >
 > A landscape image with a strict grid of 2 columns and 4 rows of wide panels, each panel three
 > times as wide as it is tall, all the same size, separated by even gaps of flat plain navy, no
-> frames. Each panel is a painted city skyline across water under a pale sky with soft clouds:
+> frames. Each panel is a sunny painted city skyline across water under a pale blue sky
+> with soft clouds, like the Sevilla view in the concept's header:
 > Sevilla with its cathedral tower and ships at the quay · Lisboa on the river with a fortified
 > tower · London with a long bridge and a white castle · La Rochelle with two harbour towers ·
 > Antwerpen with a tall cathedral spire · a sunny southern port · a walled inland city on a hill ·
@@ -109,7 +116,7 @@ Every prompt starts with the same style paragraph, so the sheets match:
 >
 > A wide 16:9 painting for a game's title screen: caravels and a galleon leaving a sunlit
 > Iberian harbour at dawn for the open ocean; in the foreground, the edge of a navy-lacquered desk
-> with gold inlay, an old sea chart, a brass astrolabe and a compass. Keep the middle third calm
+> with gold inlay like the concept's frames, an old sea chart, a brass astrolabe and a compass. Keep the middle third calm
 > and empty for the title and buttons.
 
 ---
