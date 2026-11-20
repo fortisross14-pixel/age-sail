@@ -1,5 +1,6 @@
 /** Colonies: founding them, working the land around them, feeding and clothing the settlers, growing. */
 import { GOODS, GOOD_INFO, NEEDS, LUXURIES, LUXURY_NEED, type GoodId } from '../data/goods';
+import { knowledgeMods } from './dynasty';
 import { cityById } from '../data/europe';
 import { RESOURCE_IDS } from '../data/city';
 import { T, isWater } from '../data/terrain';
@@ -193,7 +194,7 @@ export function colonySeason(world: World, s: GameState, c: Colony, log: (text: 
     else log(`${c.name} is starving. Send food, or the outpost will not last.`, 'peril');
     c.growth = Math.min(0, c.growth);
   }
-  c.growth += c.pop * (births - deaths) / 4;
+  c.growth += c.pop * (births * knowledgeMods(s).growth - deaths) / 4;
   const cap = LEVELS[c.level].cap;
   if (c.growth >= 1) {
     if (c.pop < cap) {

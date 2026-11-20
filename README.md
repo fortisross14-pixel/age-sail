@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.16
+## Now playing: v0.17
 
-Phase 3, stories and dynasty: 114 stories written as data, with choices that come back years later and three historical set pieces for each crown; a ruling house with heirs, regencies, successions and royal marriages (Court, Dynasty); courtiers who remember what you did, want things, and can be tempted away by a rival; eras that open with a choice of path; a land you name; and the history of your reign told back in the Chronicle. Also the last of Phase 2: armies that march overland, rival ships you can attack, rivals who pay to learn the ocean crossing, and pacts between peoples.
+Phase 4, depth (first half): a research tree of 32 subjects in four branches that unlock ships, soldiers, the star fort, laws and alliances; nine laws, of which a realm keeps only a few; funded scientific expeditions; and Europe as a place to act in (Court, Europe): envoys, gifts, trade treaties, pacts and alliances with fourteen realms, their wars to join or stand aside from, letters of marque, corsairs and tribute, and a Levant spice trade that an Ottoman war can cut.
+
+From v0.16, stories and dynasty: 114 stories written as data, with choices that come back years later and three historical set pieces for each crown; a ruling house with heirs, regencies, successions and royal marriages (Court, Dynasty); courtiers who remember what you did, want things, and can be tempted away by a rival; eras that open with a choice of path; a land you name; and the history of your reign told back in the Chronicle. Also the last of Phase 2: armies that march overland, rival ships you can attack, rivals who pay to learn the ocean crossing, and pacts between peoples.
 
 From v0.15, a world that pushes back: rival crowns have a treasury, ships that sail out and come home, colonies that live on convoys, and plans they choose and save for; they go to war with each other; native peoples judge every crown and fight wars of their own; at war, enemy soldiers come by sea where you can see them. Court shows what each crown is doing.
 

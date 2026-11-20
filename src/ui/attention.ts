@@ -10,7 +10,7 @@ import type { GameState, World } from '../sim/types';
 /** Where an item (or an objective's "Show me") takes the player. */
 export interface Target {
   drawer?: 'cities' | 'markets' | 'fleets' | 'court' | 'research' | 'chronicle';
-  courtTab?: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'dynasty';
+  courtTab?: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'dynasty' | 'europe';
   fleet?: number;
   party?: number;
   colony?: string;

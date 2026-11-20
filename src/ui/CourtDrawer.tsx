@@ -17,6 +17,8 @@ import { allNations, moodOf, envoy } from '../sim/natives';
 import { rivalsOf, crownSpec } from '../data/rivals';
 import { rivalScore, rivalDoing, friendOf } from '../sim/rivals';
 import { Dynasty, CourtierStanding, ReignHistory } from './Dynasty';
+import { Europe, LawsAndExpedition } from './Europe';
+import { BRANCHES } from '../data/tech';
 import { RIVAL_ECON, rivalSpec } from '../data/rivals';
 import { score } from '../sim/colony';
 import { CROWN } from '../render/palette';
@@ -33,6 +35,7 @@ export function Court() {
         ['petitioners', `Petitioners${game.petitioners.length ? ` (${game.petitioners.length})` : ''}`],
         ['peoples', `Peoples${Object.values(game.natives).filter((n) => n.met).length ? ` (${Object.values(game.natives).filter((n) => n.met).length})` : ''}`],
         ['crowns', 'Crowns'],
+        ['europe', `Europe${game.euroWars.length ? ` (${game.euroWars.length})` : ''}`],
         ['dynasty', `Dynasty${game.dynasty.offers.length ? ` (${game.dynasty.offers.length})` : ''}`],
       ]} />
       {tab === 'people' && <People />}
@@ -40,6 +43,7 @@ export function Court() {
       {tab === 'peoples' && <Peoples />}
       {tab === 'crowns' && <Crowns />}
       {tab === 'dynasty' && <Dynasty />}
+      {tab === 'europe' && <Europe />}
     </>
   );
 }
@@ -248,9 +252,9 @@ export function Research() {
         </div>
       </div>
       <div className="tech-columns">
-      {(['navigation', 'commerce', 'state'] as Branch[]).map((b) => (
+      {BRANCHES.map((b: Branch) => (
         <section key={b}>
-          <h3><Icon name={b === 'navigation' ? 'navigation' : b === 'commerce' ? 'commerce' : 'court'} size={22} tone="ink" />{BRANCH_NAMES[b]}</h3>
+          <h3><Icon name={b === 'navigation' ? 'navigation' : b === 'commerce' ? 'commerce' : b === 'war' ? 'military' : 'court'} size={22} tone="ink" />{BRANCH_NAMES[b]}</h3>
           <div className="techs">
             {TECHS.filter((t) => t.branch === b).map((t) => {
               const known = has(game, t.id);
@@ -271,6 +275,7 @@ export function Research() {
         </section>
       ))}
       </div>
+      <LawsAndExpedition />
     </div>
   );
 }

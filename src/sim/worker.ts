@@ -5,6 +5,7 @@ import type { TechId } from '../data/tech';
 import type { CrownId } from '../data/rivals';
 import { DEFAULT_DIFFICULTY, type Difficulty } from '../data/difficulty';
 import type { ObjectiveId } from '../data/objectives';
+import type { LawId } from '../data/laws';
 import { generateWorld } from './mapgen';
 import { previewParty } from './land';
 import * as G from './game';
@@ -60,6 +61,16 @@ export type Command =
   | { kind: 'retake'; party: number; free: string; stance?: Stance }
   | { kind: 'rivalPeace'; crown: CrownId }
   | { kind: 'storm'; party: number; colony: string; stance?: Stance }
+  | { kind: 'envoy'; realm: string }
+  | { kind: 'realmGift'; realm: string }
+  | { kind: 'treaty'; realm: string; treaty: 'trade' | 'pact' | 'alliance' }
+  | { kind: 'breakTreaty'; realm: string }
+  | { kind: 'joinWar'; war: number; side: string }
+  | { kind: 'marque'; on: boolean }
+  | { kind: 'tribute'; realm: string; on: boolean }
+  | { kind: 'fundExpedition' }
+  | { kind: 'enactLaw'; law: LawId }
+  | { kind: 'repealLaw'; law: LawId }
   | { kind: 'marry'; offer: number }
   | { kind: 'renameColony'; colony: string; name: string }
   | { kind: 'nameLand'; name: string; map: 'old' | 'new'; hex: number }
@@ -150,6 +161,16 @@ const api = {
       case 'retake': result = G.retakeFree(world, state, c.party, c.free, c.stance); break;
       case 'rivalPeace': result = G.rivalPeace(state, c.crown); break;
       case 'storm': result = G.stormColony(world, state, c.party, c.colony, c.stance); break;
+      case 'envoy': result = G.sendEnvoy(state, c.realm); break;
+      case 'realmGift': result = G.sendGift(state, c.realm); break;
+      case 'treaty': result = G.proposeTreaty(state, c.realm, c.treaty); break;
+      case 'breakTreaty': result = G.breakTreaty(state, c.realm); break;
+      case 'joinWar': result = G.joinWar(state, c.war, c.side); break;
+      case 'marque': result = G.setMarque(state, c.on); break;
+      case 'tribute': result = G.setTribute(state, c.realm, c.on); break;
+      case 'fundExpedition': result = G.fundExpedition(state); break;
+      case 'enactLaw': result = G.enactLaw(state, c.law); break;
+      case 'repealLaw': result = G.repealLaw(state, c.law); break;
       case 'marry': result = G.marry(state, c.offer); break;
       case 'renameColony': result = G.renameColony(state, c.colony, c.name); break;
       case 'nameLand': result = G.nameLand(state, c.name, c.map, c.hex); break;

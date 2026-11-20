@@ -334,7 +334,7 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
     // the enemy of their enemy
     for (const foe of r.wars) if (s.rivals[foe].relation === 'war') r.attitude += 0.5;
     r.attitude = Math.max(-100, Math.min(100, r.attitude));
-    if (r.relation === 'peace' && r.attitude < -50 && !tiedTo(s, spec.id) && rng() < 0.15 * spec.war * aggression(s)) {
+    if (r.relation === 'peace' && r.attitude < -50 && !tiedTo(s, spec.id) && !['pact', 'alliance'].includes(s.europe[spec.id]?.treaty) && rng() < 0.15 * spec.war * aggression(s)) {
       r.relation = 'war';
       r.warSince = s.turn;
       log('peril', `${spec.name} declares war on ${me(s)}.`);
@@ -641,8 +641,8 @@ export function rivalDoing(s: GameState, crown: CrownId): string {
   return out.length ? Cap(out.join('; ')) : 'Ships in port';
 }
 
-function fleetGuns(s: GameState, f: Fleet) {
-  const guns = f.ships.reduce((t, x) => t + SHIPS[x.type].guns * (x.hull / 100), 0) * (rivalSpec(s.crown).edge.guns ?? 1);
+export function fleetGuns(s: GameState, f: Fleet) {
+  const guns = f.ships.reduce((t, x) => t + SHIPS[x.type].guns * (x.hull / 100), 0) * (rivalSpec(s.crown).edge.guns ?? 1) * realmMods(s).guns;
   return guns + 1 + skill(personById(s, f.leader), 'military');
 }
 

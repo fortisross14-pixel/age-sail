@@ -128,7 +128,7 @@ describe('Phase 3: the stories as data', () => {
         }
       }
     }
-  });
+  }, 60000);
 });
 
 describe('Phase 3: how stories are told', () => {

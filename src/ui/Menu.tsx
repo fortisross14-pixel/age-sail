@@ -58,7 +58,7 @@ export function Menu() {
           <p className="muted small menu-note">{DIFFICULTIES.find((d) => d.id === difficulty)!.blurb}</p>
           <label className="seed">World seed <input value={seed} onChange={(e) => setSeed(e.target.value.replace(/\D/g, ''))} inputMode="numeric" /></label>
         </div>
-        <p className="muted small">Version 0.16 · lead one of the five Atlantic crowns through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
+        <p className="muted small">Version 0.17 · lead one of the five Atlantic crowns through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
       </div>
     </div>
   );

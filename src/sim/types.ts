@@ -1,5 +1,7 @@
 import type { GoodId } from '../data/goods';
 import type { Difficulty } from '../data/difficulty';
+import type { LawId } from '../data/laws';
+import type { Treaty } from '../data/diplomacy';
 import type { Gift } from '../data/dynasty';
 import type { Family } from '../data/stories/types';
 import type { ObjectiveId } from '../data/objectives';
@@ -131,6 +133,9 @@ export interface Person {
   /** something they are waiting for, and since when */
   want: { kind: 'rank' | 'command'; since: number } | null;
 }
+
+export interface RealmState { attitude: number; treaty: Treaty; /** the season your last envoy or proposal was heard */ envoy: number; /** you pay their corsairs to leave you alone */ tribute: boolean }
+export interface EuroWar { id: number; a: string; b: string; cause: string; since: number; until: number; side: string | null }
 
 /** One of the ruling house. */
 export interface Royal { id: number; name: string; numeral?: number; sex: 'm' | 'f'; born: number; gift: Gift; from?: string; frail?: number }
@@ -514,6 +519,16 @@ export interface GameState {
   dynasty: Dynasty;
   /** the path chosen for the present era, and where its goal stood when it was chosen */
   eraPath: { era: string; path: string; base: number } | null;
+  /** how the other realms of Europe stand with you (a rival crown's regard is in `rivals`) */
+  europe: Record<string, RealmState>;
+  /** wars between realms of Europe; `side` is the realm you have joined, if any */
+  euroWars: EuroWar[];
+  /** letters of marque are out */
+  marque: boolean;
+  /** laws in force */
+  laws: LawId[];
+  /** a scientific expedition you have funded: what its explorers have found of what it was sent for */
+  expedition: { since: number; done: number; need: number } | null;
   /** the name you gave the land across the ocean */
   land: { name: string; map: MapId; hex: number } | null;
   rivals: Record<CrownId, RivalState>;

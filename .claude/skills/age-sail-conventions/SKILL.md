@@ -55,8 +55,15 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   `history` family may. A follow-up is `chained: true` and reached with `['later', id, seasons]`.
   A new effect or condition is a case in `carry` or `holds` in `src/sim/stories.ts` plus its type.
   `stories.test.ts` tells every story with every choice for every crown: keep it passing.
-- **The dynasty** (`src/sim/dynasty.ts`): what the ruler's gift and the era's path do for the realm
-  goes through `realmMods(s)`; read that rather than the ruler or the path directly.
+- **What helps the realm goes through `realmMods(s)`** (`src/sim/dynasty.ts`): the ruler's gift, the
+  era's path, every subject known and every law in force, added up. A subject or a law that
+  changes a number carries `mods` (the keys are in `Mods`, `src/data/tech.ts`); a new key needs
+  one line in `add()` and one read at the rule it affects. `knowledgeMods(s)` is the same without
+  ruler and age. A subject that makes something possible lists it in `unlocks`, and the rule that
+  allows it asks `techFor` or `wallsTech`.
+- **Europe** (`src/sim/europe.ts`, numbers in `src/data/diplomacy.ts`): a realm's regard for you is
+  read with `regardOf` (a rival crown's lives in `s.rivals`, the rest in `s.europe`); treaties with
+  `treatyWith`, `pacted`, `enemyOf`. A new quarrel is a line in `QUARRELS`.
 - **Courtiers** remember through `recallDeed(s, p, amount, why)` (in `court.ts`), which moves their
   loyalty and shows the reason; never write `loyalty` directly.
 - **Rival crowns** (`src/sim/rivals.ts`, numbers in `RIVAL_ECON`): each has a treasury, hulls and a

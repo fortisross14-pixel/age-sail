@@ -816,3 +816,21 @@ b.bad { color: var(--oxblood-hi); }
 .modal.event.end { width: min(680px, calc(100vw - 32px)); max-height: 92vh; overflow-y: auto; }
 .heir-card { background: rgba(255, 250, 235, .55); border: 1px solid rgba(169, 129, 73, .55); border-radius: 10px; }
 .heir-card .portrait.card { overflow: hidden; border-radius: 50%; }
+
+/* ---------- research in four branches, laws, Europe ---------- */
+.tech-columns { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.drawer.adm-frame.drawer-research { width: min(1320px, calc(100vw - 48px)); }
+.laws { display: grid; gap: 16px; margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(169, 129, 73, .55); }
+.laws h3 { margin: 0 0 6px; }
+.laws p { margin: 0 0 8px; }
+.law-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.europe { display: grid; gap: 8px; margin-top: 10px; }
+.europe h4 { margin: 10px 0 0; font: 600 15px var(--caps); letter-spacing: .05em; color: var(--ink-3); }
+.wars, .realms { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.wars li, .realms li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; }
+.wars li > div, .realms li > div:not(.realm-acts) { flex: 1; min-width: 0; }
+.realms .attitude { max-width: 320px; }
+.realm-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.realm-acts button, .wars button { font-size: 14px; padding: 4px 10px; min-height: 30px; }
+.marque { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-top: 6px; }
+@media (max-width: 1100px) { .tech-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

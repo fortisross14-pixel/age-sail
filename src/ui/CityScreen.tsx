@@ -8,7 +8,7 @@ import { BUILDINGS, BUILDING_ORDER, UNIT_SPECS, type BuildingId } from '../data/
 import { crownSpec } from '../data/rivals';
 import { GOOD_INFO, GOODS } from '../data/goods';
 import { realmSpec } from '../data/realms';
-import { portById, projectCost, citySlots, slotsUsedIn, cityTaxes, mainPort, spreadFor } from '../sim/game';
+import { portById, projectCost, realmGate, citySlots, slotsUsedIn, cityTaxes, mainPort, spreadFor } from '../sim/game';
 import { personById } from '../sim/court';
 import { unitPrice } from '../sim/market';
 import type { City, ProjectKind, UnitType } from '../sim/types';
@@ -147,7 +147,7 @@ function Buildings({ city }: { city: City }) {
     const ok = await run({ kind: 'project', city: city.id, project: k });
     if (ok && k.kind === 'building') { setPicking(false); setSel(k.building); setFresh(k.building); }
   };
-  const selCost = sel ? projectCost({ kind: 'building', building: sel }, city, governor, edge) : null;
+  const selCost = sel ? projectCost({ kind: 'building', building: sel }, city, governor, edge, realmGate(game)) : null;
   const lvSel = sel ? city.buildings[sel] : 0;
   return (
     <>
@@ -235,7 +235,7 @@ function BuildPicker({ city, onClose, onBuild }: { city: City; onClose: () => vo
         <div className="list">
           {BUILDING_ORDER.map((b) => {
             const lv = city.buildings[b] + 1;
-            const c = projectCost({ kind: 'building', building: b }, city, governor, edge);
+            const c = projectCost({ kind: 'building', building: b }, city, governor, edge, realmGate(game));
             const top = !BUILDINGS[b].levels[lv];
             return (
               <div key={b} className={`choice ${top ? 'done' : ''}`}>
@@ -301,7 +301,7 @@ function Recruitment({ city }: { city: City }) {
   const governor = personById(game, city.governor);
   const edge = crownSpec(game.crown).edge;
   const p = city.project;
-  const offer = (k: ProjectKind) => projectCost(k, city, governor, edge);
+  const offer = (k: ProjectKind) => projectCost(k, city, governor, edge, realmGate(game));
   return (
     <>
       {p && <div className="detail-card" style={{ gridTemplateColumns: '1fr' }}><b>Under way: {projectLabel(p)}</b><span className="muted">{p.turnsLeft} season{p.turnsLeft === 1 ? '' : 's'} to go. One project at a time.</span></div>}

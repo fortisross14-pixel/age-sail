@@ -88,6 +88,11 @@ other. Later: wars with rival crowns for space, and independence wars against in
   a playing game binds far more. Castile had ten reigns in that time and England six. With nobody hired, the
   court dies out. A season costs about 5 ms. Story frequency against story count is P6-07.
 
+- Phase 4: the whole tree costs about 2,700 research points; the court alone, choosing subjects in order, knew 14
+  of 32 by 1522. Subjects already gate arquebusiers, lancers, field guns, galleons and the star fort, which
+  were open from the start before: the opening is a little poorer in soldiers until the war branch is begun.
+  Treaty thresholds (20, 40, 60) and the price of envoys and wars are first guesses.
+
 ## Milestones
 
 | # | Milestone | Status |
@@ -110,7 +115,7 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | Phase 1 | **The first hour** (v0.14): objectives (a first voyage of eight steps, then advisers' ambitions with rewards), an objectives panel with "Show me", a short welcome in place of the help wall, a tabbed guide, End Turn reminders with a count on the button, three difficulty levels, and small interface fixes. Items P1-01 to P1-23 below | 22 of 23 done; P1-20 (watching new players) needs people |
 | Phase 2 | **A world that pushes back** (v0.15): rivals with a treasury, ships that sail out and home, colonies that live on convoys, and plans chosen by what they want and can afford; crowns that fight each other; peoples who judge every crown and fight their own wars; soldiers that come by sea where you can see them. Items P2-01 to P2-15 below | done |
 | Phase 3 | **Stories and dynasty** (v0.16): 114 stories as data with chains, written for any crown; a ruling house with heirs, regencies, successions and royal marriages; courtiers who remember, want and can be lost to a rival; three historical set pieces per crown; eras that open with a choice of path; the land and colonies named by the player; the reign told back. Items P3-01 to P3-14 below | done |
-| Phase 4 | Depth: the research tree (was M15), European diplomacy and the Mediterranean (was M14), victory paths, scenarios, slavery | next |
+| Phase 4 | **Depth.** First half (v0.17): a research tree of 32 subjects in four branches, nine laws, funded scientific expeditions; European diplomacy with fourteen realms, treaties, wars to join, letters of marque, corsairs and the Levant trade. Still to come: slavery, victory paths, scenarios, a use for prestige, sea battles, more buildings, the late game. Items P4-01 to P4-17 below | 7 of 17 done |
 | Phase 5 | Interface depth: outliner, nested tooltips, ledger, turn summary, map modes, save slots | |
 | Phase 6 | Balance (was Pass 3): numbers in one place, autoplay harness, retune the five crowns. Deliberately late | deferred |
 | Phase 7 | Technical and visual polish: music, portraits, event paintings, a living map, the open engineering items. Deliberately last | deferred |
@@ -194,7 +199,7 @@ phase; nothing is renumbered.
 | 1 | The first hour | 23 | 22 |
 | 2 | A world that pushes back | 15 | 15 |
 | 3 | Stories and dynasty | 14 | 14 |
-| 4 | Depth | 17 | 1 |
+| 4 | Depth | 17 | 7 |
 | 5 | Interface depth | 13 | 0 |
 | 6 | Balance (deferred) | 10 | 0 |
 | 7 | Technical and visual polish (deferred) | 14 | 0 |
@@ -282,12 +287,12 @@ Goal: enough to decide for a 200-turn game, and more than one way to win it.
 
 | Id | Action item | Answers | Status |
 |---|---|---|---|
-| P4-01 | Research tree of about 30 subjects in four branches (navigation, commerce, state, war) unlocking ships, units, buildings and laws (was M15) | D5 | open |
-| P4-02 | Research from buildings and from funded scientific expeditions that a scientific explorer completes overseas (was M15) | D5 | open |
-| P4-03 | Laws: lasting policies unlocked by the state branch (charters, monopolies, tolerance, conscription), each with a cost and a consequence | D5, M2 | open |
-| P4-04 | European diplomacy: an attitude for each of the fifteen realms, envoys, and treaties (trade, non-aggression, alliance) (was M14) | M2 | open |
-| P4-05 | European wars: wars between realms that close ports, move markets and can be joined; letters of marque for privateers | M2 | open |
-| P4-06 | The Mediterranean front: corsairs, the Ottomans, and Venice and Genoa as trading rivals (was M14) | M2 | open |
+| P4-01 | A research tree of 32 subjects in four branches (navigation 10, commerce 8, state 7, war 7), in `src/data/tech.ts`: each gives the realm something (`mods`) or unlocks something (galleons, arquebusiers, lancers, field guns, the star fort, laws, alliances) | D5 | done |
+| P4-02 | Research comes from the court, universities, learned courtiers, the ruler and the age, and from the field; a funded scientific expedition makes everything your explorers chart, meet and survey count three times until it has found enough, then pays a reward | D5 | done |
+| P4-03 | Nine laws (`src/data/laws.ts`), each opened by a subject: a realm keeps two, and one more for every three subjects of state; some cannot stand together; enacting costs ducats, repealing costs prestige | D5, M2 | done |
+| P4-04 | European diplomacy (Court, Europe): every other realm has a regard for you, moved by envoys, gifts, marriages and what you do; regard wins a trade treaty (better prices in their ports), a pact (they will not attack you) and an alliance (a rival crown fights your enemies overseas, another realm pays toward your wars) | M2 | done |
+| P4-05 | The realms of Europe go to war over old quarrels and make peace; a war raises prices where it is fought, and you may take a side: the other side's ports close to you, it costs money each season, and the winner's friends share the indemnity. Letters of marque bring prize money while you have an enemy, and now and then a protest | M2 | done |
+| P4-06 | The Mediterranean: corsairs out of Ottoman and Moroccan ports take ships that pass near them, until you pay tribute, win a pact or win their regard; Venice and Genoa keep Italy's spice markets full, and an Ottoman war with either makes pepper scarce there | M2 | done |
 | P4-07 | Victory paths beside the score: trade hegemony, empire and prestige, each with a visible race in Court, Crowns | D7, G2 | open |
 | P4-08 | Scenarios with goals: three to start (the old Crown's charge of 20,000 ducats by 1502, a spice race, an independence crisis) | G2 | open |
 | P4-09 | Give prestige a use: it opens better petitioners, royal marriages and treaties, and is spent on favours | G6 | open |

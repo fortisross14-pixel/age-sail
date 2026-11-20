@@ -6,6 +6,8 @@
 import { HOUSES, DYNASTY, MATCH_NAMES, ROMAN, type Gift, type RoyalSeed } from '../data/dynasty';
 import { ERA_PATHS, ERA_REWARD, ERAS, eraAt, type EraPath } from '../data/eras';
 import { REALMS, realmSpec, type RealmId } from '../data/realms';
+import { techById, type Mods } from '../data/tech';
+import { lawById } from '../data/laws';
 import type { CrownId } from '../data/rivals';
 import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { score } from './colony';
@@ -53,8 +55,23 @@ export const heirOf = (d: Dynasty): Royal | undefined => [...d.heirs].sort((a, b
 export const eraPathOf = (s: GameState): EraPath | undefined => (s.eraPath ? ERA_PATHS[s.eraPath.era]?.find((p) => p.id === s.eraPath!.path) : undefined);
 
 /** Lasting advantages: the ruler's gift (none under a regent) and the path chosen for the era. */
+const BLANK = { taxes: 1, research: 0, upkeep: 1, loyalty: 0, regard: 0, spread: 0, growth: 1, storms: 1, unitCost: 1, guns: 1, moves: 0, sight: 0, stores: 0 };
+function add(m: typeof BLANK, x: Mods | undefined) {
+  if (!x) return;
+  m.taxes *= x.taxes ?? 1; m.upkeep *= x.upkeep ?? 1; m.growth *= x.growth ?? 1; m.storms *= x.storms ?? 1; m.unitCost *= x.unitCost ?? 1; m.guns *= x.guns ?? 1;
+  m.research += x.research ?? 0; m.loyalty += x.loyalty ?? 0; m.regard += x.regard ?? 0; m.spread += x.spread ?? 0; m.moves += x.moves ?? 0; m.sight += x.sight ?? 0; m.stores += x.stores ?? 0;
+}
+
+/** What you have learned and the laws you keep, apart from the ruler and the age. */
+export function knowledgeMods(s: GameState) {
+  const m = { ...BLANK };
+  for (const id of s.research.known) add(m, techById(id).mods);
+  for (const id of s.laws) add(m, lawById(id).mods);
+  return m;
+}
+
 export function realmMods(s: GameState) {
-  const m = { taxes: 1, research: 0, upkeep: 1, loyalty: 0, regard: 0 };
+  const m = knowledgeMods(s);
   const gift = s.dynasty.regency ? null : s.dynasty.ruler.gift;
   if (gift === 'commerce') m.taxes *= 1.08;
   if (gift === 'navigation') m.research += 1;
@@ -63,7 +80,7 @@ export function realmMods(s: GameState) {
   if (gift === 'diplomacy') m.regard += 10;
   if (s.dynasty.regency) { m.taxes *= 0.92; m.loyalty -= 5; }
   const p = eraPathOf(s)?.mod;
-  if (p) { m.taxes *= p.taxes ?? 1; m.research += p.research ?? 0; m.upkeep *= p.upkeep ?? 1; m.loyalty += p.loyalty ?? 0; }
+  add(m, p);
   return m;
 }
 
