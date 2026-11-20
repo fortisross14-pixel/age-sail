@@ -6,6 +6,11 @@ import { sfx, type Sfx } from './ui/sound';
 import { SAVE_KEY, LEGACY_KEY, STALE_KEYS, wrap, fromLegacy, readSave, type LoadResult } from './save';
 import type { SimApi, Command } from './sim/worker';
 import type { CrownId } from './data/rivals';
+import type { Difficulty } from './data/difficulty';
+import { objectiveById, type ObjectiveId } from './data/objectives';
+import { rewardOf, rewardText } from './sim/objectives';
+import { attention, type Target } from './ui/attention';
+import { pref } from './ui/prefs';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
 import { prevTurnStart, type Stance } from './sim/types';
 import type { MovePreview } from './sim/game';
@@ -42,6 +47,12 @@ interface Store {
   highlightAll: boolean;
   showHelp: boolean;
   showSettings: boolean;
+  /** the short greeting at the start of a new voyage */
+  showWelcome: boolean;
+  /** End Turn is asking about things left undone */
+  showGuard: boolean;
+  /** things the player has already ended a turn past: End Turn does not ask about them again */
+  guardSeen: string[];
   drawer: DrawerId | null;
   courtTab: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'research' | 'chronicle';
   /** news the player has waved away */
@@ -50,11 +61,14 @@ interface Store {
   busy: boolean;
 
   checkSave: () => Promise<void>;
-  newGame: (seed: number, until?: number, crown?: CrownId) => Promise<void>;
+  newGame: (seed: number, until?: number, crown?: CrownId, difficulty?: Difficulty) => Promise<void>;
   continueGame: () => Promise<void>;
   quitToMenu: () => void;
   run: (c: Command) => Promise<boolean>;
-  endTurn: () => Promise<void>;
+  /** End the turn; unless forced, ask first when something urgent is undone. */
+  endTurn: (force?: boolean) => Promise<void>;
+  /** Open the screen or select the thing an objective or a reminder points at. */
+  goTo: (t: Target) => void;
   selectFleet: (id: number | null) => void;
   selectParty: (id: number | null) => void;
   selectPort: (id: string | null) => void;
@@ -124,7 +138,7 @@ export const useStore = create<Store>((set, get) => {
   };
   return {
     phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, stance: 'assault', selectedPort: null, selectedColony: null, preview: null,
-    hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false, showSettings: false,
+    hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false, showSettings: false, showWelcome: false, showGuard: false, guardSeen: [],
     drawer: null, courtTab: 'people', dismissed: [], toast: null, busy: false,
 
     set: (p) => set(p),
@@ -136,13 +150,13 @@ export const useStore = create<Store>((set, get) => {
       } catch { set({ hasSave: false, saveProblem: null }); }
     },
 
-    async newGame(seed, until = DEFAULT_UNTIL, crown = 'spain') {
+    async newGame(seed, until = DEFAULT_UNTIL, crown = 'spain', difficulty = 'captain') {
       set({ phase: 'loading', saveProblem: null });
       let r;
-      try { r = await sim.newGame(seed, until, crown); } catch (e) { startFailed(e); return; }
+      try { r = await sim.newGame(seed, until, crown, difficulty); } catch (e) { startFailed(e); return; }
       const { world, state } = r;
       await save(state);
-      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: [], showHelp: true });
+      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: [], showHelp: false, showWelcome: true, showGuard: false, guardSeen: [] });
     },
 
     async continueGame() {
@@ -152,7 +166,7 @@ export const useStore = create<Store>((set, get) => {
       let loaded;
       try { loaded = await sim.load(r.state); } catch (e) { startFailed(e); return; }
       const { world, state } = loaded;
-      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: state.chronicle.filter((c) => c.turn < prevTurnStart(state.turn)).map(newsKey) });
+      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, showWelcome: false, showGuard: false, guardSeen: [], dismissed: state.chronicle.filter((c) => c.turn < prevTurnStart(state.turn)).map(newsKey) });
     },
 
     quitToMenu() {
@@ -163,19 +177,24 @@ export const useStore = create<Store>((set, get) => {
     async run(c) {
       let out;
       try { out = await sim.command(c); } catch (e) { await recover('with that order', e); return false; }
-      const { result, state } = out;
+      const { result, state, achieved } = out;
       set({ game: state });
       follow(state);
       void save(state);
       if (!result.ok) { sfx('error'); get().say(result.error, true); }
+      else if (achieved.length) announce(state, achieved);
       else { sfx(soundFor(c)); if (result.message) get().say(result.message); }
       return result.ok;
     },
 
-    async endTurn() {
-      const g = get().game;
-      if (!g || get().busy) return;
-      set({ busy: true, preview: null });
+    async endTurn(force = false) {
+      const g = get().game, w = get().world;
+      if (!g || !w || get().busy) return;
+      // things left undone: ask once about each, then let the turn go
+      const urgent = attention(g, w).filter((a) => a.urgent).map((a) => a.id);
+      const seen = get().guardSeen.filter((id) => urgent.includes(id));
+      if (!force && pref('guard') && urgent.some((id) => !seen.includes(id))) { sfx('open'); set({ showGuard: true, guardSeen: seen }); return; }
+      set({ busy: true, preview: null, showGuard: false, guardSeen: urgent });
       sfx('season');
       let state: GameState;
       try { state = await sim.endTurn(); } catch (e) { await recover('while ending the turn', e); return; }
@@ -187,6 +206,27 @@ export const useStore = create<Store>((set, get) => {
       set({ game: state, busy: false, selectedFleet: keep ? sel : null, selectedParty: psel != null && state.parties.some((p) => p.id === psel) ? psel : null, landing: null, dismissed: [...new Set([...get().dismissed.slice(-200), ...old])] });
       follow(state);
       void save(state);
+      const fresh = (Object.keys(state.objectives.done) as ObjectiveId[]).filter((id) => g.objectives.done[id] == null);
+      if (fresh.length) announce(state, fresh);
+    },
+
+    goTo(t) {
+      const s = get();
+      set({ showGuard: false, showHelp: false, showWelcome: false });
+      if (t.fleet != null) {
+        const f = s.game?.fleets.find((x) => x.id === t.fleet);
+        if (f) { set({ drawer: null }); s.selectFleet(f.id); void import('./ui/MapCanvas').then((m) => m.getView()?.focusHex(f.map, f.hex)); }
+        return;
+      }
+      if (t.party != null) {
+        const p = s.game?.parties.find((x) => x.id === t.party);
+        if (p) { set({ drawer: null }); s.selectParty(p.id); void import('./ui/MapCanvas').then((m) => m.getView()?.focusHex(p.map, p.hex)); }
+        return;
+      }
+      if (t.drawer) {
+        sfx('open');
+        set({ drawer: t.drawer, ...(t.courtTab ? { courtTab: t.courtTab } : {}), ...(t.colony ? { selectedColony: t.colony, selectedPort: t.colony } : {}) });
+      }
     },
 
     selectFleet(id) {
@@ -235,6 +275,14 @@ export const useStore = create<Store>((set, get) => {
     },
   };
 });
+
+/** Tell the player what they have just achieved, and what it paid. */
+function announce(state: GameState, ids: ObjectiveId[]) {
+  const o = objectiveById(ids[0]);
+  const paid = rewardText(rewardOf(state, o));
+  sfx('build');
+  useStore.getState().say(`${o.chain === 'voyage' ? 'First voyage' : 'Ambition fulfilled'}: ${o.title}${ids.length > 1 ? ` (and ${ids.length - 1} more)` : ''}.${paid ? ` +${paid}.` : ''}`);
+}
 
 /** Ask the worker for a route preview to a hex for the selected fleet or party. */
 async function plan(hex: number) {

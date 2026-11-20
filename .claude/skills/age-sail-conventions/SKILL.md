@@ -49,6 +49,14 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   Count soldiers with `isMilitary(type)`, never `type === 'infantry'`.
 - **Markets** move in `seasonTick`: `src/sim/trade.ts` adds regional taste and shocks to consumption
   (`demandFactor`), rival merchants, and factories (`factorySeason`); numbers in `src/data/trade.ts`.
+- **Objectives** (the first voyage, advisers' ambitions): words, order and rewards in
+  `src/data/objectives.ts`, conditions in `src/sim/objectives.ts` (`MET`, one function per id).
+  `checkObjectives` runs after every order (in the worker) and every season; it pays once and
+  logs to the chronicle. A new objective is a data entry plus a condition; never pay a reward
+  anywhere else.
+- **Difficulty** (`state.difficulty`): read levers through `difficultySpec(s.difficulty)` from
+  `src/data/difficulty.ts`. Captain must leave every number as it was; add a lever there rather
+  than branching on the level in rules.
 - **The world is regenerated from the seed on load**, not saved. Any change to `mapgen.ts`
   output changes every existing save's map: bump the generator version (see Saves).
 
@@ -79,6 +87,12 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   icons) and `Art` slots for painted pictures (`src/ui/theme/Art.tsx`, list in `art/PROMPTS.md`).
 - Sounds go through `sfx()` in `src/ui/sound.ts` (synthesized, no files). Game orders get their
   sound in `store.run`; panels, tabs and pickers play their own.
+- **What needs the player** is one list, `attention()` in `src/ui/attention.ts` (pure, no rules):
+  End Turn's reminder, the count on its button and any future outliner read it. A new kind of
+  reminder goes there, with a stable id so the player is asked once. Jump to things with
+  `store.goTo(target)`.
+- Per-player choices that are not part of a voyage (reminders on or off, a folded panel) go in
+  `src/ui/prefs.ts` (localStorage), never in `GameState`.
 - Screens (the `Drawer`) open centred over everything, HUD included, on a dimmed backdrop; a
   click outside or Escape closes them. Nothing on the map moves when one opens.
 - Overlays opened from inside a screen must portal to `.game`: the panel's transform traps
@@ -100,7 +114,9 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
    (`--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist`).
    In dev the page exposes `window.__store` (Zustand) and `window.__view` (the MapView) for
    driving and inspecting the game. Screenshot at 1440×900 and 1280×720.
-4. Bump the README "Now playing" line and `docs/ROADMAP.md` when a milestone or pass lands.
+4. Bump the README "Now playing" line when a phase lands, and in `docs/ROADMAP.md` set the status
+   of each action item you finish (ids like P1-16) and the phase's done count. Why an item exists
+   is in `docs/PRODUCTION-AUDIT.md`.
 
 ## Gotchas
 

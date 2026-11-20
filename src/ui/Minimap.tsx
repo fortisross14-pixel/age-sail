@@ -18,6 +18,8 @@ export function setCamera(map: MapId, v: { x: number; y: number; w: number; h: n
 
 /** the chart fits this box, keeping the board's shape */
 const BOX = { w: 230, h: 230 };
+/** uncharted hexes: aged chart paper, so the unknown reads as unknown and not as a hole */
+const UNCHARTED = '#8d7f5e';
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 /** A small chart of the whole board: realms, your colonies and fleets, and the part in view. */
@@ -39,12 +41,12 @@ export function Minimap() {
     const x = c.getContext('2d')!;
     x.setTransform(2 * scale, 0, 0, 2 * scale, 0, 0);
     const m = world[map], fog = game.fog[map];
-    x.fillStyle = '#1b2a33'; x.fillRect(0, 0, g.pxW, g.pxH);
+    x.fillStyle = UNCHARTED; x.fillRect(0, 0, g.pxW, g.pxH);
     const r = 44;
     for (let i = 0; i < g.N; i++) {
       const known = fog[i] >= Fog.Charted;
       const realm = realmAt(m.realm[i]);
-      x.fillStyle = !known ? '#2b2a22' : isWater(m.terrain[i]) ? (m.deep[i] ? '#3a5a6e' : '#4f7488')
+      x.fillStyle = !known ? UNCHARTED : isWater(m.terrain[i]) ? (m.deep[i] ? '#3a5a6e' : '#4f7488')
         : realm ? hex(realmSpec(realm).color) : '#b9a26f';
       x.fillRect(g.cx(i) - r * 0.5, g.cy(i) - r * 0.45, r, r * 0.9);
     }

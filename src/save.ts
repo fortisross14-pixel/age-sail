@@ -12,8 +12,10 @@ import type { GameState } from './sim/types';
  * Version 13 (M12) adds army supply (party food), colony walls and veteran ranks; old infantry are
  * pikemen.
  * Version 14 (M13) adds factories in European ports and market shocks.
+ * Version 15 (Phase 1, the first hour) adds the difficulty and objectives. An older voyage is Captain,
+ * and ticks the objectives it has already met without rewards when it is next loaded.
  */
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 export const SAVE_KEY = 'age-sail:save';
 /** Keys used before the envelope. v9 is migrated; older ones can't be read and are removed. */
 export const LEGACY_KEY = 'age-sail:save:v9';
@@ -46,6 +48,7 @@ const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, 
     parties: (s.parties as Record<string, unknown>[]).map((p) => ({ ...p, food: 12 })),
   }),
   13: (s) => ({ ...s, factories: [], shocks: [] }),
+  14: (s) => ({ ...s, difficulty: 'captain', objectives: { done: {}, catchUp: true } }),
 };
 
 export function wrap(state: GameState): SaveEnvelope {

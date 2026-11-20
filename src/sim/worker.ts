@@ -3,6 +3,8 @@ import * as Comlink from 'comlink';
 import type { GoodId } from '../data/goods';
 import type { TechId } from '../data/tech';
 import type { CrownId } from '../data/rivals';
+import { DEFAULT_DIFFICULTY, type Difficulty } from '../data/difficulty';
+import type { ObjectiveId } from '../data/objectives';
 import { generateWorld } from './mapgen';
 import { previewParty } from './land';
 import * as G from './game';
@@ -69,8 +71,8 @@ function need() {
 }
 
 const api = {
-  newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain') {
-    const g = G.newGame(seed, until, crown);
+  newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain', difficulty: Difficulty = DEFAULT_DIFFICULTY) {
+    const g = G.newGame(seed, until, crown, difficulty);
     world = g.world;
     state = g.state;
     return g;
@@ -78,6 +80,8 @@ const api = {
   load(saved: GameState) {
     world = generateWorld(saved.seed, saved.crown);
     state = saved;
+    // a save from before objectives existed ticks what is already done, without rewards
+    G.checkObjectives(world, state);
     return { world, state };
   },
   preview(fleet: number, hex: number) {
@@ -89,7 +93,7 @@ const api = {
     const p = state.parties.find((x) => x.id === party);
     return p ? previewParty(world, state, p, hex) : null;
   },
-  command(c: Command): { result: G.CommandResult; state: GameState } {
+  command(c: Command): { result: G.CommandResult; state: GameState; achieved: ObjectiveId[] } {
     const { world, state } = need();
     let result: G.CommandResult;
     switch (c.kind) {
@@ -143,7 +147,8 @@ const api = {
       case 'storm': result = G.stormColony(world, state, c.party, c.colony, c.stance); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
-    return { result, state };
+    const achieved = result.ok ? G.checkObjectives(world, state).map((o) => o.id) : [];
+    return { result, state, achieved };
   },
   endTurn() {
     const { world, state } = need();

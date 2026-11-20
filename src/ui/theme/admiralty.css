@@ -690,3 +690,75 @@ b.bad { color: var(--oxblood-hi); }
 .notice.shock { padding: 6px 10px; border-radius: 4px; background: rgba(184, 134, 47, .14); border-left: 3px solid var(--gold-mid); margin: 6px 0; font-size: 13.5px; }
 .factory-head { display: grid; gap: 4px; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 249, 232, .7); }
 .factory-head .adm-gold-btn { justify-self: start; }
+
+/* ---------- guidance: objectives, the end-turn reminder, the welcome, the guide ---------- */
+.objectives {
+  position: absolute; z-index: 7; right: 16px; top: calc(var(--top) + 18px); width: 318px; display: grid;
+  color: var(--parch); border: 1px solid transparent; border-radius: 10px;
+  background: var(--lacquer-grain) padding-box, linear-gradient(180deg, rgba(27, 50, 71, .97), rgba(14, 28, 40, .97)) padding-box, var(--leaf) border-box;
+  box-shadow: 0 10px 22px -8px rgba(0, 0, 0, .7);
+}
+.objectives.folded { width: auto; }
+.objectives button { background: none; border: 0; box-shadow: none; color: inherit; font: inherit; min-height: 0; text-align: left; }
+.objectives .obj-fold { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font: 600 15px var(--caps); letter-spacing: .05em; color: var(--gold-hi); cursor: pointer; }
+.objectives .obj-fold:hover { filter: brightness(1.15); }
+.objectives .obj-tally { margin-left: auto; padding-left: 10px; font: 14px var(--serif); color: #b9c4cc; letter-spacing: 0; }
+.obj-scroll { max-height: calc(100vh - var(--top) - 340px); min-height: 90px; overflow-y: auto; padding: 0 8px 8px; border-top: 1px solid rgba(227, 185, 94, .3); }
+.obj-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; }
+.obj-sub { margin: 10px 4px 0; font: 600 14px var(--caps); letter-spacing: .05em; color: var(--gold); }
+.obj-head { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 5px 6px; border-radius: 6px; font-size: 15px; cursor: pointer; }
+.obj-head:hover:not(:disabled) { background: rgba(255, 243, 198, .08); }
+.obj-mark { flex: none; width: 18px; text-align: center; font: 600 14px var(--display); color: var(--gold); }
+.obj-count { margin-left: auto; font-size: 14px; color: #b9c4cc; white-space: nowrap; }
+.obj.done .obj-head { color: #8fa0ac; cursor: default; }
+.obj.done .obj-title { text-decoration: line-through; text-decoration-color: rgba(143, 160, 172, .5); }
+.obj.done .obj-mark { color: #8fbf8a; }
+.obj.open { background: rgba(255, 243, 198, .07); border-radius: 8px; box-shadow: inset 3px 0 0 var(--gold); }
+.obj.open .obj-title { color: var(--parch-3); font-weight: 600; }
+.obj-body { padding: 0 10px 10px 32px; font-size: 14.5px; line-height: 1.4; animation: rise 260ms var(--ease-out) both; }
+.obj-body p { margin: 2px 0 8px; color: #d6dde2; }
+.obj-from { font: italic 14px var(--serif); color: var(--gold); }
+.obj-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.obj-reward { font-size: 14px; color: var(--gold-hi); }
+.objectives .obj-foot .small-btn {
+  padding: 4px 12px; font-size: 14px; border-radius: 6px; color: #2a1a08; font-weight: 600; cursor: pointer;
+  background: var(--leaf); box-shadow: 0 1px 0 rgba(0, 0, 0, .5);
+}
+.objectives .obj-foot .small-btn:hover { filter: brightness(1.08); }
+/* screens open over everything: the panel dims with the map */
+.game.screen-open .objectives { pointer-events: none; }
+
+.hud .end-turn .end-count {
+  display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px;
+  font: 700 14px var(--sans); color: #2a1a08; background: var(--leaf); box-shadow: 0 0 0 1px #1b0603;
+}
+
+.modal.guard, .modal.welcome { width: min(560px, calc(100vw - 32px)); }
+.modal.welcome p { font-size: 17px; line-height: 1.5; }
+.modal.welcome .row, .modal.guard .row { gap: 10px; margin-top: 6px; }
+.modal.guard h4 { margin: 14px 0 4px; font: 600 14px var(--caps); letter-spacing: .05em; color: var(--ink-3); }
+.guard-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.guard-list li { margin: 0; }
+.guard-list button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 9px 14px; text-align: left; font-size: 16px; }
+.guard-list.urgent button { box-shadow: inset 4px 0 0 var(--oxblood-hi); }
+.guard-list:not(.urgent) button { font-size: 15px; padding: 6px 14px; }
+
+.modal.help { width: min(760px, calc(100vw - 32px)); }
+.modal.help .tabs { flex-wrap: wrap; margin: 4px 0 10px; }
+.help-page { min-height: 300px; }
+.help-page dl { margin: 0; display: grid; gap: 12px; }
+.help-page dt { font: 600 17px var(--display); color: var(--ink); }
+.help-page dd { margin: 2px 0 0; font-size: 16px; line-height: 1.5; color: var(--ink-2); }
+.help-page .keys { display: grid; gap: 10px; padding: 0; list-style: none; font-size: 16px; }
+.menu-note { margin: 0; max-width: 520px; text-align: center; min-height: 1.4em; }
+
+@media (max-width: 1100px) {
+  .objectives { width: 270px; }
+  .obj-scroll { max-height: calc(100vh - var(--top) - 300px); }
+}
+@media (max-width: 760px) {
+  .objectives { right: 8px; top: calc(var(--top) + 8px); max-width: calc(100vw - 16px); }
+  .obj-scroll { max-height: 40vh; }
+}
+/* a chosen option stays dark under the pointer (the plain hover turned it pale, with pale text) */
+.lengths button.on:hover:not(:disabled), .settings-pop button.on:hover:not(:disabled) { color: var(--gold-hi); background: linear-gradient(180deg, #5a3e20, #38250f); border-color: #1a0f05; }

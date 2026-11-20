@@ -1,5 +1,10 @@
 # Best-practices audit (after v0.8)
 
+> This is the engineering audit. The review of the game itself against the leaders of the genre is
+> [PRODUCTION-AUDIT.md](PRODUCTION-AUDIT.md), and every open item from both is tracked in the
+> production plan in [ROADMAP.md](ROADMAP.md#production-plan): finding 6 is P6-01 and P6-02, finding 8
+> is P5-10, finding 4 is P7-10, and findings 11 to 13 are P7-11.
+
 Checked against the project skills in `.claude/skills/` (save-systems, performance-optimization,
 pixijs-rendering, procedural-gen, game-ai, game-ui-ux). Numbers come from the scripts in
 `tools/` run in this repo on 2026-11-19, headless on a cloud container. GPU and frame-time numbers
@@ -95,12 +100,12 @@ still need a real laptop.
 | 3 | Map renders when idle | Fixed: render on demand. Measured 0 frames in 2 idle seconds (it used to render every frame) |
 | 4 | GPU memory | Partly: the New World's art is built on first view, so a game that hasn't crossed holds half the textures. Releasing canvases after upload is not done: Pixi needs them to recover from a lost GPU context |
 | 5 | Map update on every store change | Fixed: the map redraws only when the state or a field it shows changes; hover no longer triggers it |
-| 6 | Scattered balance numbers | For the balance pass |
+| 6 | Scattered balance numbers | For the balance pass (P6-01, P6-02) |
 | 7 | Test gaps | Fixed: save round-trip, pinned RNG outputs, pinned world digest for seed 1492, 25-seed sweep in Vitest (63 tests) |
-| 8 | Accessibility and readability | Folded into the GUI pass |
+| 8 | Accessibility and readability | Partly done in the GUI pass (Escape, reduced motion); the rest is P5-10 |
 | 9 | Font subsets | Fixed: latin files only, 57 → 21 build assets |
 | 10 | Two default game lengths | Fixed: `DEFAULT_UNTIL` in `src/data/eras.ts` |
-| 11–13 | File size, linter, chunking | Open, low |
+| 11–13 | File size, linter, chunking | Open, low (P7-11) |
 
 ## Proposed Pass 1 scope
 

@@ -17,6 +17,11 @@ Every prompt starts with the same style paragraph, describing the concept art's 
 > the top left, a fine dark outline, rich but readable detail. No text, letters, numbers or
 > labels anywhere.
 
+**What is coming.** The production plan in `docs/ROADMAP.md` lists the art still to ask for:
+story paintings by family (P3-12, painted in P7-04), a larger portrait set (P7-03), and painted
+colonist and missionary figures (P7-06). Visual polish is the last phase, so those prompts are
+written when their items start, not before.
+
 ---
 
 ## Done (cut and in the game)

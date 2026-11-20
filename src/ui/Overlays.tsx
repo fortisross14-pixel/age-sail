@@ -6,8 +6,7 @@ import { sfx, setSound, soundOn, soundVolume } from './sound';
 import { spriteUrl } from '../render/assets';
 import { getView } from './MapCanvas';
 import { standings } from '../sim/empire';
-import { portById } from '../sim/game';
-import { crownSpec } from '../data/rivals';
+import { GuardSwitch } from './Guidance';
 import { BattleReportView } from './Battle';
 
 function FinalStandings() {
@@ -64,40 +63,63 @@ export function EventCard() {
   );
 }
 
+/** The guide, a page at a time: the objectives panel teaches the opening, this is the reference. */
+const GUIDE: { id: string; name: string; items: [string, string][] }[] = [
+  { id: 'start', name: 'First steps', items: [
+    ['Form an expedition.', 'In Fleets, join the two ships. In Court, make your best navigator an explorer and choose who sails with them (a colonist, soldiers or a missionary). When they are ready, give them command of the fleet. The colonist and soldier waiting in port can go aboard too.'],
+    ['Load cargo.', 'Iron tools are cheap in Europe, and the peoples of the coast may prize them.'],
+    ['Sail south.', 'Click the sea to plan a voyage: numbered markers show where each season’s sailing ends. Click again or press Space. The trade winds carry you down the coast; coming home is harder.'],
+    ['Go ashore.', 'Ships only chart coasts. Beside a shore, Land party puts your units and explorer ashore. On foot they survey the land for gold, silver, timber and fertile soil, and follow rumours of ruins (the red ?). Bring them back aboard from a ship beside them.'],
+  ] },
+  { id: 'sea', name: 'At sea', items: [
+    ['Mind wind and food.', 'Trade winds blow west in the south, westerlies blow east in the north (V shows them). Ships carry food for about 8 seasons; then scurvy kills the crew. Away from home, stores refill only to half: in foreign ports, from native traders, or by anchoring a whole season off a green coast.'],
+    ['Find, meet, trade.', 'Only a fleet led by an explorer may enter uncharted waters. Trade tools with the peoples you meet for furs, tobacco, cacao, dyes and gold, and sell them in Europe while they are rare.'],
+    ['The open ocean.', 'Before your scholars master the Volta do mar (Research), the darker open sea spoils food twice as fast. You can try the western crossing, but few come back.'],
+  ] },
+  { id: 'colonies', name: 'Colonies', items: [
+    ['Found colonies.', 'Train colonists in your cities and take them over with timber and tools in the hold. Land them on surveyed coast and choose Found colony.'],
+    ['Work and needs.', 'Each colonist works a hex: food first, then sugar, tobacco, furs, gold, silver. Colonists need food, cloth and wine every season; luxuries make them grow faster. Ship their goods home and sell them.'],
+    ['Loyalty.', 'Colonies grow less loyal with every generation born overseas, with high taxes and when their needs go unmet. Charters, festivals and garrisons hold them; a disloyal city may break away.'],
+  ] },
+  { id: 'others', name: 'Peoples and crowns', items: [
+    ['The peoples.', 'Every coast belongs to someone. In Court, Peoples: send gifts, make alliances, or pay a people to turn on its rivals. Dock to build a trading post; land a missionary to found a mission. You can also conquer, and every people will remember it. Colonies on a people’s land anger them; angry peoples raid.'],
+    ['Rival crowns.', 'The other Atlantic crowns race you for the same coasts: their ships appear on the map, their colonies claim land you can no longer settle, their trading posts thin out the native trade. Settle too close and they grow hostile; at war, their privateers hunt your ships. Court, Crowns shows the standings.'],
+  ] },
+  { id: 'realm', name: 'Your realm', items: [
+    ['Build and trade at home.', 'Cities have room for a few buildings (docks, barracks, church, university, market) and train colonists, soldiers and missionaries; a governor with construction skill speeds them up. A merchant can run a fleet on a trade route between European ports by itself.'],
+    ['The court.', 'People age, and new petitioners come to court each spring. Stories ask for your decisions.'],
+    ['The long game.', 'Eras pass. The age ends at the year you chose; the crown with the highest score wins. Score counts colonists, territory and the ducats your sales have earned. Ships and wages cost upkeep every season.'],
+  ] },
+];
+
 export function Help() {
   const show = useStore((s) => s.showHelp);
   const set = useStore((s) => s.set);
-  const game = useStore((s) => s.game);
-  const world = useStore((s) => s.world);
-  if (!show || !game || !world) return null;
+  const [tab, setTab] = useState('start');
+  if (!show) return null;
+  const page = GUIDE.find((g) => g.id === tab);
   return (
     <div className="modal-back" onClick={() => set({ showHelp: false })}>
       <div className="modal help" role="dialog" aria-label="How to play" onClick={(e) => e.stopPropagation()}>
-        <h2>Your realm</h2>
-        <p>It is 1492, and you rule {crownSpec(game.crown).name}. Two ships wait in {portById(world, crownSpec(game.crown).home)?.name}, with a colonist, a soldier, your court and a little gold. Every city of your realm is yours to build in. South lies the African coast beyond Cape Bojador, uncharted and different every voyage. West lies the open Mar Océano: pilots say no ship that sails far into it comes back.</p>
-        <ol>
-          <li><b>Form an expedition.</b> In <b>Fleets</b>, join the two ships. In <b>Court</b>, make your best navigator an explorer and choose who sails with them (colonists, infantry or missionaries). After two seasons, give them command of the fleet. The colonist and soldier waiting in port can go aboard too.</li>
-          <li><b>Load cargo.</b> Iron tools are cheap in Europe, and the peoples of the coast may prize them.</li>
-          <li><b>Go ashore.</b> Ships only chart coasts. Beside a shore, <b>Land party</b> puts your units and explorer ashore. On foot they survey the land for gold, silver, timber and fertile soil, and follow rumours of ruins (the red ?). Bring them back aboard from a ship beside them.</li>
-          <li><b>Sail south.</b> Click the sea to plan a voyage: numbered markers show where each season’s sailing ends. Click again or press <kbd>Space</kbd>. The trade winds carry you down the coast; coming home is harder.</li>
-          <li><b>Found colonies.</b> Train colonists in your cities and take them over with <b>timber</b> and <b>tools</b> in the hold. Land them on surveyed coast and choose <b>Found colony</b>. Each colonist works a hex: food first, then sugar, tobacco, furs, gold, silver… Colonists need food, <b>cloth</b> and <b>wine</b> every season; luxuries make them grow faster. Ship their goods home and sell them.</li>
-          <li><b>The peoples.</b> Every coast belongs to someone. In <b>Court → Peoples</b>, send gifts, make alliances, or pay a people to turn on its rivals. Dock to build a trading post; land a missionary to found a mission. You can also conquer: a battle is a matter of numbers, and every people will remember it. Colonies on a people’s land anger them; angry peoples raid.</li>
-          <li><b>Rival crowns.</b> The other Atlantic crowns race you for the same coasts: their ships appear on the map, their colonies claim land you can no longer settle, their trading posts thin out the native trade. Settle too close and they grow hostile; at war, their privateers hunt your ships. <b>Court → Crowns</b> shows the standings.</li>
-          <li><b>The long game.</b> Eras pass, and colonies grow less loyal with every generation born overseas, with high taxes and when their needs go unmet. Charters, festivals and garrisons hold them; a disloyal city may break away. Stories ask for your decisions. The age ends at the year you chose; the crown with the highest score wins.</li>
-          <li><b>Score</b> counts colonists, territory and the ducats your sales have earned.</li>
-          <li><b>Research.</b> Your court studies one subject at a time (the scroll at the top). <i>Volta do mar</i>, long-distance navigation, makes the open ocean survivable. Before it, the darker open sea spoils food twice as fast. You can try the western crossing, but few come back.</li>
-          <li><b>Mind wind and food.</b> Trade winds blow west in the south, westerlies blow east in the north (<kbd>V</kbd> shows them). Ships carry food for about 8 seasons; then scurvy kills the crew. Away from home, stores refill only to half: in foreign ports, from native traders, or by anchoring a whole season off a green coast.</li>
-          <li><b>Find, meet, trade.</b> Only a fleet led by an explorer may enter uncharted waters. Trade tools with the peoples you meet for furs, tobacco, cacao, dyes and gold, and sell them in Europe while they are rare.</li>
-          <li><b>Build and trade at home.</b> <b>Cities</b> have room for a few buildings (docks, barracks, church, university, market) and train colonists, infantry and missionaries; a governor with construction skill speeds them up. A merchant can run a fleet on a trade route between European ports by itself. People age, and new petitioners come to court each spring.</li>
-        </ol>
-        <p>There is no deadline: build the largest, richest realm you can before the age ends. Ships cost upkeep every season.</p>
-        <h3>Controls</h3>
-        <ul className="keys">
-          <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows, drag, or rest the pointer at the screen edge to pan · <kbd>Wheel</kbd>/<kbd>Pinch</kbd> zoom</li>
-          <li><kbd>Space</kbd> sail · <kbd>Enter</kbd> end season · <kbd>Tab</kbd> next fleet · <kbd>Esc</kbd> cancel or close · <kbd>M</kbd> switch map</li>
-          <li><kbd>1</kbd> Cities · <kbd>2</kbd> Markets · <kbd>3</kbd> Fleets · <kbd>4</kbd> Court · <kbd>V</kbd> winds · <kbd>G</kbd> hex grid · hold <kbd>Alt</kbd> to highlight everything you can click</li>
-        </ul>
-        <button className="primary" autoFocus onClick={() => set({ showHelp: false })}>Set out</button>
+        <h2>The guide</h2>
+        <div className="tabs" role="tablist">
+          {[...GUIDE, { id: 'keys', name: 'Controls' }].map((g) => (
+            <button key={g.id} role="tab" aria-selected={tab === g.id} className={tab === g.id ? 'on' : ''} onClick={() => { sfx('tab'); setTab(g.id); }}>{g.name}</button>
+          ))}
+        </div>
+        <div className="help-page">
+          {page ? (
+            <dl>{page.items.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}</dl>
+          ) : (
+            <ul className="keys">
+              <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows, drag, or rest the pointer at the screen edge to pan · <kbd>Wheel</kbd>/<kbd>Pinch</kbd> zoom</li>
+              <li><kbd>Space</kbd> sail · <kbd>Enter</kbd> end the turn · <kbd>Tab</kbd> next fleet · <kbd>Esc</kbd> cancel or close · <kbd>M</kbd> switch map</li>
+              <li><kbd>1</kbd> Cities · <kbd>2</kbd> Markets · <kbd>3</kbd> Fleets · <kbd>4</kbd> Court · <kbd>5</kbd> Research · <kbd>6</kbd> Chronicle</li>
+              <li><kbd>V</kbd> winds · <kbd>G</kbd> hex grid · <kbd>H</kbd> this guide · hold <kbd>Alt</kbd> to highlight everything you can click</li>
+            </ul>
+          )}
+        </div>
+        <button className="primary" autoFocus onClick={() => set({ showHelp: false })}>Close</button>
       </div>
     </div>
   );
@@ -128,6 +150,7 @@ export function Settings() {
       <label>Volume
         <input type="range" min={0} max={1} step={0.05} value={vol} disabled={!on} onChange={(e) => { const v = Number(e.target.value); setVol(v); setSound(on, v); }} onPointerUp={() => sfx('select')} />
       </label>
+      <GuardSwitch />
       <button onClick={() => set({ showSettings: false, showHelp: true })}>How to play</button>
     </Frame>
   );

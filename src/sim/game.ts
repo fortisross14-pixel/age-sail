@@ -9,6 +9,8 @@ import * as Riv from './rivals';
 import * as Emp from './empire';
 import * as Story from './stories';
 import * as Trade from './trade';
+import * as Obj from './objectives';
+import { DEFAULT_DIFFICULTY, difficultySpec, type Difficulty } from '../data/difficulty';
 import type { CrownId } from '../data/rivals';
 import { CITIES, cityById, cityMarket, KNOWN_SOUTH, ATLANTIC_ISLANDS } from '../data/europe';
 import { crownSpec, type CrownEdge } from '../data/rivals';
@@ -225,7 +227,7 @@ function initialOldFog(world: World): number[] {
   return fog;
 }
 
-export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain'): { world: World; state: GameState } {
+export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain', difficulty: Difficulty = DEFAULT_DIFFICULTY): { world: World; state: GameState } {
   const world = generateWorld(seed, crown);
   const rng = mulberry32(hashSeed(seed, 99));
   const spec = crownSpec(crown);
@@ -259,7 +261,7 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
   }
 
   const state: GameState = {
-    seed, crown, turn: 0, treasury: 5000, prestige: 0,
+    seed, crown, difficulty, objectives: { done: {} }, turn: 0, treasury: difficultySpec(difficulty).treasury, prestige: 0,
     fog: { old: initialOldFog(world), new: new Array(GRIDS.new.N).fill(Fog.Unknown) },
     fleets: [], people: [], petitioners: [], units: [], parties: [], cities, markets, discovered: [],
     surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
@@ -1032,7 +1034,7 @@ function advance(world: World, s: GameState, f: Fleet) {
     reveal(world, s, f);
     const deep = m.deep[next] && deepPeril(s);
     if (deep) f.deepThisTurn = true;
-    if (rng() < stormRisk(g, m, season, next) * (deep ? deepStorms(s, f) : 1)) {
+    if (rng() < stormRisk(g, m, season, next) * (deep ? deepStorms(s, f) : 1) * difficultySpec(s.difficulty).storms) {
       storm(s, f, rng);
       if (!s.fleets.includes(f)) return;
     }
@@ -1103,7 +1105,7 @@ export function seasonTick(world: World, s: GameState): void {
   for (const f of [...s.fleets]) {
     if (f.at || f.movedThisTurn) continue;
     const deep = deepPeril(s) && world[f.map].deep[f.hex] ? deepStorms(s, f) : 1;
-    if (rng() < stormRisk(GRIDS[f.map], world[f.map], seasonOf(s.turn), f.hex) * 4 * deep) storm(s, f, rng);
+    if (rng() < stormRisk(GRIDS[f.map], world[f.map], seasonOf(s.turn), f.hex) * 4 * deep * difficultySpec(s.difficulty).storms) storm(s, f, rng);
   }
 
   // city projects
@@ -1263,7 +1265,13 @@ export function seasonTick(world: World, s: GameState): void {
   const notes: string[] = [];
   for (const f of [...s.fleets]) if (s.fleets.includes(f)) runRoute(world, s, f, notes);
   if (notes.length) log(s, 'trade', notes.join(' '));
+  checkObjectives(world, s);
   s.prestige = Math.round(s.prestige * 100) / 100;
+}
+
+/** Tick and reward the objectives met by now: called after every order and every season. */
+export function checkObjectives(world: World, s: GameState) {
+  return Obj.checkObjectives(world, s, (k, t) => log(s, k, t));
 }
 
 export { dateLabel };

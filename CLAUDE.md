@@ -3,7 +3,12 @@
 Turn-based colonisation game: Vite, React, TypeScript, PixiJS 8, rules in a Web Worker.
 
 - Read `.claude/skills/age-sail-conventions/SKILL.md` before changing `src/`.
-- Design decisions and milestones: `docs/ROADMAP.md`. Latest audit: `docs/AUDIT.md`.
+- Design decisions, milestones and the production plan (every action item, by phase, with its
+  status): `docs/ROADMAP.md`. Why each item exists: `docs/PRODUCTION-AUDIT.md`. Engineering audit:
+  `docs/AUDIT.md`.
+- Work the phases in order. When an item lands, set its status in the roadmap and update the phase
+  count. Balance (Phase 6) and technical and visual polish (Phase 7) are parked until the end: keep
+  new numbers provisional in `src/data/`, and don't spend time tuning or polishing before then.
 - Verify with `npm test`, `npm run build` and `npx vite-node tools/seed-sweep.ts 100`.
 
 ## Art and style direction (from the owner)

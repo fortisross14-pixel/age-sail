@@ -1,4 +1,6 @@
 import type { GoodId } from '../data/goods';
+import type { Difficulty } from '../data/difficulty';
+import type { ObjectiveId } from '../data/objectives';
 import type { ShipType } from '../data/ships';
 import type { TechId } from '../data/tech';
 import type { BuildingId, ResourceId } from '../data/city';
@@ -412,6 +414,10 @@ export interface GameState {
   seed: number;
   /** the crown you lead */
   crown: CrownId;
+  /** chosen on the menu: starting gold, the rivals' pace, storms */
+  difficulty: Difficulty;
+  /** the first voyage and your advisers' ambitions: the season each was achieved */
+  objectives: { done: Partial<Record<ObjectiveId, number>>; catchUp?: boolean };
   turn: number;
   treasury: number;
   prestige: number;

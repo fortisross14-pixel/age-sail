@@ -11,6 +11,7 @@ import { SelectionCard } from './ui/SelectionCard';
 import { NewsFeed } from './ui/NewsFeed';
 import { HoverInfo } from './ui/HoverInfo';
 import { EventCard, Help, Toast, Settings } from './ui/Overlays';
+import { ObjectivesPanel, EndTurnGuard, Welcome } from './ui/Guidance';
 
 const DRAWER_KEYS: Record<string, DrawerId> = { '1': 'cities', '2': 'markets', '3': 'fleets', '4': 'court', '5': 'research', '6': 'chronicle' };
 const PAN_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
@@ -26,6 +27,14 @@ function useKeys() {
       if (PAN_KEYS.has(k)) return; // the map view pans on these
       if (e.key === 'Alt') { e.preventDefault(); s.set({ highlightAll: true }); return; }
       if (s.game.events.length) return; // answer the card first
+      if (s.showWelcome) {
+        if (e.key === 'Escape') { e.preventDefault(); s.set({ showWelcome: false }); }
+        return; // Enter presses the focused button
+      }
+      if (s.showGuard) {
+        if (e.key === 'Escape') { e.preventDefault(); s.set({ showGuard: false }); }
+        return; // Enter presses "End the turn anyway", which has the focus
+      }
       if (s.showHelp) {
         if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); s.set({ showHelp: false }); }
         return;
@@ -80,6 +89,7 @@ export function App() {
       <Hud />
       <Rail />
       <NewsFeed />
+      <ObjectivesPanel />
       <Dock />
       <Minimap />
       <Settings />
@@ -89,6 +99,8 @@ export function App() {
       <Toast />
       <EventCard />
       <Help />
+      <Welcome />
+      <EndTurnGuard />
     </div>
   );
 }

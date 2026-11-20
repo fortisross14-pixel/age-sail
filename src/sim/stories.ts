@@ -6,7 +6,7 @@ import { SHIPS } from '../data/ships';
 import { SKILLS, yearOf, type EventChoice, type GameEvent, type GameState, type Person, type World, type Skill } from './types';
 import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { personById, skill } from './court';
-import { rivalSpec, crownSpec, type CrownId } from '../data/rivals';
+import { rivalSpec, crownSpec, rivalsOf, type CrownId } from '../data/rivals';
 import { CITIES } from '../data/europe';
 
 const CITY_NAME: Record<string, string> = Object.fromEntries(CITIES.map((c) => [c.id, c.name]));
@@ -141,7 +141,7 @@ const STORIES: Story[] = [
   },
   {
     id: 'survivors', cooldown: 24,
-    when: (_w, s, rng) => { const f = s.fleets.find((x) => !x.at); return f && rng() < 0.5 ? { fleet: f.id, crown: pick(rng, ['portugal', 'england', 'netherlands']) } : null; },
+    when: (_w, s, rng) => { const f = s.fleets.find((x) => !x.at); return f && rng() < 0.5 ? { fleet: f.id, crown: pick(rng, rivalsOf(s.crown)).id } : null; },
     title: () => 'Survivors at sea',
     text: (s, c) => `${s.fleets.find((x) => x.id === c.fleet)?.name ?? 'One of your fleets'} finds a boat of survivors from a wrecked ship of ${rivalSpec(c.crown as CrownId).name}, half dead from thirst.`,
     choices: () => [

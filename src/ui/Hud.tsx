@@ -10,6 +10,7 @@ import { spriteUrl } from '../render/assets';
 import { Icon, Crest } from './theme/icons';
 import { Medal, CrestArt } from './theme/Art';
 import { sfx } from './sound';
+import { attention } from './attention';
 
 const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th'];
 
@@ -24,7 +25,7 @@ export function Hud() {
   const endTurn = useStore((s) => s.endTurn);
   const sc = score(game, world);
   const rank = 1 + rivalsOf(game.crown).filter((r) => rivalScore(game, r.id).total > sc.total).length;
-  const idle = game.fleets.filter((f) => f.moves > 0 && !f.order && !f.at).length;
+  const waiting = attention(game, world).filter((a) => a.urgent);
   const crown = crownSpec(game.crown);
   const colours = CROWN[game.crown];
   const era = eraAt(yearOf(game.turn));
@@ -62,8 +63,9 @@ export function Hud() {
         <button className={`adm-square ${drawer === 'court' ? 'on' : ''}`} onClick={() => toggle('court')} title="Court (4)" aria-label="Court"><Medal name="people" size={50} fallback={<Icon name="units" size={26} />} /></button>
         <button className={`adm-square ${showSettings ? 'on' : ''}`} onClick={() => { sfx(showSettings ? 'close' : 'open'); set({ showSettings: !showSettings }); }} title="Settings" aria-label="Settings"><Medal name="settings" size={50} fallback={<Icon name="settings" size={26} />} /></button>
       </div>
-      <button className="end-turn" onClick={() => void endTurn()} disabled={busy} title={idle ? `${idle} fleet${idle > 1 ? 's' : ''} without orders (Enter)` : `End the turn: ${turnStride(game.turn) === 2 ? 'half a year' : 'a year'} passes (Enter)`}>
+      <button className="end-turn" onClick={() => void endTurn()} disabled={busy} title={waiting.length ? `${waiting.map((a) => a.text).join('\n')}\n(Enter)` : `End the turn: ${turnStride(game.turn) === 2 ? 'half a year' : 'a year'} passes (Enter)`}>
         {busy ? 'Time passes…' : 'End Turn'}
+        {!busy && waiting.length > 0 && <span className="end-count" aria-label={`${waiting.length} things need you`}>{waiting.length}</span>}
         <Icon name="arrow" size={22} tone="light" />
       </button>
     </header>

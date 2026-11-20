@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.13
+## Now playing: v0.14
 
-M13, a living market: factories in any European port that sell slowly at fair prices and buy cheap; regional tastes; shocks; rival merchants; tools that wear out in the colonies.
+Phase 1, the first hour: a first voyage in eight steps and advisers' ambitions with rewards, an objectives panel with "Show me", a short welcome and a tabbed guide in place of the help wall, End Turn reminders, and three difficulty levels (Squire, Captain, Admiral). The plan from here, item by item: [docs/ROADMAP.md](docs/ROADMAP.md#production-plan); the audit behind it: [docs/PRODUCTION-AUDIT.md](docs/PRODUCTION-AUDIT.md).
+
+From v0.13, a living market: factories in any European port that sell slowly at fair prices and buy cheap; regional tastes; shocks; rival merchants; tools that wear out in the colonies.
 
 From v0.12, armies: six kinds of soldiers, armies that need food, battles in three rounds with a report, walls and guns, veterans.
 
@@ -58,11 +60,14 @@ npm run build      # production build in dist/
 
 Controls: WASD, the arrow keys, dragging, or resting the pointer at a screen edge pans; wheel or
 pinch zooms. Click the sea or a port to plan, click again or press `Space` to sail, right-click to
-sail at once. `Enter` ends the season, `1`–`4` open Cities, Markets, Fleets and Court, `M`
+sail at once. `Enter` ends the turn (and asks first if something urgent is undone), `1`–`6` open Cities, Markets,
+Fleets, Court, Research and Chronicle, `H` opens the guide, `M`
 switches map, `V` shows winds, `Tab` cycles fleets, `Esc` closes, hold `Alt` to highlight
 everything you can click.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for the agreed design and the milestones.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the agreed design, the milestones and the production plan,
+[docs/PRODUCTION-AUDIT.md](docs/PRODUCTION-AUDIT.md) for the review against the leaders of the genre, and
+[docs/AUDIT.md](docs/AUDIT.md) for the engineering audit.
 
 ## How it is built
 

@@ -127,9 +127,14 @@ function FleetDetail({ fleet }: { fleet: Fleet }) {
               {home && <button className="x-inline" onClick={() => void run({ kind: 'disembark', unit: u.id })} title="Go ashore" aria-label="Go ashore">↧</button>}
             </span>
           ))}
-          {waitingUnits.map((u) => (
-            <button key={u.id} className="small-btn" onClick={() => void run({ kind: 'embark', unit: u.id, fleet: fleet.id })}>Embark {UNIT_INFO[u.type].name.toLowerCase()}</button>
-          ))}
+          {[...new Set(waitingUnits.map((u) => u.type))].map((type) => {
+            const of = waitingUnits.filter((u) => u.type === type);
+            return (
+              <button key={type} className="small-btn" title={`${of.length} waiting in port`} onClick={() => void run({ kind: 'embark', unit: of[0].id, fleet: fleet.id })}>
+                Embark {UNIT_INFO[type].name.toLowerCase()}{of.length > 1 ? ` (${of.length} waiting)` : ''}
+              </button>
+            );
+          })}
         </div>
       </div>
 

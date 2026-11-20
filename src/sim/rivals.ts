@@ -4,6 +4,7 @@
  * relations sour. Everything they do happens on the map, where the player can see it.
  */
 import { CROWNS, RIVAL_SETTLERS_EVERY, rivalSpec, rivalsOf, type CrownId } from '../data/rivals';
+import { difficultySpec } from '../data/difficulty';
 import { SHIPS } from '../data/ships';
 import { isWater } from '../data/terrain';
 import { RESOURCE_IDS } from '../data/city';
@@ -145,7 +146,7 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
           if (site != null) spawn(w, s, spec.id, map, 'settlers', site);
         }
       }
-      r.next = s.turn + Math.max(8, spec.pace - Math.floor(s.turn / 40));
+      r.next = s.turn + Math.round(Math.max(8, spec.pace - Math.floor(s.turn / 40)) * difficultySpec(s.difficulty).rivalPace);
     }
     // earnings
     // what their trade earns, on the same scale as the player's sales
