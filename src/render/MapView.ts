@@ -508,7 +508,7 @@ class Scene {
     const surveyed = state.surveyed[g.id];
     let sk = 0;
     for (let i = 0; i < surveyed.length; i++) sk += surveyed[i];
-    const findsKey = `${sk}|${state.rumoursDone[g.id].length}|${fogKey}`;
+    const findsKey = `${sk}|${state.rumoursDone[g.id].length}|${fogKey}|${state.land?.name ?? ''}`;
     if (findsKey !== this.lastFinds) { this.lastFinds = findsKey; this.drawFinds(state); }
     this.syncColonies(state);
     this.syncNations(state, fogKey);
@@ -541,6 +541,12 @@ class Scene {
       node.addChild(icon);
       node.position.set(g.cx(i) + HEX_R * 0.35, g.cy(i) - HEX_R * 0.3);
       this.resLayer.addChild(node);
+    }
+    // the name you gave the land, written where it was first sighted
+    if (state.land && state.land.map === g.id) {
+      const t = label(state.land.name, 30, { italic: true, spacing: 6, halo: true });
+      t.position.set(g.cx(state.land.hex) + HEX_W * 2.5, g.cy(state.land.hex) - HEX_R * 1.6);
+      this.rumourLayer.addChild(t);
     }
     const fog = state.fog[g.id];
     for (const r of m.rumours) {
@@ -666,7 +672,7 @@ class Scene {
       const crown = CROWN[x.crown];
       const node = new Container();
       node.addChild(new Graphics().ellipse(0, 0, HEX_W * 0.42, HEX_W * 0.17).fill({ color: crown.primary, alpha: 0.6 }).stroke({ width: x.kind === 'privateer' || x.kind === 'raid' ? 2.4 : 1.4, color: x.kind === 'privateer' || x.kind === 'raid' ? 0x111111 : crown.secondary }));
-      const sp = new Sprite(this.assets.tex(`ships/${x.kind === 'privateer' ? 'sloop' : x.kind === 'trader' || x.kind === 'supply' ? 'fluyt' : 'carrack'}`));
+      const sp = new Sprite(this.assets.tex(x.kind === 'army' ? 'units/pikeman' : `ships/${x.kind === 'privateer' ? 'sloop' : x.kind === 'trader' || x.kind === 'supply' ? 'fluyt' : 'carrack'}`));
       sp.anchor.set(0.5, 0.82);
       sp.width = HEX_W * 0.85;
       sp.scale.y = sp.scale.x;

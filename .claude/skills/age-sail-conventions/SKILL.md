@@ -47,6 +47,18 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   `nativeForce`, `rivalForce`, `freeForce`); unit numbers live in `src/data/army.ts`. Player-ordered
   battles push a `kind: 'battle'` event with the report. Check odds with `tools/battles.ts`.
   Count soldiers with `isMilitary(type)`, never `type === 'infantry'`.
+- **Stories are data.** A new story is an entry in its family's file under `src/data/stories/`
+  (types and the list of text variables in `types.ts`): `about` binds its subjects, `when` its
+  conditions, each choice has `effects` from the fixed vocabulary, and optionally a `roll` with an
+  `else`. Never write a realm's own place or family names in a story: use `{capital}`, `{house}`,
+  `{school}`, `{bankers}`, `{saint}`, `{ruler}` (crown data in `src/data/dynasty.ts`); only the
+  `history` family may. A follow-up is `chained: true` and reached with `['later', id, seasons]`.
+  A new effect or condition is a case in `carry` or `holds` in `src/sim/stories.ts` plus its type.
+  `stories.test.ts` tells every story with every choice for every crown: keep it passing.
+- **The dynasty** (`src/sim/dynasty.ts`): what the ruler's gift and the era's path do for the realm
+  goes through `realmMods(s)`; read that rather than the ruler or the path directly.
+- **Courtiers** remember through `recallDeed(s, p, amount, why)` (in `court.ts`), which moves their
+  loyalty and shows the reason; never write `loyalty` directly.
 - **Rival crowns** (`src/sim/rivals.ts`, numbers in `RIVAL_ECON`): each has a treasury, hulls and a
   plan. A new thing a rival can do is an `Option` in `options()` with a want (`u`), a cost and a
   `run`; `decide` picks. Every ship must come from a hull (`spawn`) and return it (`reachHome`) or

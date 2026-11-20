@@ -744,7 +744,9 @@ describe('M8: the long game', () => {
     const { world, state } = newGame(1492);
     state.turn = (1520 - 1492) * 4 - 1;
     endTurn(world, state);
-    expect(state.events.some((e) => e.kind === 'era' && e.title === 'Age of Conquest')).toBe(true);
+    const card = state.events.find((e) => e.story === 'era:conquest');
+    expect(card?.title).toBe('Age of Conquest');
+    expect(card?.choices?.length).toBe(3);
   });
 
   it('loyalty falls with high taxes and generations overseas; a charter wins it back and halves taxes', () => {

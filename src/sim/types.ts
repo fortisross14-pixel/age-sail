@@ -1,5 +1,7 @@
 import type { GoodId } from '../data/goods';
 import type { Difficulty } from '../data/difficulty';
+import type { Gift } from '../data/dynasty';
+import type { Family } from '../data/stories/types';
 import type { ObjectiveId } from '../data/objectives';
 import type { ShipType } from '../data/ships';
 import type { TechId } from '../data/tech';
@@ -120,6 +122,32 @@ export interface Person {
   died?: number;
   /** hexes of new land charted, people met */
   discoveries: number;
+  /** 0..100: how far they can be counted on; it follows what they remember */
+  loyalty: number;
+  /** what they hold for and against you */
+  memory: Memory[];
+  /** rivals, friends and kin at court */
+  bonds: { with: number; kind: 'rival' | 'friend' | 'kin' }[];
+  /** something they are waiting for, and since when */
+  want: { kind: 'rank' | 'command'; since: number } | null;
+}
+
+/** One of the ruling house. */
+export interface Royal { id: number; name: string; numeral?: number; sex: 'm' | 'f'; born: number; gift: Gift; from?: string; frail?: number }
+export interface MarriageOffer { id: number; realm: string; name: string; sex: 'm' | 'f'; born: number; gift: Gift; dowry: number }
+/** Who rules, who follows, and the realms the house is tied to by marriage. */
+export interface Dynasty {
+  house: string;
+  ruler: Royal;
+  consort: Royal | null;
+  heirs: Royal[];
+  /** the ruler is a child: a regent governs */
+  regency: boolean;
+  reigns: { name: string; from: number; to: number | null }[];
+  /** rulers of each name so far, for numerals */
+  counts: Record<string, number>;
+  offers: MarriageOffer[];
+  ties: string[];
 }
 
 export interface Unit {
@@ -233,6 +261,8 @@ export interface NativeState {
   crowns: Partial<Record<CrownId, number>>;
   /** a war with another people, which keeps their warriors busy */
   feud: { with: string; since: number } | null;
+  /** a people they are allied with against a common enemy */
+  pact: string | null;
 }
 
 /** One remembered deed, good or bad, and how much it still weighs. */
@@ -259,6 +289,9 @@ export interface RivalState {
   toward: Partial<Record<CrownId, number>>;
   wars: CrownId[];
   rivalWarSince: Partial<Record<CrownId, number>>;
+  /** what their pilots have learned of the ocean crossing, paid for season by season; and whether they have it */
+  learning: number;
+  volta: boolean;
   /** abstract earnings from trade, for their score */
   revenue: number;
   /** trading posts they hold at native grounds (site ids) */
@@ -293,7 +326,8 @@ export interface RivalShip {
   crown: CrownId;
   map: MapId;
   hex: number;
-  kind: 'settlers' | 'trader' | 'privateer' | 'supply' | 'raid';
+  /** `army` is soldiers marching overland: no ship, and no hull */
+  kind: 'settlers' | 'trader' | 'privateer' | 'supply' | 'raid' | 'army';
   name: string;
   /** the errand is done and she is sailing home, where her hull is free again */
   homeward: boolean;
@@ -386,6 +420,8 @@ export interface GameEvent {
   battle?: BattleReport;
   /** for stories with choices: which story, and what it is about */
   story?: string;
+  /** which kind of story, for its picture */
+  family?: Family;
   ctx?: Record<string, string | number>;
   choices?: EventChoice[];
   title: string;
@@ -471,6 +507,15 @@ export interface GameState {
   loans: { perSeason: number; left: number }[];
   /** stories already told, so they are not repeated too often */
   told: Record<string, number>;
+  /** what earlier choices left behind: a flag and the season it was set */
+  flags: Record<string, number>;
+  /** stories that will follow an earlier choice, and when */
+  pending: { story: string; at: number; ctx: Record<string, string | number> }[];
+  dynasty: Dynasty;
+  /** the path chosen for the present era, and where its goal stood when it was chosen */
+  eraPath: { era: string; path: string; base: number } | null;
+  /** the name you gave the land across the ocean */
+  land: { name: string; map: MapId; hex: number } | null;
   rivals: Record<CrownId, RivalState>;
   rivalColonies: RivalColony[];
   rivalShips: RivalShip[];

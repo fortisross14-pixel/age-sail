@@ -785,3 +785,34 @@ b.bad { color: var(--oxblood-hi); }
 @keyframes pointerPulse { 0%, 100% { transform: scale(.85); opacity: 1; } 50% { transform: scale(1.2); opacity: .55; } }
 .hud .next-need { margin-right: 10px; }
 .news-foot { display: flex; gap: 6px; }
+
+/* ---------- dynasty, courtier standing, story cards ---------- */
+.dynasty { display: grid; gap: 8px; margin-top: 10px; max-width: 860px; }
+.dynasty h4 { margin: 10px 0 0; font: 600 15px var(--caps); letter-spacing: .05em; color: var(--ink-3); }
+.dynasty .royal { grid-template-columns: 118px 1fr; }
+.dynasty .royal h3 { margin: 0; font: 700 26px var(--display); }
+.dynasty .royal p { margin: 6px 0 0; }
+.heirs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.heirs li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; }
+.heirs li > div { flex: 1; }
+.heirs .portrait.card { width: 54px; height: 54px; flex: none; }
+.heirs .rank-badge { margin-left: 6px; }
+.royal-initial { display: grid; place-items: center; width: 100%; height: 100%; font: 700 28px var(--display); color: var(--gold-hi); background: var(--lacquer-2); border-radius: 50%; }
+.standing { display: grid; gap: 6px; }
+.standing p { margin: 0; }
+.loyalty-line { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; font-size: 15px; }
+.loyalty-line .attitude { grid-column: auto; margin: 0; }
+.reasons { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 14.5px; }
+.reasons .good { color: #2f6b34; } .reasons .bad { color: var(--oxblood); }
+.life summary, .reign-history summary { cursor: pointer; font-weight: 600; color: var(--ink-2); }
+.reign-history { margin: 0 0 14px; padding: 10px 14px; border-radius: 10px; background: rgba(255, 250, 235, .55); border: 1px solid rgba(169, 129, 73, .55); text-align: left; }
+.reign-history p { margin: 8px 0 0; font-size: 16px; line-height: 1.5; }
+.event-art.family { display: inline-block; }
+.event-art.family img { max-height: 150px; border-radius: 8px; }
+.event-family { font: 600 13px var(--caps); letter-spacing: .12em; color: var(--ink-3); text-transform: uppercase; margin-top: 2px; }
+.name-land { display: flex; align-items: end; justify-content: center; gap: 10px; margin: 12px 0 2px; }
+.name-land label { display: grid; gap: 4px; font-weight: 600; text-align: left; }
+.name-land input { font: 18px var(--serif); padding: 6px 10px; width: 260px; border-radius: 6px; border: 1px solid var(--gold-mid); background: #fffdf4; }
+.modal.event.end { width: min(680px, calc(100vw - 32px)); max-height: 92vh; overflow-y: auto; }
+.heir-card { background: rgba(255, 250, 235, .55); border: 1px solid rgba(169, 129, 73, .55); border-radius: 10px; }
+.heir-card .portrait.card { overflow: hidden; border-radius: 50%; }

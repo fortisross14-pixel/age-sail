@@ -44,7 +44,7 @@ export function nationAt(w: World, map: MapId, hex: number): NationDef | undefin
 export function initNatives(w: World): Record<string, NativeState> {
   return Object.fromEntries(allNations(w).map((n) => [n.id, {
     met: false, attitude: 10, relation: 'peace' as const, warriors: n.warriors, converted: 0, post: false, mission: false, lost: [], contact: null, epidemic: false,
-    memory: [], siege: null, crowns: {}, feud: null,
+    memory: [], siege: null, crowns: {}, feud: null, pact: null,
   }]));
 }
 
@@ -381,15 +381,36 @@ function feuds(w: World, s: GameState, log: Log) {
       if (rng() < NATIVE_FEUD.skirmish) st.warriors = Math.max(1, st.warriors - 1);
       if (rng() < NATIVE_FEUD.skirmish) fs.warriors = Math.max(1, fs.warriors - 1);
       if (rng() < NATIVE_FEUD.battle || s.turn - st.feud.since >= NATIVE_FEUD.longest) {
-        const mineWins = rng() < st.warriors / (st.warriors + fs.warriors);
+        // an ally's warriors count for half
+        const help = (x: NativeState) => (x.pact && s.natives[x.pact] ? s.natives[x.pact].warriors * NATIVE_FEUD.allyShare : 0);
+        const a = st.warriors + help(st), b = fs.warriors + help(fs);
+        const mineWins = rng() < a / (a + b);
         const [win, lose, loser] = mineWins ? [n, foe, fs] : [foe, n, st];
         loser.warriors = Math.max(1, Math.round(loser.warriors * NATIVE_FEUD.defeat));
         st.feud = fs.feud = null;
+        // beaten badly enough, they give up a village and move away from their enemies
+        if (loser.warriors < lose.warriors * NATIVE_FEUD.flee) {
+          const left = lose.villages.filter((v) => !loser.lost.includes(v));
+          if (left.length) {
+            loser.lost.push(left.sort((x, y) => GRIDS[lose.map].distance(x, win.siteHex) - GRIDS[lose.map].distance(y, win.siteHex))[0]);
+            if (loser.met) log('court', `${cap(nameOf(lose))} abandon a village and move away from ${nameOf(win)}.`);
+          }
+        }
         if (st.met || fs.met) log('court', `The war between ${nameOf(n)} and ${nameOf(foe)} is over. ${cap(nameOf(win))} have the better of it; ${nameOf(lose)} are weakened.`);
       }
       continue;
     }
     if (seasonOf(s.turn) !== 0 || st.siege) continue;
+    // peoples with a common enemy make common cause
+    if (st.pact && (!s.natives[st.pact] || s.natives[st.pact].pact !== n.id)) st.pact = null;
+    if (!st.pact && rng() < NATIVE_FEUD.pact) {
+      const friend = all.find((m) => m.id !== n.id && m.map === n.map && !n.rivals.includes(m.id) && !m.rivals.includes(n.id) && !s.natives[m.id]?.pact
+        && s.natives[m.id]?.relation !== 'subject' && m.rivals.some((r) => n.rivals.includes(r)));
+      if (friend) {
+        st.pact = friend.id; s.natives[friend.id].pact = n.id;
+        if (st.met || s.natives[friend.id].met) log('court', `${cap(nameOf(n))} and ${nameOf(friend)} have sworn to stand together against their enemies.`);
+      }
+    }
     const foes = n.rivals.map((id) => all.find((x) => x.id === id)).filter((x): x is NationDef => !!x && !!s.natives[x.id] && !s.natives[x.id].feud && s.natives[x.id].relation !== 'subject');
     if (!foes.length || rng() >= NATIVE_FEUD.chance) continue;
     const foe = pick(rng, foes);
@@ -431,6 +452,14 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
       if (st.relation !== 'subject') remember(s, st, `Settlers at ${c.name} on their land`, -k);
       const friendly = st.relation === 'allied' || st.relation === 'subject' || (st.relation === 'peace' && st.attitude >= NATIVE.friendly);
       if (friendly && !st.siege) c.stock.food = (c.stock.food ?? 0) + (st.relation === 'peace' ? NATIVE.friendFood : NATIVE.allyFood);
+    }
+    // crowded out: a weak people that has had enough of settlers gives up a village and goes inland
+    if (near.length && st.attitude <= NATIVE.furious && st.warriors < NATIVE_FEUD.crowded && st.relation !== 'subject' && rng() < 0.1) {
+      const left = n.villages.filter((v) => !st.lost.includes(v));
+      if (left.length) {
+        st.lost.push(left.sort((x, y) => g.distance(x, near[0].hex) - g.distance(y, near[0].hex))[0]);
+        log('court', `${cap(nameOf(n))} abandon a village near ${near[0].name} and move inland, away from the settlers.`);
+      }
     }
     // sickness: some seasons after first contact, an epidemic
     if (!st.epidemic && s.turn - st.contact >= 4 + (hashSeed(s.seed, n.siteHex) % 5)) {

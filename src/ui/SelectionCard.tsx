@@ -1,4 +1,5 @@
 import { useStore } from '../store';
+import { rivalSpec } from '../data/rivals';
 import { provisionsMax, maxMoves, leaderOf, slotsUsed, slotsMax, isPortal, canCross, portById, cargoUsed, cargoCapacity, provisionCost } from '../sim/game';
 import { fmt } from './format';
 import { GRIDS } from '../sim/hex';
@@ -93,6 +94,15 @@ export function SelectionCard() {
             {leaderOf(game, fleet) && aboard > 0 && <button title="Units go ashore; the leader stays with the ships" onClick={() => set({ landing: { leader: false } })}>Land units only</button>}
           </>
         )}
+        {!preview && game.rivalShips.filter((x) => x.kind !== 'army' && x.map === fleet.map && g.distance(x.hex, fleet.hex) <= 1).slice(0, 2).map((x) => {
+          const spec = rivalSpec(x.crown), war = game.rivals[x.crown].relation === 'war';
+          return (
+            <button key={x.id} className="danger" title={`A ${x.kind === 'raid' ? 'troopship' : x.kind === 'privateer' ? 'privateer' : x.kind === 'settlers' ? 'ship with settlers' : 'merchantman'} of ${spec.name}.${war ? '' : ' Attacking her means war.'}`}
+              onClick={() => { if (war || window.confirm(`Attack the ${x.name}? It means war with ${spec.name}.`)) void run({ kind: 'intercept', fleet: fleet.id, ship: x.id }); }}>
+              Attack the {x.name}
+            </button>
+          );
+        })}
         {!preview && port?.kind === 'native' && (() => {
           const n = nationOfSite(world, port.id);
           const st = n ? game.natives[n.id] : undefined;
@@ -205,6 +215,9 @@ function PartyCard({ partyId }: { partyId: number }) {
             </button>
           );
         })()}
+        {!preview && units.length > 0 && game.rivalShips.filter((x) => x.kind === 'army' && x.map === p.map && g.distance(x.hex, p.hex) <= 1).map((x) => (
+          <button key={x.id} className="danger" title={`Soldiers of ${rivalSpec(x.crown).name} on the march: about ${x.strength} companies.`} onClick={() => void run({ kind: 'engage', party: p.id, ship: x.id, stance })}>Give battle to {rivalSpec(x.crown).people}</button>
+        ))}
         {!preview && ships.map((f) => (
           <button key={f.id} onClick={async () => {
             if (await run({ kind: 'boardParty', party: p.id, fleet: f.id })) useStore.getState().selectFleet(f.id);

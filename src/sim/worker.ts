@@ -60,6 +60,11 @@ export type Command =
   | { kind: 'retake'; party: number; free: string; stance?: Stance }
   | { kind: 'rivalPeace'; crown: CrownId }
   | { kind: 'storm'; party: number; colony: string; stance?: Stance }
+  | { kind: 'marry'; offer: number }
+  | { kind: 'renameColony'; colony: string; name: string }
+  | { kind: 'nameLand'; name: string; map: 'old' | 'new'; hex: number }
+  | { kind: 'intercept'; fleet: number; ship: number }
+  | { kind: 'engage'; party: number; ship: number; stance?: Stance }
   | { kind: 'dismissEvent' };
 
 let world: World | null = null;
@@ -145,6 +150,11 @@ const api = {
       case 'retake': result = G.retakeFree(world, state, c.party, c.free, c.stance); break;
       case 'rivalPeace': result = G.rivalPeace(state, c.crown); break;
       case 'storm': result = G.stormColony(world, state, c.party, c.colony, c.stance); break;
+      case 'marry': result = G.marry(state, c.offer); break;
+      case 'renameColony': result = G.renameColony(state, c.colony, c.name); break;
+      case 'nameLand': result = G.nameLand(state, c.name, c.map, c.hex); break;
+      case 'intercept': result = G.intercept(world, state, c.fleet, c.ship); break;
+      case 'engage': result = G.engage(world, state, c.party, c.ship, c.stance); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
     const achieved = result.ok ? G.checkObjectives(world, state).map((o) => o.id) : [];

@@ -7,6 +7,7 @@ import { rivalScore } from './rivals';
 import { rivalsOf, rivalSpec } from '../data/rivals';
 import { fight, casualties, recordLosses, blood, partyForce, type Force } from './battle';
 import { isMilitary } from '../data/army';
+import { realmMods, judgeEra, eraCard } from './dynasty';
 import { yearOf, emptyAccount, type Stance, type Colony, type GameEvent, type GameState, type World, type Party } from './types';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -35,6 +36,8 @@ export function loyaltyFactors(s: GameState, c: Colony): { label: string; value:
   if (garrison) f.push({ label: `Garrison (${garrison})`, value: Math.min(15, garrison * 4) });
   if (c.last.hungry || c.last.discontent) f.push({ label: 'Needs not met', value: -15 });
   if (c.last.luxuries) f.push({ label: 'Luxuries', value: 4 });
+  const realm = realmMods(s).loyalty;
+  if (realm) f.push({ label: s.dynasty.regency ? 'A regency, and the path of the age' : 'Your rule, and the path of the age', value: realm });
   return f;
 }
 export const loyaltyTarget = (s: GameState, c: Colony) => Math.max(0, Math.min(100, loyaltyFactors(s, c).reduce((t, x) => t + x.value, 0)));
@@ -70,8 +73,11 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
   // a new era
   const era = ERAS.find((e) => e.year === year && s.turn % 4 === 0);
   if (era && era.year > 1492) {
+    // the age that closes is judged by what it promised; the new one asks for a path
+    judgeEra(w, s, log);
     log('court', `A new age begins: the ${era.name}.`);
-    ev({ kind: 'era', title: era.name, map: 'old', hex: w.old.ports.find((p) => p.id === rivalSpec(s.crown).home)!.hex, text: era.blurb });
+    const hex = w.old.ports.find((p) => p.id === rivalSpec(s.crown).home)!.hex;
+    ev(eraCard(era.id, hex) ?? { kind: 'era', title: era.name, map: 'old', hex, text: era.blurb });
   }
   // loans
   for (const l of s.loans) { s.treasury -= l.perSeason; l.left--; }
@@ -105,6 +111,7 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
   // the end of the age
   if (!s.ended && s.turn >= s.endTurn) {
     s.ended = true;
+    judgeEra(w, s, log);
     const st = standings(w, s);
     const first = st[0];
     const mine = st.find((x) => x.mine)!;

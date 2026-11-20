@@ -124,6 +124,11 @@ export const RIVAL_ECON = {
   margin: 0.2,
   /** chance a season that a ship at sea is lost (twice that across the ocean) */
   wreck: 0.008,
+  /** ducats a season a crown pays its pilots to study the ocean crossing; it is learned after `volta` seasons of study */
+  study: 12,
+  /** an army marches when the colony is within this many hexes by land, this many hexes a season */
+  marchReach: 9,
+  marchPace: 2,
   /** ducats a season a war with another crown costs each side */
   warCost: 30,
   /** a people's regard for a crown: friends above, raiders below */

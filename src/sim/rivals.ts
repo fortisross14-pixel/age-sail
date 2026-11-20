@@ -17,6 +17,8 @@ import { RESOURCE_IDS } from '../data/city';
 import { GRIDS, type Grid } from './hex';
 import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { planRoute, stepCost } from './sailing';
+import { planLand } from './land';
+import { realmMods, tiedTo } from './dynasty';
 import { LEVELS } from './colony';
 import { personById, skill } from './court';
 import { fight, casualties, recordLosses, blood, partyForce, assaultColony, rivalGarrison, type Force } from './battle';
@@ -43,7 +45,7 @@ const NAMES: Record<CrownId, string[]> = {
 export function initRivals(_me: CrownId = 'spain'): Record<CrownId, RivalState> {
   return Object.fromEntries(CROWNS.map((r) => [r.id, {
     attitude: 10, relation: 'peace', next: r.start, revenue: 0, posts: [], warSince: null,
-    treasury: RIVAL_ECON.startTreasury, hulls: RIVAL_ECON.startShips, built: RIVAL_ECON.startShips, plan: { kind: 'idle' }, toward: {}, wars: [], rivalWarSince: {},
+    treasury: RIVAL_ECON.startTreasury, hulls: RIVAL_ECON.startShips, built: RIVAL_ECON.startShips, plan: { kind: 'idle' }, toward: {}, wars: [], rivalWarSince: {}, learning: 0, volta: false,
   }])) as unknown as Record<CrownId, RivalState>;
 }
 
@@ -183,11 +185,11 @@ function options(w: World, s: GameState, spec: RivalSpec, r: RivalState, rng: Rn
   const pace = spec.pace * difficultySpec(s.difficulty).rivalPace;
   const mine = s.rivalColonies.filter((c) => c.crown === spec.id);
   const atSea = s.rivalShips.filter((x) => x.crown === spec.id);
-  const boards: MapId[] = s.turn >= spec.volta ? ['old', 'new', 'new'] : ['old'];
+  const boards: MapId[] = r.volta ? ['old', 'new', 'new'] : ['old'];
   const home = w.old.ports.find((p) => p.id === spec.home)!;
 
   // a colony short of stores comes first
-  const needy = mine.filter((c) => c.supply <= E.supplyLow && (c.map === 'old' || s.turn >= spec.volta) && !atSea.some((x) => x.kind === 'supply' && x.target === c.hex && x.map === c.map));
+  const needy = mine.filter((c) => c.supply <= E.supplyLow && (c.map === 'old' || r.volta) && !atSea.some((x) => x.kind === 'supply' && x.target === c.hex && x.map === c.map));
   if (needy.length) {
     const c = [...needy].sort((a, b) => a.supply - b.supply)[0];
     out.push({ kind: 'supply', u: 3, cost: E.supply, hull: true, run: () => {
@@ -209,13 +211,22 @@ function options(w: World, s: GameState, spec: RivalSpec, r: RivalState, rng: Rn
       } });
     }
     const prey = s.colonies.filter((c) => boards.includes(c.map) && mine.some((x) => x.map === c.map && GRIDS[c.map].distance(x.hex, c.hex) <= E.raidReach)
-      && !atSea.some((x) => x.kind === 'raid' && x.map === c.map && x.target === c.hex));
+      && !atSea.some((x) => (x.kind === 'raid' || x.kind === 'army') && x.map === c.map && x.target === c.hex));
     if (prey.length) {
       out.push({ kind: 'raid', u: 1.3 * spec.war * aggression(s), cost: E.raid, hull: true, run: () => {
         const c = pick(rng, prey);
         const base = mine.filter((x) => x.map === c.map).sort((a, b) => GRIDS[c.map].distance(a.hex, c.hex) - GRIDS[c.map].distance(b.hex, c.hex))[0];
+        const strength = Math.min(6, 2 + Math.floor((s.turn - (r.warSince ?? s.turn)) / 8));
+        // close enough to walk: an army marches overland, where your own soldiers can meet it
+        const road = base && GRIDS[c.map].distance(base.hex, c.hex) <= E.marchReach ? planLand(GRIDS[c.map], w[c.map], known(c.map), base.hex, c.hex, 99, 99) : null;
+        if (base && road) {
+          const names = SHIP_NAMES_BY_CROWN[spec.id];
+          s.rivalShips.push({ id: s.nextId++, crown: spec.id, map: c.map, hex: base.hex, kind: 'army', target: c.hex, path: road.path, trail: [base.hex], strength, name: `the companies of ${names[s.nextId % names.length]}`, homeward: false, cargo: null });
+          if (seen(s, c.map, base.hex)) log('peril', `Soldiers of ${spec.name} march out of ${base.name}, toward ${c.name}.`);
+          return true;
+        }
         const from = base ? GRIDS[c.map].neighbors(base.hex).find((h) => isWater(w[c.map].terrain[h])) : undefined;
-        const ship = spawn(w, s, spec.id, c.map, 'raid', c.hex, Math.min(6, 2 + Math.floor((s.turn - (r.warSince ?? s.turn)) / 8)), from);
+        const ship = spawn(w, s, spec.id, c.map, 'raid', c.hex, strength, from);
         if (ship && seen(s, ship.map, ship.hex)) log('peril', `Soldiers of ${spec.name} have embarked${base ? ` at ${base.name}` : ''}. They are making for ${c.name}.`);
         return !!ship;
       } });
@@ -291,6 +302,15 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
     const posts = r.posts.length * E.perPost;
     r.revenue += posts;
     r.treasury += E.homeIncome + posts - r.built * E.shipUpkeep;
+    // their pilots study the ocean road, while there is money to pay them
+    if (!r.volta && r.treasury >= E.study) {
+      r.treasury -= E.study;
+      r.learning++;
+      if (r.learning >= spec.volta * difficultySpec(s.difficulty).rivalPace) {
+        r.volta = true;
+        log('court', `Word from ${w.old.ports.find((p) => p.id === spec.home)?.name}: the pilots of ${spec.name} have learned to cross the Mar Océano and come home.`);
+      }
+    }
 
     const before = s.rivalShips.length;
     decide(w, s, spec, r, rng, log);
@@ -304,7 +324,8 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
     }
 
     // relations drift, and sour with neighbours too close
-    r.attitude += r.attitude > 10 ? -0.5 : r.attitude < 10 ? 0.5 : 0;
+    const rest = 10 + realmMods(s).regard + (tiedTo(s, spec.id) ? 20 : 0);
+    r.attitude += r.attitude > rest ? -0.5 : r.attitude < rest ? 0.5 : 0;
     for (const c of s.colonies) {
       if (s.rivalColonies.some((x) => x.crown === spec.id && x.map === c.map && GRIDS[c.map].distance(x.hex, c.hex) <= 6)) r.attitude -= 3;
       if (spec.id === 'portugal' && s.turn > 6 && c.map === 'old') r.attitude -= 2;
@@ -313,7 +334,7 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
     // the enemy of their enemy
     for (const foe of r.wars) if (s.rivals[foe].relation === 'war') r.attitude += 0.5;
     r.attitude = Math.max(-100, Math.min(100, r.attitude));
-    if (r.relation === 'peace' && r.attitude < -50 && rng() < 0.15 * spec.war * aggression(s)) {
+    if (r.relation === 'peace' && r.attitude < -50 && !tiedTo(s, spec.id) && rng() < 0.15 * spec.war * aggression(s)) {
       r.relation = 'war';
       r.warSince = s.turn;
       log('peril', `${spec.name} declares war on ${me(s)}.`);
@@ -341,6 +362,16 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
       // ships in your own home ports are safe under the harbour guns
       const safe = prey.at != null && !!s.cities[prey.at];
       if (g.distance(prey.hex, ship.hex) <= 1 && !safe) seaBattle(s, prey, ship, rng, log, onFleetLost);
+      continue;
+    }
+    if (ship.kind === 'army') {
+      // two hexes a season on foot; at the walls, they assault, and what is left goes home
+      ship.trail = [ship.hex];
+      for (let k = 0; k < E.marchPace && ship.path && ship.path.length > 1; k++) { ship.path.shift(); ship.hex = ship.path[0]; ship.trail.push(ship.hex); }
+      if (ship.path && ship.path.length > 1 && r.relation === 'war') continue;
+      s.rivalShips = s.rivalShips.filter((x) => x !== ship);
+      const c = s.colonies.find((x) => x.map === ship.map && x.hex === ship.target);
+      if (c && r.relation === 'war') landAt(w, s, ship, c, rng, log);
       continue;
     }
     sail(w, s, ship);
@@ -381,14 +412,7 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
       }
     } else if (ship.kind === 'raid') {
       const c = s.colonies.find((x) => x.map === ship.map && x.hex === ship.target);
-      if (c && r.relation === 'war') {
-        const out = assaultColony(s, c, { name: spec.name, units: rivalGarrison(ship.strength, 0, yearOf(s.turn)), crown: spec.id }, w[c.map].terrain[c.hex], rng);
-        if (out.win) {
-          if (c.pop > 1) c.pop--;
-          for (const k of Object.keys(c.stock) as (keyof Colony['stock'])[]) c.stock[k] = Math.floor((c.stock[k] ?? 0) / 2);
-          log('peril', `${Cap(spec.people)} land at ${c.name}: a colonist is killed and the warehouse plundered.`);
-        } else log('peril', `${Cap(spec.people)} land at ${c.name}, and are beaten off.`);
-      }
+      if (c && r.relation === 'war') landAt(w, s, ship, c, rng, log);
     }
     turnHome(w, s, ship);
   }
@@ -415,6 +439,89 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
   }
 
   crownsAndPeoples(w, s, rng, log);
+}
+
+/** Soldiers from a ship or a march fall on one of your colonies. */
+function landAt(w: World, s: GameState, ship: RivalShip, c: Colony, rng: Rng, log: Log) {
+  const spec = rivalSpec(ship.crown);
+  const out = assaultColony(s, c, { name: spec.name, units: rivalGarrison(ship.strength, 0, yearOf(s.turn)), crown: spec.id }, w[c.map].terrain[c.hex], rng);
+  const how = ship.kind === 'army' ? 'march on' : 'land at';
+  if (out.win) {
+    if (c.pop > 1) c.pop--;
+    for (const k of Object.keys(c.stock) as (keyof Colony['stock'])[]) c.stock[k] = Math.floor((c.stock[k] ?? 0) / 2);
+    log('peril', `${Cap(spec.people)} ${how} ${c.name}: a colonist is killed and the warehouse plundered.`);
+  } else log('peril', `${Cap(spec.people)} ${how} ${c.name}, and are beaten off.`);
+}
+
+/** The rival crown most likely to tempt one of your courtiers away: the one that likes you least. */
+export function suitor(s: GameState, rng: Rng): CrownId | undefined {
+  const rs = rivalsOf(s.crown);
+  const worst = [...rs].sort((a, b) => s.rivals[a.id].attitude - s.rivals[b.id].attitude)[0];
+  return rng() < 0.6 ? worst?.id : pick(rng, rs).id;
+}
+
+/** How hard a rival ship is to take: privateers and troopships fight, the rest mostly run. */
+export const shipStrength = (x: RivalShip) => (x.kind === 'privateer' ? x.strength : x.kind === 'raid' ? x.strength + 3 : 2);
+
+/** One of your fleets falls on a rival ship beside it. Attacking a crown you are at peace with is war. */
+export function intercept(w: World, s: GameState, f: Fleet, shipId: number, rng: Rng, log: Log, onFleetLost: (f: Fleet, why: string) => void): Result {
+  const ship = s.rivalShips.find((x) => x.id === shipId);
+  if (!ship || ship.kind === 'army') return fail('No such ship.');
+  if (ship.map !== f.map || GRIDS[f.map].distance(f.hex, ship.hex) > 1) return fail('The fleet must be beside her.');
+  const home = w.old.ports.find((p) => p.id === rivalSpec(ship.crown).home);
+  if (ship.map === 'old' && home && ship.hex === home.hex) return fail('She lies under the guns of her home port.');
+  const r = s.rivals[ship.crown], spec = rivalSpec(ship.crown);
+  if (r.relation !== 'war') { r.relation = 'war'; r.warSince = s.turn; r.attitude = Math.min(r.attitude, -70); log('peril', `The attack on the ${ship.name} means war with ${spec.name}.`); }
+  const a = fleetGuns(s, f), d = shipStrength(ship);
+  if (rng() < a / (a + d)) {
+    const prize = int(rng, 150, 500) + (ship.cargo ? ship.cargo.qty * 15 : 0) + (ship.kind === 'settlers' || ship.kind === 'supply' ? 200 : 0);
+    loseShip(s, ship);
+    s.treasury += prize;
+    s.prestige += ship.kind === 'raid' ? 8 : 4;
+    for (const x of f.ships) x.hull = Math.max(10, x.hull - int(rng, 3, 18));
+    const what = ship.kind === 'raid' ? ', with the soldiers she carried' : ship.kind === 'settlers' ? ', with her settlers' : ship.kind === 'supply' ? ', with the stores for their colony' : '';
+    log('peril', `${f.name} takes the ${ship.name} of ${spec.name}${what}. Prize money: ${prize} ducats.`);
+    return { ok: true, message: `The ${ship.name} strikes her colours. +${prize} ducats.` };
+  }
+  const lost = f.ships[int(rng, 0, f.ships.length - 1)];
+  f.ships = f.ships.filter((x) => x !== lost);
+  if (!f.ships.length) { onFleetLost(f, `${f.name} attacks the ${ship.name} of ${spec.name} and is lost.`); return { ok: true, message: 'The fight goes against you. The fleet is lost.' }; }
+  f.crew = Math.max(1, f.crew - SHIPS[lost.type].crew);
+  log('peril', `${f.name} attacks the ${ship.name} of ${spec.name} and is beaten off, losing the ${lost.name}.`);
+  return { ok: true, message: `Beaten off: the ${lost.name} is lost.` };
+}
+
+/** One of your parties meets a rival army in the field, before it reaches a colony. */
+export function engage(w: World, s: GameState, p: Party, shipId: number, rng: Rng, log: Log, ev: Ev, stance: Stance = 'assault'): Result {
+  const army = s.rivalShips.find((x) => x.id === shipId && x.kind === 'army');
+  if (!army) return fail('No such army.');
+  if (army.map !== p.map || GRIDS[p.map].distance(p.hex, army.hex) > 1) return fail('The party must stand beside them.');
+  const mine = partyForce(s, p);
+  if (!mine.units.length) return fail('The party has no one who can fight.');
+  const spec = rivalSpec(army.crown);
+  const theirs: Force = { name: `Soldiers of ${spec.name}`, units: rivalGarrison(army.strength, 0, yearOf(s.turn)), crown: army.crown };
+  const out = fight(rng, mine, theirs, w[p.map].terrain[army.hex], stance);
+  const units = s.units.filter((u) => u.party === p.id);
+  const dead = casualties(rng, units, out.atkLoss);
+  s.units = s.units.filter((u) => !dead.includes(u));
+  recordLosses(out.report.attacker, dead);
+  const theirDead = casualties(rng, theirs.units, out.defLoss);
+  recordLosses(out.report.defender, theirDead);
+  const who = personById(s, p.leader)?.name ?? p.name;
+  let text: string;
+  if (out.attackerWon) {
+    s.rivalShips = s.rivalShips.filter((x) => x !== army);
+    blood(s.units.filter((u) => u.party === p.id));
+    s.prestige += 6;
+    text = `${who} meets the soldiers of ${spec.name} on the march and breaks them. They will not reach the colony.`;
+  } else {
+    army.strength = Math.max(1, army.strength - theirDead.length);
+    text = `${who} cannot stop the soldiers of ${spec.name}.${dead.length ? ` ${dead.length} compan${dead.length > 1 ? 'ies are' : 'y is'} lost.` : ''} They march on.`;
+  }
+  if (!s.units.some((u) => u.party === p.id)) s.parties = s.parties.filter((x) => x !== p);
+  log('peril', text);
+  ev({ kind: 'battle', title: out.attackerWon ? 'Victory in the field' : 'Beaten in the field', map: p.map, hex: army.hex, text, battle: out.report });
+  return { ok: true };
 }
 
 // ---------- the crowns among themselves ----------
@@ -527,7 +634,7 @@ function crownsAndPeoples(w: World, s: GameState, rng: Rng, log: Log) {
 export function rivalDoing(s: GameState, crown: CrownId): string {
   const r = s.rivals[crown];
   const WANT: Record<RivalPlanKind, string> = { idle: '', settle: 'a new colony', trade: 'a trading voyage', supply: 'a supply convoy', build: 'a new ship', saving: '', privateer: 'privateers', raid: 'a landing force' };
-  const AT_SEA: Record<RivalShip['kind'], string> = { settlers: 'settlers at sea', trader: 'a trading voyage under way', supply: 'a convoy to its colonies', privateer: 'privateers hunting', raid: 'soldiers at sea' };
+  const AT_SEA: Record<RivalShip['kind'], string> = { settlers: 'settlers at sea', trader: 'a trading voyage under way', supply: 'a convoy to its colonies', privateer: 'privateers hunting', raid: 'soldiers at sea', army: 'soldiers on the march' };
   const out = [...new Set(s.rivalShips.filter((x) => x.crown === crown && !x.homeward).map((x) => AT_SEA[x.kind]))];
   if (s.rivalShips.some((x) => x.crown === crown && x.homeward)) out.push('ships homeward bound');
   if (r.plan.kind === 'saving' && r.plan.for) out.push(`saving for ${WANT[r.plan.for]}`);

@@ -10,6 +10,8 @@ import * as Emp from './empire';
 import * as Story from './stories';
 import * as Trade from './trade';
 import * as Obj from './objectives';
+import * as Dyn from './dynasty';
+import { courtYear, onPromotion } from './court';
 import { DEFAULT_DIFFICULTY, difficultySpec, type Difficulty } from '../data/difficulty';
 import type { CrownId } from '../data/rivals';
 import { CITIES, cityById, cityMarket, KNOWN_SOUTH, ATLANTIC_ISLANDS } from '../data/europe';
@@ -37,7 +39,7 @@ export { crewNeeded };
 
 export const has = (s: GameState, t: TechId) => s.research.known.includes(t);
 /** Research points the court produces each season, before discoveries. */
-export const basePoints = (s: GameState) => 4 + (has(s, 'chancery') ? 2 : 0);
+export const basePoints = (s: GameState) => 4 + (has(s, 'chancery') ? 2 : 0) + Dyn.realmMods(s).research;
 export const techAvailable = (s: GameState, t: TechId) => !has(s, t) && techById(t).requires.every((r) => has(s, r));
 
 export function setResearch(s: GameState, t: TechId): CommandResult {
@@ -267,6 +269,7 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
     surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
     rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0, natives: Nat.initNatives(world), rivals: Riv.initRivals(crown), rivalColonies: [], rivalShips: [],
     freeStates: [], endTurn: (until - 1492) * 4, ended: false, taxRate: 'normal', loans: [], told: {},
+    flags: {}, pending: [], dynasty: Dyn.initialDynasty(crown, (() => { let k = 0; return () => -(++k); })()), eraPath: null, land: null,
     adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
     chronicle: [], events: [], factories: [], shocks: [], nextId: 1, newWorldFound: false,
     research: { known: [...(spec.edge.startTechs ?? [])], current: null, progress: 0, pending: 0 },
@@ -467,6 +470,7 @@ export function promote(s: GameState, personId: number, rank: Rank, opts: { unit
   }
   s.treasury -= info.cost;
   p.rank = rank;
+  onPromotion(s, p);
   p.ready = info.ready;
   p.unitType = rank === 'explorer' ? opts.unit! : null;
   const when = info.ready ? ` Ready in ${info.ready} season${info.ready > 1 ? 's' : ''}.` : '';
@@ -645,6 +649,41 @@ export function stormColony(world: World, s: GameState, partyId: number, colonyI
 export function grantCharter(s: GameState, colonyId: string): CommandResult { return Emp.charter(s, colonyId); }
 export function holdFestival(s: GameState, colonyId: string): CommandResult { return Emp.festival(s, colonyId); }
 export function setTaxRate(s: GameState, rate: GameState['taxRate']): CommandResult { return Emp.setTaxRate(s, rate); }
+export function marry(s: GameState, offer: number): CommandResult { return Dyn.marry(s, offer, (k, t) => log(s, k, t)); }
+
+const cleanName = (name: string) => name.replace(/[^\p{L}\p{N} '’.-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 28);
+/** Give a colony a name of your own. */
+export function renameColony(s: GameState, colonyId: string, name: string): CommandResult {
+  const c = s.colonies.find((x) => x.id === colonyId);
+  const n = cleanName(name);
+  if (!c) return fail('No such colony.');
+  if (n.length < 2) return fail('A name needs at least two letters.');
+  if (s.colonies.some((x) => x !== c && x.name === n) || s.rivalColonies.some((x) => x.name === n)) return fail('Another colony has that name.');
+  log(s, 'court', `${c.name} is to be called ${n}.`);
+  c.name = n;
+  return { ok: true, message: `The colony is now ${n}.` };
+}
+/** Name the land across the ocean: charts, chronicle and stories use it from now on. */
+export function nameLand(s: GameState, name: string, map: MapId, hex: number): CommandResult {
+  const n = cleanName(name);
+  if (n.length < 2) return fail('A name needs at least two letters.');
+  const first = !s.land;
+  s.land = { name: n, map: s.land?.map ?? map, hex: s.land?.hex ?? hex };
+  log(s, 'discovery', first ? `By your order the land across the ocean is named ${n}, and so it is written on every chart.` : `The land across the ocean is renamed ${n}.`);
+  return { ok: true, message: `It will be called ${n}.` };
+}
+/** Fall on a rival ship beside one of your fleets. */
+export function intercept(world: World, s: GameState, fleetId: number, shipId: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  if (!f) return fail('No such fleet.');
+  return Riv.intercept(world, s, f, shipId, mulberry32(hashSeed(s.seed, s.turn, shipId, 79)), (k, t) => log(s, k, t), (x, why) => loseFleet(s, x, why));
+}
+/** Meet a rival army in the field with a party beside it. */
+export function engage(world: World, s: GameState, partyId: number, shipId: number, stance: Stance = 'assault'): CommandResult {
+  const p = Land.partyById(s, partyId);
+  if (!p) return fail('No such party.');
+  return Riv.engage(world, s, p, shipId, mulberry32(hashSeed(s.seed, s.turn, shipId, 80)), (k, t) => log(s, k, t), (e) => event(s, e), stance);
+}
 export function chooseStory(world: World, s: GameState, index: number): CommandResult { return Story.resolveStory(world, s, index, (k, t) => log(s, k, t)); }
 export function retakeFree(world: World, s: GameState, partyId: number, freeId: string, stance: Stance = 'assault'): CommandResult {
   const p = Land.partyById(s, partyId);
@@ -1147,7 +1186,8 @@ export function seasonTick(world: World, s: GameState): void {
     taxes += cityTaxes(c);
     addResearch(s, c.buildings.university * 2);
   }
-  s.treasury += taxes;
+  const mods = Dyn.realmMods(s);
+  s.treasury += Math.round(taxes * mods.taxes);
 
   // the court: commissions take effect, salaries, a learned court helps the scholars
   for (const p of s.people) {
@@ -1209,7 +1249,7 @@ export function seasonTick(world: World, s: GameState): void {
   // wages and upkeep
   const upkeep = s.fleets.reduce((t, f) => t + f.ships.reduce((u, sh) => u + SHIPS[sh.type].upkeep, 0), 0)
     + s.units.reduce((t, u) => t + UNIT_SPECS[u.type].upkeep, 0);
-  s.treasury -= upkeep + wages;
+  s.treasury -= Math.round(upkeep * mods.upkeep) + wages;
   if (s.treasury < 0) {
     const interest = Math.ceil(-s.treasury * 0.05);
     s.treasury -= interest;
@@ -1220,6 +1260,17 @@ export function seasonTick(world: World, s: GameState): void {
 
   // the long game: eras, loyalty and independence, loans, the end of the age; and perhaps a story
   Emp.empireSeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e));
+  // the ruling house: births, deaths, successions; and each spring the court takes stock of you
+  Dyn.dynastySeason(world, s, (k, t) => log(s, k, t), (e) => event(s, e), portById(world, mainPort(s), s)!.hex);
+  if (seasonOf(s.turn) === 0) {
+    const yr = mulberry32(hashSeed(s.seed, s.turn, 211));
+    for (const p of courtYear(s, yr)) {
+      // a rival crown makes them an offer, unless one is already on the table
+      if (s.pending.some((x) => x.story === 'defect' && x.ctx.courtier === p.id)) continue;
+      const to = Riv.suitor(s, yr);
+      if (to) s.pending.push({ story: 'defect', at: s.turn, ctx: { courtier: p.id, crown: to } });
+    }
+  }
   Story.maybeStory(world, s, (e) => event(s, e));
 
   // each spring the court grows a year older, and new faces ask to join it

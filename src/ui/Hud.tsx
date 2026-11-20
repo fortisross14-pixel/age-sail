@@ -11,6 +11,7 @@ import { Icon, Crest } from './theme/icons';
 import { Medal, CrestArt } from './theme/Art';
 import { sfx } from './sound';
 import { attention } from './attention';
+import { styled } from '../sim/dynasty';
 
 const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th'];
 
@@ -34,7 +35,7 @@ export function Hud() {
   return (
     <header className="hud">
       <Armillary />
-      <div className="hud-crest" title={`${crown.name}. ${crown.edge.label}`}>
+      <div className="hud-crest" title={`${styled(game.crown, game.dynasty.ruler)} of ${crown.name}${game.dynasty.regency ? ' (a regency)' : ''}. ${crown.edge.label}`}>
         <CrestArt realm={game.crown} size={56} fallback={<Crest primary={colours.css2} secondary={colours.css} size={46} />} />
       </div>
       <div className="hud-date" title={`${era.blurb} The age ends in ${1492 + Math.floor(game.endTurn / 4)}${game.ended ? ' (passed: playing on)' : ''}.`}>

@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.15
+## Now playing: v0.16
 
-Phase 2, a world that pushes back: rival crowns have a treasury, ships that sail out and come home, colonies that live on convoys, and plans they choose and save for; they go to war with each other; native peoples judge every crown and fight wars of their own; at war, enemy soldiers come by sea where you can see them. Court shows what each crown is doing.
+Phase 3, stories and dynasty: 114 stories written as data, with choices that come back years later and three historical set pieces for each crown; a ruling house with heirs, regencies, successions and royal marriages (Court, Dynasty); courtiers who remember what you did, want things, and can be tempted away by a rival; eras that open with a choice of path; a land you name; and the history of your reign told back in the Chronicle. Also the last of Phase 2: armies that march overland, rival ships you can attack, rivals who pay to learn the ocean crossing, and pacts between peoples.
+
+From v0.15, a world that pushes back: rival crowns have a treasury, ships that sail out and come home, colonies that live on convoys, and plans they choose and save for; they go to war with each other; native peoples judge every crown and fight wars of their own; at war, enemy soldiers come by sea where you can see them. Court shows what each crown is doing.
 
 From v0.14, the first hour: a first voyage in eight steps and advisers' ambitions with rewards, an objectives panel with "Show me", a short welcome and a tabbed guide in place of the help wall, End Turn reminders with `N` for the next thing that needs you, a ring on the map for the step in hand, openings written for each crown, news of the first rival sail, and three difficulty levels (Squire, Captain, Admiral). The plan from here, item by item: [docs/ROADMAP.md](docs/ROADMAP.md#production-plan); the audit behind it: [docs/PRODUCTION-AUDIT.md](docs/PRODUCTION-AUDIT.md).
 

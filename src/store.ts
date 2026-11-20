@@ -54,7 +54,7 @@ interface Store {
   /** things the player has already ended a turn past: End Turn does not ask about them again */
   guardSeen: string[];
   drawer: DrawerId | null;
-  courtTab: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'research' | 'chronicle';
+  courtTab: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'dynasty' | 'research' | 'chronicle';
   /** news the player has waved away */
   dismissed: string[];
   toast: { text: string; bad?: boolean; id: number } | null;

@@ -10,7 +10,7 @@ import type { GameState, World } from '../sim/types';
 /** Where an item (or an objective's "Show me") takes the player. */
 export interface Target {
   drawer?: 'cities' | 'markets' | 'fleets' | 'court' | 'research' | 'chronicle';
-  courtTab?: 'people' | 'petitioners' | 'peoples' | 'crowns';
+  courtTab?: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'dynasty';
   fleet?: number;
   party?: number;
   colony?: string;
@@ -63,5 +63,8 @@ export function attention(g: GameState, world: World): Attention[] {
   const yards = Object.values(g.cities).filter((c) => !c.project && c.buildings.docks > 0).length;
   if (yards) out.push({ id: 'yards', urgent: false, go: { drawer: 'cities' }, text: `${plural(yards, 'shipyard stands', 'shipyards stand')} idle.` });
   if (g.petitioners.length) out.push({ id: 'petitioners', urgent: false, go: { drawer: 'court', courtTab: 'petitioners' }, text: `${plural(g.petitioners.length, 'petitioner waits', 'petitioners wait')} at court.` });
+  if (g.dynasty.offers.length) out.push({ id: 'offers', urgent: false, go: { drawer: 'court', courtTab: 'dynasty' }, text: `${plural(g.dynasty.offers.length, 'offer', 'offers')} of marriage wait for an answer.` });
+  const leaving = g.people.filter((p) => p.alive && p.loyalty <= 20).length;
+  if (leaving) out.push({ id: 'disloyal', urgent: false, go: { drawer: 'court', courtTab: 'people' }, text: `${plural(leaving, 'courtier is', 'courtiers are')} ready to leave your service.` });
   return out;
 }

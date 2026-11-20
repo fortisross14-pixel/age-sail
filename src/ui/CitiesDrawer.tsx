@@ -47,6 +47,7 @@ export function ColonyCard({ colonyId }: { colonyId: string }) {
       </button>
       {open && (
         <div className="city-body">
+          <button className="link" onClick={() => { const n = prompt('A new name for the colony', c.name); if (n && n.trim() !== c.name) void run({ kind: 'renameColony', colony: c.id, name: n }); }}>rename</button>
           <div className="loyalty" title={loyaltyFactors(game, c).map((f) => `${f.label}: ${f.value > 0 ? '+' : ''}${f.value}`).join('\n')}>
             <span className="small">Loyalty <b>{Math.round(c.loyalty)}</b> → {Math.round(loyaltyTarget(game, c))}{c.unrest ? ' · unrest: work slows' : ''}{c.loyalty < 15 && c.pop >= 6 ? ' · talk of independence' : ''}</span>
             <div className="bar"><div className={c.loyalty < 30 ? 'bad' : ''} style={{ width: `${c.loyalty}%` }} /></div>

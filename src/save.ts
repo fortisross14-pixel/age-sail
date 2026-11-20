@@ -1,6 +1,7 @@
 import { GEN_VERSION } from './sim/version';
 import type { GameState } from './sim/types';
-import { RIVAL_ECON } from './data/rivals';
+import { RIVAL_ECON, rivalSpec, type CrownId } from './data/rivals';
+import { dynastyFor } from './sim/dynasty';
 
 /**
  * Save format. Bump SAVE_VERSION when the shape of GameState changes and add a migration from the
@@ -17,8 +18,11 @@ import { RIVAL_ECON } from './data/rivals';
  * and ticks the objectives it has already met without rewards when it is next loaded.
  * Version 16 (Phase 2, a world that pushes back) gives rival crowns a purse, ships that come home, plans and
  * relations with each other; their colonies stores and produce; peoples a regard for each crown and feuds.
+ * Version 17 (Phase 3, stories and dynasty) adds the ruling house, story flags and follow-ups, what courtiers
+ * remember and want, the era's path, the name of the new land, pacts between peoples, and what rivals have
+ * learned of the crossing. An older voyage gets a ruler in their prime, named from its seed.
  */
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 export const SAVE_KEY = 'age-sail:save';
 /** Keys used before the envelope. v9 is migrated; older ones can't be read and are removed. */
 export const LEGACY_KEY = 'age-sail:save:v9';
@@ -62,6 +66,18 @@ const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, 
     rivalShips: (s.rivalShips as Record<string, unknown>[]).map((x, i) => ({ ...x, name: `Ship ${i + 1}`, homeward: false, cargo: null })),
     natives: Object.fromEntries(Object.entries(s.natives as Record<string, Record<string, unknown>>).map(([id, st]) => [id, { ...st, crowns: {}, feud: null }])),
   }),
+  16: (s) => {
+    const person = (p: Record<string, unknown>) => ({ ...p, loyalty: 60, memory: [], bonds: [], want: null });
+    const turn = s.turn as number;
+    return {
+      ...s, flags: {}, pending: [], eraPath: null, land: null, dynasty: dynastyFor(s.crown as CrownId, s.seed as number, turn),
+      people: (s.people as Record<string, unknown>[]).map(person),
+      petitioners: (s.petitioners as { person: Record<string, unknown> }[]).map((x) => ({ ...x, person: person(x.person) })),
+      natives: Object.fromEntries(Object.entries(s.natives as Record<string, Record<string, unknown>>).map(([id, st]) => [id, { ...st, pact: null }])),
+      // they knew the crossing from a fixed season before: keep what they knew
+      rivals: Object.fromEntries(Object.entries(s.rivals as Record<string, Record<string, unknown>>).map(([id, r]) => [id, { ...r, learning: turn, volta: turn >= rivalSpec(id as CrownId).volta }])),
+    };
+  },
 };
 
 export function wrap(state: GameState): SaveEnvelope {

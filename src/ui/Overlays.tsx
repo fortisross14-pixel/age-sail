@@ -8,6 +8,9 @@ import { getView } from './MapCanvas';
 import { standings } from '../sim/empire';
 import { GuardSwitch } from './Guidance';
 import { BattleReportView } from './Battle';
+import { Art } from './theme/Art';
+import { ReignHistory } from './Dynasty';
+import { FAMILY_NAME } from '../data/stories/types';
 
 function FinalStandings() {
   const game = useStore((s) => s.game)!;
@@ -26,7 +29,9 @@ export function EventCard() {
   const ev = useStore((s) => s.game?.events[0]);
   const run = useStore((s) => s.run);
   const set = useStore((s) => s.set);
+  const [land, setLand] = useState('');
   if (!ev) return null;
+  const naming = ev.kind === 'landfall' && !useStore.getState().game?.land;
   const art = ev.kind === 'landfall' || ev.kind === 'tech' || ev.kind === 'era' || ev.kind === 'end' ? 'ornaments/compass-large' : ev.kind === 'people' ? 'colonies/trading-post-outpost' : ev.kind === 'story' ? 'ornaments/cartouche' : 'ornaments/serpent';
   const close = async (look: boolean) => {
     await run({ kind: 'dismissEvent' });
@@ -38,11 +43,23 @@ export function EventCard() {
   return (
     <div className="modal-back">
       <div className={`modal event ${ev.kind}`} role="dialog" aria-label={ev.title}>
-        {!ev.battle && <img className="event-art" src={spriteUrl(art)} alt="" />}
+        {!ev.battle && (ev.family
+          ? <span className={`event-art family family-${ev.family}`} title={FAMILY_NAME[ev.family]}><Art slot={`story/${ev.family}`} fallback={<img src={spriteUrl(art)} alt="" />} /></span>
+          : <img className="event-art" src={spriteUrl(art)} alt="" />)}
+        {ev.family && <div className="event-family">{FAMILY_NAME[ev.family]}</div>}
         <h2>{ev.title}</h2>
         {ev.battle && <BattleReportView r={ev.battle} />}
         <p className="event-text">{ev.text}</p>
         {ev.kind === 'end' && <FinalStandings />}
+        {ev.kind === 'end' && <ReignHistory open />}
+        {naming && (
+          <form className="name-land" onSubmit={(e) => { e.preventDefault(); if (land.trim().length >= 2) void run({ kind: 'nameLand', name: land, map: ev.map, hex: ev.hex }); }}>
+            <label>What shall this land be called?
+              <input value={land} maxLength={28} placeholder="Leave it for the mapmakers" onChange={(e) => setLand(e.target.value)} />
+            </label>
+            <button disabled={land.trim().length < 2}>Name it</button>
+          </form>
+        )}
         {ev.choices ? (
           <div className="choices">
             {ev.choices.map((c, i) => (

@@ -16,6 +16,7 @@ import { getView } from './MapCanvas';
 import { allNations, moodOf, envoy } from '../sim/natives';
 import { rivalsOf, crownSpec } from '../data/rivals';
 import { rivalScore, rivalDoing, friendOf } from '../sim/rivals';
+import { Dynasty, CourtierStanding, ReignHistory } from './Dynasty';
 import { RIVAL_ECON, rivalSpec } from '../data/rivals';
 import { score } from '../sim/colony';
 import { CROWN } from '../render/palette';
@@ -32,11 +33,13 @@ export function Court() {
         ['petitioners', `Petitioners${game.petitioners.length ? ` (${game.petitioners.length})` : ''}`],
         ['peoples', `Peoples${Object.values(game.natives).filter((n) => n.met).length ? ` (${Object.values(game.natives).filter((n) => n.met).length})` : ''}`],
         ['crowns', 'Crowns'],
+        ['dynasty', `Dynasty${game.dynasty.offers.length ? ` (${game.dynasty.offers.length})` : ''}`],
       ]} />
       {tab === 'people' && <People />}
       {tab === 'petitioners' && <Petitioners />}
       {tab === 'peoples' && <Peoples />}
       {tab === 'crowns' && <Crowns />}
+      {tab === 'dynasty' && <Dynasty />}
     </>
   );
 }
@@ -115,6 +118,7 @@ function PersonDetail({ p }: { p: Person }) {
       </div>
       <SkillBars p={p} />
       <p className="trait"><b>{TRAIT_INFO[p.trait].name}.</b> {TRAIT_INFO[p.trait].blurb}</p>
+      <CourtierStanding p={p} />
       {p.alive && <PersonActions p={p} />}
     </aside>
   );
@@ -276,6 +280,7 @@ export function Chronicle() {
   let lastTurn = -1;
   return (
     <div className="entries">
+      <ReignHistory />
       {[...game.chronicle].reverse().map((c, i) => {
         const head = c.turn !== lastTurn;
         lastTurn = c.turn;
@@ -321,6 +326,7 @@ function Peoples() {
                   {st.post ? ' · trading post' : ''}{st.mission ? ` · mission (${Math.round(st.converted * 100)}% won over)` : ''}
                   {(() => { const foe = st.feud ? allNations(world).find((x) => x.id === st.feud!.with) : undefined; return foe ? ` · at war with the ${foe.people}` : ''; })()}
                   {(() => { const f = friendOf(st); return f ? ` · friends of ${rivalSpec(f).name}` : ''; })()}
+                  {(() => { const a = st.pact ? allNations(world).find((x) => x.id === st.pact) : undefined; return a ? ` · sworn to the ${a.people}` : ''; })()}
                   {(Object.entries(st.crowns) as [typeof game.crown, number][]).filter(([, a]) => a <= RIVAL_ECON.peopleAngry).map(([c]) => ` · angry with ${rivalSpec(c).name}`).join('')}
                 </span>
               </div>
@@ -402,7 +408,8 @@ function Crowns() {
               <div className="person-actions">
                 <div className="muted small">
                   <b>{rivalDoing(game, r.id)}.</b> {st.built} ship{st.built === 1 ? '' : 's'}, {st.hulls} in port · treasury {st.treasury < 200 ? 'thin' : st.treasury < 1200 ? 'sound' : 'full'}
-                  {st.wars.length ? ` · at war with ${st.wars.map((c) => rivalSpec(c).name).join(' and ')}` : ''}.{' '}
+                  {st.wars.length ? ` · at war with ${st.wars.map((c) => rivalSpec(c).name).join(' and ')}` : ''}
+                  {st.volta ? ' · their pilots know the ocean crossing' : ' · their pilots are still learning the ocean crossing'}.{' '}
                   {war ? 'Their privateers hunt your ships, and their soldiers sail from their colonies to land at yours: watch for their ships. A party beside one of their colonies can storm it.' : 'Settling close to their colonies sours relations; below −50 they may declare war.'}
                   {r.id === 'portugal' && game.turn > 6 ? ' Under the Treaty of Tordesillas, they resent colonies on the African coast.' : ''}
                 </div>

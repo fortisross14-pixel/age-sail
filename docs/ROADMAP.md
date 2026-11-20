@@ -83,6 +83,11 @@ other. Later: wars with rival crowns for space, and independence wars against in
   little left to buy: for Phase 6. France now plants colonies; the Netherlands still starts last. A season
   costs about 4 ms with rivals routing ships out and home (it was under 1 ms): for Phase 7.
 
+- Phase 3: in two full games played with no orders and every card answered in turn, about 170 stories were
+  told in 158 years, 37 of the 114 distinct, because most stories need fleets at sea, colonies or peoples met;
+  a playing game binds far more. Castile had ten reigns in that time and England six. With nobody hired, the
+  court dies out. A season costs about 5 ms. Story frequency against story count is P6-07.
+
 ## Milestones
 
 | # | Milestone | Status |
@@ -103,9 +108,9 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | M12 | Armies: pikemen, swordsmen, crossbowmen, arquebusiers, lancers and field guns (barracks II for the last three), each with fire, melee, toughness and pursuit; parties ashore are armies under a general, carrying food (a small band forages, an army starves without supply, and restocks beside a colony); automatic battles in three rounds (fire, melee, pursuit) decided by morale, with terrain (horse and guns poor in rough country, defenders stronger there), firearms frightening peoples who have never met them, assault or steady stance, and a battle report; colony walls (palisade, stone walls, star fort) that field guns breach; veterans; native raids, sieges and ambushes, rival raids and storms, and retaking free states all fought the same way | done |
 | M13 | A living market: factories in any European port (yours or foreign, with dues abroad) that hold your goods, sell them slowly at fair prices and buy what you need while it is cheap; regional tastes (wine and spices in the North, silver and sugar in Italy, no wine in the Maghreb); shocks that move a region's demand for a few years (bad harvests, plague, war, a royal wedding, a fashion, a good peace); rival merchants who ship their colonies' sugar, tobacco and furs into their home ports and buy tools and cloth there; colonies wear out tools and work slower without them; glut and scarce markers. Paris trades through Rouen | done |
 | Phase 1 | **The first hour** (v0.14): objectives (a first voyage of eight steps, then advisers' ambitions with rewards), an objectives panel with "Show me", a short welcome in place of the help wall, a tabbed guide, End Turn reminders with a count on the button, three difficulty levels, and small interface fixes. Items P1-01 to P1-23 below | 22 of 23 done; P1-20 (watching new players) needs people |
-| Phase 2 | **A world that pushes back** (v0.15): rivals with a treasury, ships that sail out and home, colonies that live on convoys, and plans chosen by what they want and can afford; crowns that fight each other; peoples who judge every crown and fight their own wars; soldiers that come by sea where you can see them. Items P2-01 to P2-15 below | 12 of 15 done |
-| Phase 3 | Stories and dynasty: a hundred stories in data, chains, a monarch and heirs, crown-specific text | next |
-| Phase 4 | Depth: the research tree (was M15), European diplomacy and the Mediterranean (was M14), victory paths, scenarios | |
+| Phase 2 | **A world that pushes back** (v0.15): rivals with a treasury, ships that sail out and home, colonies that live on convoys, and plans chosen by what they want and can afford; crowns that fight each other; peoples who judge every crown and fight their own wars; soldiers that come by sea where you can see them. Items P2-01 to P2-15 below | done |
+| Phase 3 | **Stories and dynasty** (v0.16): 114 stories as data with chains, written for any crown; a ruling house with heirs, regencies, successions and royal marriages; courtiers who remember, want and can be lost to a rival; three historical set pieces per crown; eras that open with a choice of path; the land and colonies named by the player; the reign told back. Items P3-01 to P3-14 below | done |
+| Phase 4 | Depth: the research tree (was M15), European diplomacy and the Mediterranean (was M14), victory paths, scenarios, slavery | next |
 | Phase 5 | Interface depth: outliner, nested tooltips, ledger, turn summary, map modes, save slots | |
 | Phase 6 | Balance (was Pass 3): numbers in one place, autoplay harness, retune the five crowns. Deliberately late | deferred |
 | Phase 7 | Technical and visual polish: music, portraits, event paintings, a living map, the open engineering items. Deliberately last | deferred |
@@ -187,8 +192,8 @@ phase; nothing is renumbered.
 | Phase | Theme | Items | Done |
 |---|---|---|---|
 | 1 | The first hour | 23 | 22 |
-| 2 | A world that pushes back | 15 | 12 |
-| 3 | Stories and dynasty | 14 | 0 |
+| 2 | A world that pushes back | 15 | 15 |
+| 3 | Stories and dynasty | 14 | 14 |
 | 4 | Depth | 17 | 1 |
 | 5 | Interface depth | 13 | 0 |
 | 6 | Balance (deferred) | 10 | 0 |
@@ -245,9 +250,9 @@ Systems only: the numbers stay provisional until Phase 6.
 | P2-10 | Rival cargoes are real: a colony's produce waits for a ship, sails home in it and is sold in the home market, where the convoy's tools, cloth and wine were bought. The abstract `rivalMerchants` flow is gone | D2 | done |
 | P2-11 | Peoples go to war with their rivals without being incited: skirmishes, a deciding battle, and warriors too busy to raid you meanwhile | M6 | done |
 | P2-12 | At war, a rival's soldiers are a ship on the map: they embark at their nearest colony, you are told where they are bound, and they land at your colony when they arrive (raids used to be an unseen roll) | D2 | done |
-| P2-13 | Peoples make alliances with each other and migrate when beaten or crowded out (left over from P2-11) | M6 | open |
-| P2-14 | Rival armies that march overland to a colony, and your fleets able to intercept a rival ship at sea before it lands (left over from P2-12) | D2 | open |
-| P2-15 | Rivals learn the ocean crossing by research they pay for, instead of on the fixed `volta` season | D2 | open |
+| P2-13 | Peoples with a common enemy swear pacts (an ally's warriors count for half in their wars), and a people beaten badly, or crowded by settlers it is too weak to fight, abandons a village and moves away | M6 | done |
+| P2-14 | At war, a rival's soldiers march overland when your colony is within nine hexes by land, as an army on the map that one of your parties can meet in the field; and a fleet beside any rival ship can attack her (it is war if it was not already) | D2 | done |
+| P2-15 | Rivals learn the ocean crossing by paying their pilots season by season (`RIVAL_ECON.study`); a crown without money does not learn it, and a navigator who leaves your court for theirs brings it sooner | D2 | done |
 
 ### Phase 3: Stories and dynasty
 
@@ -256,20 +261,20 @@ one game.
 
 | Id | Action item | Answers | Status |
 |---|---|---|---|
-| P3-01 | Move stories to data (`src/data/stories/`, one file per family) with a small engine in `src/sim/stories.ts`: conditions by tags, weights, effects from a fixed vocabulary | N1 | open |
-| P3-02 | Crown-specific text: remove every hard-coded Castilian name (Toledo, Sevilla, Salamanca, "the King") from `marriage`, `pilot`, `scholar`, `bankers` and `charter_plea`; draw cities, houses and titles from the crown's own data | N5 | open |
-| P3-03 | Volume: 100 stories, in steps of 40, 70 and 100. By family: at sea 20, court 20, colonies 20, peoples 15, rival crowns 10, Europe 10, eras 5 | N1 | open |
-| P3-04 | Chains: story flags in the game state, follow-ups that fire seasons later because of an earlier choice (a ransom remembered, a loan called in, a marriage that produces an heir) | N2 | open |
-| P3-05 | Courtiers with memory: an opinion of you with reasons (as peoples have), and relationships between courtiers (rival, friend, kin) that stories read and write | N3 | open |
-| P3-06 | A monarch: a named ruler with age, traits and skills, who dies; an heir, a succession event, and a regency when the heir is a child | N4 | open |
-| P3-07 | Royal marriages with the other realms of Europe: a consort, in-laws, claims and alliances (feeds P4-04) | N4, M2 | open |
-| P3-08 | Courtier ambitions and loyalty: a courtier wants a rank, a fleet or a governorship; ignored long enough, they leave for a rival crown and take what they know | N3 | open |
-| P3-09 | Three historical set pieces per crown, on the model of the Armada for Castile | N7 | open |
-| P3-10 | Pacing rule: stories weighted by how much they concern what the player is doing; none repeats in a game while unseen ones remain | N1 | open |
-| P3-11 | Tell the reign back: an end-of-game history written from the chronicle (discoveries, wars, rulers), and a short biography for each explorer | N9 | open |
-| P3-12 | A picture slot per story family on the event card, with the grid prompts written in `art/PROMPTS.md`. Painting them is P7-04 | N8 | open |
-| P3-13 | Era cards with a choice: each new era offers two or three paths that set an ambition for the age | N10 | open |
-| P3-14 | Naming: the player names the lands they discover and the colonies they found, and the map and chronicle use the names | N9 | open |
+| P3-01 | Stories are data (`src/data/stories/`, one file per family) read by a small engine in `src/sim/stories.ts`: subjects bound by filters, conditions, effects and uncertain outcomes from a fixed vocabulary, and hints written from the effects | N1 | done |
+| P3-02 | No story outside the set pieces names a particular realm's places: cities, great houses, a seat of learning, bankers, a saint and the ruler's title come from the crown's own data (`src/data/dynasty.ts`). A test enforces it | N5 | done |
+| P3-03 | 114 stories: at sea 17, the court 17, colonies 17, peoples 14, rival crowns 10, Europe 10, the age 5, the dynasty 6, history 18. The three largest families are three short of the 20 first aimed at | N1 | done |
+| P3-04 | Chains: story flags and follow-ups in the game state; nine follow-ups arrive seasons later because of an earlier choice (a ransom repaid in kind, a refused petition that returns, a guest prince who goes home, guns that change a war) | N2 | done |
+| P3-05 | Courtiers remember: a loyalty that follows what they hold for and against you, with the reasons shown; rivals, friends and kin at court, so that raising one person galls or pleases others | N3 | done |
+| P3-06 | A monarch: the house each crown had in 1492, a ruler with an age and a gift that helps the realm, a consort, heirs born and lost, death, succession by the eldest heir, a regency for a child, and a costly crisis when there is no heir (Court, Dynasty) | N4 | done |
+| P3-07 | Royal marriages: offers from the other realms every two years while the ruler is unmarried; a consort brings a dowry (larger with prestige), heirs, and a tie that keeps a rival crown from declaring war. Claims and alliances are left to P4-04 | N4, M2 | done |
+| P3-08 | Courtiers want a commission or a command; kept waiting they resent it, and a courtier whose loyalty runs out is offered a place by a rival crown: pay to keep them, let them go with what they know, or arrest them | N3 | done |
+| P3-09 | Three set pieces for each crown at about their years, told once and only to that crown (Granada, the Comuneros and the Armada; the road to India, Morocco and the union of crowns; Cabot, the break with Rome and the Armada's defeat; Naples, Verrazzano and the wars of religion; the towns' charters, the breaking of the images and the great company) | N7 | done |
+| P3-10 | Pacing: a story never told comes before any that has been; stories about what you are doing (fleets at sea, colonies, peoples met, wars) are likelier; when only old stories fit, they return half as often | N1 | done |
+| P3-11 | The reign told back: a history written from the chronicle, the dynasty and the standings, in the Chronicle and at the end of the age; and a short life of each courtier in Court | N9 | done |
+| P3-12 | A picture slot for each story family on the card, with the family named under it, and the 3 × 3 grid prompt in `art/PROMPTS.md`. Until the sheet is painted (P7-04) the card shows the cartouche | N8 | done |
+| P3-13 | Each new era opens with three paths: the one chosen gives a lasting advantage while the era lasts and sets a goal, judged when the era ends (30 prestige if met) | N10 | done |
+| P3-14 | Naming: the first landfall asks what the land shall be called, and the name goes on the map, into the chronicle and the stories; colonies can be renamed | N9 | done |
 
 ### Phase 4: Depth
 

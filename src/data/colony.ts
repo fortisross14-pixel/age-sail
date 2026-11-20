@@ -64,4 +64,11 @@ export const NATIVE_FEUD = {
   longest: 12,
   /** the loser keeps this share of its warriors */
   defeat: 0.75,
+  /** chance each spring that two peoples with a common enemy make a pact; an ally's warriors count for this share */
+  pact: 0.05,
+  allyShare: 0.5,
+  /** a loser with fewer than this share of its first strength abandons a village */
+  flee: 0.5,
+  /** a furious people with fewer warriors than this gives ground to settlers instead of fighting */
+  crowded: 4,
 };
