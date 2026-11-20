@@ -12,6 +12,7 @@ import { cargoUsed, cargoCapacity } from '../sim/game';
 import { getView } from './MapCanvas';
 import { turnLabel } from '../sim/types';
 import { ArmyRow } from './Battle';
+import { Art } from './theme/Art';
 import { WALLS } from '../data/army';
 
 export function ColonyCard({ colonyId }: { colonyId: string }) {
@@ -103,8 +104,10 @@ export function ColonyCard({ colonyId }: { colonyId: string }) {
             const w = c.walls ?? 0;
             const next = WALLS[w + 1];
             return (
-              <div className="row small">
+              <div className="row small walls-row">
+                <span className="wall-art"><Art slot={`wall/${w}`} fallback={null} /></span>
                 <span><b>{WALLS[w].name}</b>{w ? '' : ': only a fence of stakes'}.</span>
+                {next && <span className="wall-art next" title={`Next: ${next.name}`}><Art slot={`wall/${w + 1}`} fallback={null} /></span>}
                 {next && <button disabled={(w + 1 === 3 && c.level === 'outpost') || Object.entries(next.needs).some(([g, n]) => (c.stock[g as GoodId] ?? 0) < (n as number))}
                   title={`Walls make the defenders much harder to break; field guns breach them.${w + 1 === 3 && c.level === 'outpost' ? ' A star fort needs a town.' : ''}`}
                   onClick={() => void run({ kind: 'walls', colony: c.id })}>

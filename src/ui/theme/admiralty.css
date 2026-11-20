@@ -1022,3 +1022,14 @@ b.bad { color: var(--oxblood-hi); }
   .lead-act { grid-column: 1 / -1; justify-content: flex-start; }
   .fleet-page .facts.wide { grid-template-columns: repeat(2, auto 1fr); }
 }
+/* walls, camp and wagon art */
+.walls-row { align-items: center; }
+.wall-art { width: 64px; height: 64px; display: inline-flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.wall-art img { width: 100%; height: 100%; object-fit: cover; }
+.wall-art.next { width: 44px; height: 44px; opacity: .75; }
+.party-art { width: 62px; height: 62px; display: inline-flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--gold-mid); }
+.party-art img { width: 100%; height: 100%; object-fit: cover; }
+.wagon { display: inline-flex; width: 22px; height: 22px; vertical-align: -5px; border-radius: 4px; overflow: hidden; }
+.wagon img { width: 100%; height: 100%; object-fit: cover; }
+.battle-sides .vs { width: 70px; }
+.battle-sides .vs img { width: 70px; border-radius: 8px; }
