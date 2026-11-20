@@ -150,6 +150,25 @@ const STORIES: Story[] = [
     ],
   },
   {
+    id: 'protest', cooldown: 24,
+    when: (_w, s) => {
+      for (const r of rivalsOf(s.crown)) {
+        const st = s.rivals[r.id];
+        if (st.relation !== 'peace' || st.attitude >= 0) continue;
+        const mine = s.colonies.find((c) => s.rivalColonies.some((x) => x.crown === r.id && x.map === c.map && GRIDS[c.map].distance(x.hex, c.hex) <= 6));
+        if (mine) return { crown: r.id, colony: mine.id };
+      }
+      return null;
+    },
+    title: (_s, c) => `A protest from ${rivalSpec(c.crown as CrownId).name}`,
+    text: (s, c) => `An ambassador of ${rivalSpec(c.crown as CrownId).name} asks for an audience. ${s.colonies.find((x) => x.id === c.colony)?.name ?? 'Your colony'} stands too close to their own settlements, he says, and his master will not suffer it much longer.`,
+    choices: () => [
+      { label: 'Pay for their goodwill', hint: '−500 ducats; they think much better of you', apply: (_w, s, c) => { s.treasury -= 500; s.rivals[c.crown as CrownId].attitude += 30; return 'The ambassador leaves with a chest of ducats and a treaty of friendship.'; } },
+      { label: 'Promise to settle no closer', hint: 'They think better of you; −5 prestige', apply: (_w, s, c) => { s.rivals[c.crown as CrownId].attitude += 18; s.prestige -= 5; return 'A line is drawn on the chart. Your court mutters that you gave way.'; } },
+      { label: 'The sea is free to all', hint: 'They are angered; +3 prestige', apply: (_w, s, c) => { s.rivals[c.crown as CrownId].attitude -= 15; s.prestige += 3; return 'The ambassador bows coldly and takes ship the same night.'; } },
+    ],
+  },
+  {
     id: 'envoys', cooldown: 20,
     when: (w, s, rng) => { const n = allNations(w).filter((x) => s.natives[x.id]?.met && s.natives[x.id].relation === 'peace'); return n.length ? { nation: pick(rng, n).id } : null; },
     title: () => 'Envoys from across the sea',

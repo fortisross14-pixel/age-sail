@@ -52,3 +52,16 @@ export const NATIVE = {
 
 /** A colony's defence: soldiers count four, settlers a little, walls by level. */
 export const DEFENCE = { soldier: 4, settler: 0.6, base: 1, town: 2, city: 4 };
+
+/** Wars between peoples who are rivals, without anyone inciting them. Provisional numbers. */
+export const NATIVE_FEUD = {
+  /** chance each spring that a people goes to war with one of its rivals */
+  chance: 0.06,
+  /** chance a season that each side loses a warrior in skirmishes */
+  skirmish: 0.3,
+  /** chance a season of the battle that ends it; it ends anyway after `longest` seasons */
+  battle: 0.1,
+  longest: 12,
+  /** the loser keeps this share of its warriors */
+  defeat: 0.75,
+};

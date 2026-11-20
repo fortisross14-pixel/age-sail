@@ -1,5 +1,6 @@
 import { GEN_VERSION } from './sim/version';
 import type { GameState } from './sim/types';
+import { RIVAL_ECON } from './data/rivals';
 
 /**
  * Save format. Bump SAVE_VERSION when the shape of GameState changes and add a migration from the
@@ -14,8 +15,10 @@ import type { GameState } from './sim/types';
  * Version 14 (M13) adds factories in European ports and market shocks.
  * Version 15 (Phase 1, the first hour) adds the difficulty and objectives. An older voyage is Captain,
  * and ticks the objectives it has already met without rewards when it is next loaded.
+ * Version 16 (Phase 2, a world that pushes back) gives rival crowns a purse, ships that come home, plans and
+ * relations with each other; their colonies stores and produce; peoples a regard for each crown and feuds.
  */
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 export const SAVE_KEY = 'age-sail:save';
 /** Keys used before the envelope. v9 is migrated; older ones can't be read and are removed. */
 export const LEGACY_KEY = 'age-sail:save:v9';
@@ -49,6 +52,16 @@ const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, 
   }),
   13: (s) => ({ ...s, factories: [], shocks: [] }),
   14: (s) => ({ ...s, difficulty: 'captain', objectives: { done: {}, catchUp: true } }),
+  15: (s) => ({
+    ...s,
+    rivals: Object.fromEntries(Object.entries(s.rivals as Record<string, Record<string, unknown>>).map(([id, r]) => [id, {
+      ...r, treasury: RIVAL_ECON.startTreasury, hulls: RIVAL_ECON.startShips, built: RIVAL_ECON.startShips + (s.rivalShips as { crown: string }[]).filter((x) => x.crown === id).length,
+      plan: { kind: 'idle' }, toward: {}, wars: [], rivalWarSince: {},
+    }])),
+    rivalColonies: (s.rivalColonies as Record<string, unknown>[]).map((c) => ({ ...c, supply: RIVAL_ECON.supplyFull, stock: 0, growth: 0 })),
+    rivalShips: (s.rivalShips as Record<string, unknown>[]).map((x, i) => ({ ...x, name: `Ship ${i + 1}`, homeward: false, cargo: null })),
+    natives: Object.fromEntries(Object.entries(s.natives as Record<string, Record<string, unknown>>).map(([id, st]) => [id, { ...st, crowns: {}, feud: null }])),
+  }),
 };
 
 export function wrap(state: GameState): SaveEnvelope {

@@ -15,7 +15,8 @@ import { sfx } from './sound';
 import { getView } from './MapCanvas';
 import { allNations, moodOf, envoy } from '../sim/natives';
 import { rivalsOf, crownSpec } from '../data/rivals';
-import { rivalScore } from '../sim/rivals';
+import { rivalScore, rivalDoing, friendOf } from '../sim/rivals';
+import { RIVAL_ECON, rivalSpec } from '../data/rivals';
 import { score } from '../sim/colony';
 import { CROWN } from '../render/palette';
 import { SKILL_INFO as SK } from '../data/court';
@@ -318,6 +319,9 @@ function Peoples() {
                 <span className="person-status small">
                   About {st.warriors} warriors · {villages} village{villages === 1 ? '' : 's'}{st.epidemic ? ' · struck by sickness' : ''}
                   {st.post ? ' · trading post' : ''}{st.mission ? ` · mission (${Math.round(st.converted * 100)}% won over)` : ''}
+                  {(() => { const foe = st.feud ? allNations(world).find((x) => x.id === st.feud!.with) : undefined; return foe ? ` · at war with the ${foe.people}` : ''; })()}
+                  {(() => { const f = friendOf(st); return f ? ` · friends of ${rivalSpec(f).name}` : ''; })()}
+                  {(Object.entries(st.crowns) as [typeof game.crown, number][]).filter(([, a]) => a <= RIVAL_ECON.peopleAngry).map(([c]) => ` · angry with ${rivalSpec(c).name}`).join('')}
                 </span>
               </div>
               <div className="person-actions">
@@ -397,7 +401,9 @@ function Crowns() {
               </div>
               <div className="person-actions">
                 <div className="muted small">
-                  {war ? 'Their privateers hunt your ships and they raid colonies near theirs. A party beside one of their colonies can storm it.' : 'Settling close to their colonies sours relations; below −50 they may declare war.'}
+                  <b>{rivalDoing(game, r.id)}.</b> {st.built} ship{st.built === 1 ? '' : 's'}, {st.hulls} in port · treasury {st.treasury < 200 ? 'thin' : st.treasury < 1200 ? 'sound' : 'full'}
+                  {st.wars.length ? ` · at war with ${st.wars.map((c) => rivalSpec(c).name).join(' and ')}` : ''}.{' '}
+                  {war ? 'Their privateers hunt your ships, and their soldiers sail from their colonies to land at yours: watch for their ships. A party beside one of their colonies can storm it.' : 'Settling close to their colonies sours relations; below −50 they may declare war.'}
                   {r.id === 'portugal' && game.turn > 6 ? ' Under the Treaty of Tordesillas, they resent colonies on the African coast.' : ''}
                 </div>
                 <div className="row">

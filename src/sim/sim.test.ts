@@ -7,7 +7,7 @@ import {
   foundColony, upgradeColony, colonyTransfer, allyNation, incorporateNation, attackVillage, tradingPost, declareWar, rivalPeace, stormColony,
   grantCharter, setTaxRate, chooseStory, buildWalls, openFactory, factoryOrder,
 } from './game';
-import { demandFactor, rivalMerchants } from './trade';
+import { demandFactor } from './trade';
 import { battleOdds, type Force } from './battle';
 import { T } from '../data/terrain';
 import type { UnitType } from './types';
@@ -894,13 +894,4 @@ describe('M13 a living market', () => {
     expect(demandFactor(state, 'france', 'food')).toBeGreaterThan(before * 1.5);
   });
 
-  it("rival merchants bring their colonies' goods into their home port", () => {
-    const { world, state } = newGame(1492);
-    const home = state.markets.lisbon;
-    const hex = [...Array(NEW.N).keys()].find((h) => Math.abs(NEW.lat(h)) < 20 && world.new.terrain[h] > 1)!;
-    state.rivalColonies.push({ id: 'rcol-x', crown: 'portugal', name: 'X', map: 'new', hex, pop: 10, level: 'town', founded: 0, garrison: 1, seen: false });
-    const sugar = home.sugar!.stock;
-    rivalMerchants(world, state);
-    expect(home.sugar!.stock).toBeGreaterThan(sugar);
-  });
 });

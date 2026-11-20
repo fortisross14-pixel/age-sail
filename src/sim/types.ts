@@ -229,6 +229,10 @@ export interface NativeState {
   memory: Memory[];
   /** a siege they are laying to one of your colonies */
   siege: { colony: string; since: number } | null;
+  /** how they regard each of the other crowns, -100..100 (absent means they have not dealt with them) */
+  crowns: Partial<Record<CrownId, number>>;
+  /** a war with another people, which keeps their warriors busy */
+  feud: { with: string; since: number } | null;
 }
 
 /** One remembered deed, good or bad, and how much it still weighs. */
@@ -237,11 +241,24 @@ export interface Memory { why: string; amount: number; turn: number }
 export type { CrownId };
 
 /** How a rival crown stands with Castile. */
+export type RivalPlanKind = 'idle' | 'settle' | 'trade' | 'supply' | 'build' | 'saving' | 'privateer' | 'raid';
+
 export interface RivalState {
   attitude: number;
   relation: 'peace' | 'war';
-  /** season when their next colony expedition sails */
+  /** the season before which they attempt nothing new: the first sailing, then a pause after each venture */
   next: number;
+  /** ducats to spend on ships and ventures */
+  treasury: number;
+  /** ships lying in the home port, free to sail; and all the ships they own */
+  hulls: number;
+  built: number;
+  /** what they did last, or what they are saving for */
+  plan: { kind: RivalPlanKind; for?: RivalPlanKind };
+  /** how they regard each of the other rival crowns, and which they are at war with */
+  toward: Partial<Record<CrownId, number>>;
+  wars: CrownId[];
+  rivalWarSince: Partial<Record<CrownId, number>>;
   /** abstract earnings from trade, for their score */
   revenue: number;
   /** trading posts they hold at native grounds (site ids) */
@@ -262,6 +279,12 @@ export interface RivalColony {
   garrison: number;
   /** the player has seen it */
   seen: boolean;
+  /** seasons of stores from home left; at none the colony stops growing and shrinks */
+  supply: number;
+  /** produce waiting for a ship home */
+  stock: number;
+  /** births less deaths so far: a whole one joins or leaves */
+  growth: number;
 }
 
 /** A rival ship on the map, sailing with a purpose. */
@@ -270,7 +293,12 @@ export interface RivalShip {
   crown: CrownId;
   map: MapId;
   hex: number;
-  kind: 'settlers' | 'trader' | 'privateer';
+  kind: 'settlers' | 'trader' | 'privateer' | 'supply' | 'raid';
+  name: string;
+  /** the errand is done and she is sailing home, where her hull is free again */
+  homeward: boolean;
+  /** a colony's produce, carried home to be sold */
+  cargo: { good: GoodId; qty: number } | null;
   /** where it is going: a hex to settle, a port to trade at, or home */
   target: number | null;
   path: number[] | null;

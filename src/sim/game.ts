@@ -1165,9 +1165,8 @@ export function seasonTick(world: World, s: GameState): void {
   const wages = Math.round(s.people.filter((p) => p.alive).reduce((t, p) => t + salary(p), 0));
   for (const p of s.people) if (p.alive && p.trait === 'learned' && p.fleet == null) addResearch(s, 1);
 
-  // markets: shocks come and go, rival merchants bring their goods home, every market moves
+  // markets: shocks come and go, every market moves (rival cargoes arrive with their ships, in rivalsSeason)
   Trade.shockSeason(s, (k, t) => log(s, k, t));
-  Trade.rivalMerchants(world, s);
   for (const [id, book] of Object.entries(s.markets)) {
     const port = portById(world, id, s);
     const european = port?.kind !== 'native';

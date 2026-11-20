@@ -77,6 +77,12 @@ other. Later: wars with rival crowns for space, and independence wars against in
   (15–17 colonies by 1542) and France and the Netherlands weakest (1–4): for the balance pass.
   A season costs under 0.6 ms with 35 markets; a save is about 150 KB.
 
+- Phase 2: with no player orders, the four rivals hold 5–8 colonies between them by 1512 (it was 8–14 between
+  three before they had purses) and about 42 by 1642, with 6–15 wars among themselves in 150 years. Their
+  treasuries run to hundreds of thousands of ducats late on, because trading posts pay for ever and there is
+  little left to buy: for Phase 6. France now plants colonies; the Netherlands still starts last. A season
+  costs about 4 ms with rivals routing ships out and home (it was under 1 ms): for Phase 7.
+
 ## Milestones
 
 | # | Milestone | Status |
@@ -97,8 +103,8 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | M12 | Armies: pikemen, swordsmen, crossbowmen, arquebusiers, lancers and field guns (barracks II for the last three), each with fire, melee, toughness and pursuit; parties ashore are armies under a general, carrying food (a small band forages, an army starves without supply, and restocks beside a colony); automatic battles in three rounds (fire, melee, pursuit) decided by morale, with terrain (horse and guns poor in rough country, defenders stronger there), firearms frightening peoples who have never met them, assault or steady stance, and a battle report; colony walls (palisade, stone walls, star fort) that field guns breach; veterans; native raids, sieges and ambushes, rival raids and storms, and retaking free states all fought the same way | done |
 | M13 | A living market: factories in any European port (yours or foreign, with dues abroad) that hold your goods, sell them slowly at fair prices and buy what you need while it is cheap; regional tastes (wine and spices in the North, silver and sugar in Italy, no wine in the Maghreb); shocks that move a region's demand for a few years (bad harvests, plague, war, a royal wedding, a fashion, a good peace); rival merchants who ship their colonies' sugar, tobacco and furs into their home ports and buy tools and cloth there; colonies wear out tools and work slower without them; glut and scarce markers. Paris trades through Rouen | done |
 | Phase 1 | **The first hour** (v0.14): objectives (a first voyage of eight steps, then advisers' ambitions with rewards), an objectives panel with "Show me", a short welcome in place of the help wall, a tabbed guide, End Turn reminders with a count on the button, three difficulty levels, and small interface fixes. Items P1-01 to P1-23 below | 22 of 23 done; P1-20 (watching new players) needs people |
-| Phase 2 | A world that pushes back: rivals with treasuries, needs, fleets and intentions; rivals and peoples who deal with each other | next |
-| Phase 3 | Stories and dynasty: a hundred stories in data, chains, a monarch and heirs, crown-specific text | |
+| Phase 2 | **A world that pushes back** (v0.15): rivals with a treasury, ships that sail out and home, colonies that live on convoys, and plans chosen by what they want and can afford; crowns that fight each other; peoples who judge every crown and fight their own wars; soldiers that come by sea where you can see them. Items P2-01 to P2-15 below | 12 of 15 done |
+| Phase 3 | Stories and dynasty: a hundred stories in data, chains, a monarch and heirs, crown-specific text | next |
 | Phase 4 | Depth: the research tree (was M15), European diplomacy and the Mediterranean (was M14), victory paths, scenarios | |
 | Phase 5 | Interface depth: outliner, nested tooltips, ledger, turn summary, map modes, save slots | |
 | Phase 6 | Balance (was Pass 3): numbers in one place, autoplay harness, retune the five crowns. Deliberately late | deferred |
@@ -181,7 +187,7 @@ phase; nothing is renumbered.
 | Phase | Theme | Items | Done |
 |---|---|---|---|
 | 1 | The first hour | 23 | 22 |
-| 2 | A world that pushes back | 12 | 0 |
+| 2 | A world that pushes back | 15 | 12 |
 | 3 | Stories and dynasty | 14 | 0 |
 | 4 | Depth | 17 | 1 |
 | 5 | Interface depth | 13 | 0 |
@@ -227,18 +233,21 @@ Systems only: the numbers stay provisional until Phase 6.
 
 | Id | Action item | Answers | Status |
 |---|---|---|---|
-| P2-01 | Give each rival a treasury: income from home taxes, colonies and posts; expeditions, ships and soldiers cost money. Replace the `next` timer with "sails when it can afford to" | D2 | open |
-| P2-02 | Rival colonies have needs and grow as yours do (births, deaths, settlers shipped from home), instead of one settler every `RIVAL_SETTLERS_EVERY` seasons | D2 | open |
-| P2-03 | Rival fleets persist: named ships that sail out and home, can be lost to storms and battles, and must be rebuilt | D2 | open |
-| P2-04 | A plan per rival chosen by utility scoring (trade, settle, conquer, harass), weighted by its character in `src/data/rivals.ts`; see the `game-ai` skill | D2 | open |
-| P2-05 | Rivals deal with native peoples: alliances, missions, wars, and a people's attitude toward each crown, not only toward you | D3 | open |
-| P2-06 | Rivals answer what you do: contest a trading ground you profit from, race for a coast you have surveyed, offer or demand a deal when you settle near them | D2, D3 | open |
-| P2-07 | Rivals have relations with each other: wars and peaces among the four you do not play, visible in Court, Crowns | D3 | open |
-| P2-08 | Show intent: news when a rival fleet sails, a line per crown in Court, Crowns saying what it is doing now | D2, U3 | open |
-| P2-09 | Difficulty changes behaviour, not only numbers: how readily rivals declare war, raid and contest sites at each level | D1 | open |
-| P2-10 | Rivals trade in the same markets with real cargoes carried by P2-03 fleets, replacing the abstract `rivalMerchants` flow | D2 | open |
-| P2-11 | Native peoples act among themselves: wars, alliances and migrations between peoples without the player inciting them | M6 | open |
-| P2-12 | Rival armies that can be met in the field, not only at a colony's walls: landings, marches and a force on the map | D2 | open |
+| P2-01 | Each rival has a treasury: the realm's allowance, trading posts and the profit of cargoes brought home; ships cost upkeep, and every venture has a price (`RIVAL_ECON` in `src/data/rivals.ts`). A crown sails when it can afford to, and otherwise saves for what it wants | D2 | done |
+| P2-02 | Rival colonies live on stores from home: a convoy fills them and lands a settler; supplied, they grow by births; unsupplied, they produce less, shrink and are abandoned in the end | D2 | done |
+| P2-03 | Rival ships persist: each crown owns named hulls that sail out, do their errand and sail home before they can be used again; ships are lost to storms and to your guns, and new ones are built for money, more as the crown's colonies multiply | D2 | done |
+| P2-04 | A plan per rival by utility scoring (`options` and `decide` in `src/sim/rivals.ts`): supply, settle, trade, build, and at war privateers and landings, weighted by each crown's taste for trade and for war | D2 | done |
+| P2-05 | Peoples judge every crown, not only yours (`NativeState.crowns`): trading posts win them, settlers on their land anger them, angry peoples raid and burn rival colonies, and a people friendly to a crown at war with you speaks against you | D3 | done |
+| P2-06 | Rivals answer what you do: they favour trading grounds you have found or hold a post at, hurry to coasts where your surveyors found riches, and send an ambassador to protest when you settle beside them (pay, promise or refuse) | D2, D3 | done |
+| P2-07 | The crowns you do not play have relations with each other: grudges, wars that cost them money, colonies and ships, and peaces; the enemy of your enemy warms to you | D3 | done |
+| P2-08 | Show intent: news when a rival sends settlers or soldiers, and a line per crown in Court, Crowns saying what it is doing, how many ships it has, how full its treasury is and whom it is fighting; Court, Peoples shows each people's friends, grudges and wars | D2, U3 | done |
+| P2-09 | Difficulty changes behaviour, not only numbers: an `aggression` lever scales how readily rivals declare war, land soldiers, and contest what you have found | D1 | done |
+| P2-10 | Rival cargoes are real: a colony's produce waits for a ship, sails home in it and is sold in the home market, where the convoy's tools, cloth and wine were bought. The abstract `rivalMerchants` flow is gone | D2 | done |
+| P2-11 | Peoples go to war with their rivals without being incited: skirmishes, a deciding battle, and warriors too busy to raid you meanwhile | M6 | done |
+| P2-12 | At war, a rival's soldiers are a ship on the map: they embark at their nearest colony, you are told where they are bound, and they land at your colony when they arrive (raids used to be an unseen roll) | D2 | done |
+| P2-13 | Peoples make alliances with each other and migrate when beaten or crowded out (left over from P2-11) | M6 | open |
+| P2-14 | Rival armies that march overland to a colony, and your fleets able to intercept a rival ship at sea before it lands (left over from P2-12) | D2 | open |
+| P2-15 | Rivals learn the ocean crossing by research they pay for, instead of on the fixed `volta` season | D2 | open |
 
 ### Phase 3: Stories and dynasty
 

@@ -169,8 +169,10 @@ export function GuardSwitch() {
 export function StepHint({ screen }: { screen: string }) {
   const game = useStore((s) => s.game)!;
   const [seen, setSeen] = useState(pref('hintsSeen'));
+  const courtTab = useStore((s) => s.courtTab);
   const step = VOYAGE.find((o) => !objectiveDone(game, o.id));
   if (!step?.inScreen || step.goto?.screen !== screen || seen.includes(step.id)) return null;
+  if (screen === 'court' && step.goto.courtTab && step.goto.courtTab !== courtTab) return null;
   const close = () => { const v = [...seen, step.id]; setSeen(v); setPref('hintsSeen', v); };
   return (
     <div className="step-hint" role="note">

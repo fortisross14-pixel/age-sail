@@ -1,9 +1,15 @@
 /**
- * Rival crowns. They are not simulated in full: they research the crossing on a schedule, send ships to found
- * colonies at good sites and to trade with native peoples, grow their colonies, and go to war with you when
- * relations sour. Everything they do happens on the map, where the player can see it.
+ * Rival crowns. Each has a purse, a few ships and a temper. Every season it weighs what it could do (supply a
+ * colony, settle, trade, build a ship, or, at war, send privateers and soldiers), does the thing it wants most if it
+ * has the money and a ship, and otherwise saves for it. Ships sail out and home again on the map; colonies live on
+ * what the ships bring. The crowns also quarrel among themselves, and the peoples judge each of them.
+ * They still learn the ocean crossing on a schedule (`volta`).
  */
-import { CROWNS, RIVAL_SETTLERS_EVERY, rivalSpec, rivalsOf, type CrownId } from '../data/rivals';
+import { CROWNS, RIVAL_ECON, SHIP_NAMES_BY_CROWN, rivalSpec, rivalsOf, type CrownId, type RivalSpec } from '../data/rivals';
+import { RIVAL_TRADE } from '../data/trade';
+import type { GoodId } from '../data/goods';
+import { sellValue } from './market';
+import * as Nat from './natives';
 import { difficultySpec } from '../data/difficulty';
 import { SHIPS } from '../data/ships';
 import { isWater } from '../data/terrain';
@@ -15,7 +21,7 @@ import { LEVELS } from './colony';
 import { personById, skill } from './court';
 import { fight, casualties, recordLosses, blood, partyForce, assaultColony, rivalGarrison, type Force } from './battle';
 import { isMilitary } from '../data/army';
-import { Fog, seasonOf, yearOf, emptyAccount, type Stance, type Colony, type Fleet, type GameEvent, type GameState, type MapId, type Party, type RivalColony, type RivalShip, type RivalState, type World } from './types';
+import { Fog, seasonOf, yearOf, emptyAccount, type Stance, type Colony, type Fleet, type GameEvent, type GameState, type MapId, type Party, type RivalColony, type RivalShip, type RivalState, type RivalPlanKind, type NativeState, type NationDef, type PortDef, type World } from './types';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -35,7 +41,10 @@ const NAMES: Record<CrownId, string[]> = {
 
 /** Every crown gets a record; the one you play is never used. */
 export function initRivals(_me: CrownId = 'spain'): Record<CrownId, RivalState> {
-  return Object.fromEntries(CROWNS.map((r) => [r.id, { attitude: 10, relation: 'peace', next: r.start, revenue: 0, posts: [], warSince: null }])) as unknown as Record<CrownId, RivalState>;
+  return Object.fromEntries(CROWNS.map((r) => [r.id, {
+    attitude: 10, relation: 'peace', next: r.start, revenue: 0, posts: [], warSince: null,
+    treasury: RIVAL_ECON.startTreasury, hulls: RIVAL_ECON.startShips, built: RIVAL_ECON.startShips, plan: { kind: 'idle' }, toward: {}, wars: [], rivalWarSince: {},
+  }])) as unknown as Record<CrownId, RivalState>;
 }
 
 const MOVES = 15;
@@ -65,6 +74,8 @@ function pickSite(w: World, s: GameState, crown: CrownId, map: MapId, rng: Rng):
     if (taken.some((t) => g.distance(t, h) <= 4)) continue;
     if (m.ports.some((p) => g.distance(p.hex, h) <= 2)) continue;
     let score = rng() * 2;
+    // word of what your surveyors found travels: rivals hurry to the same coasts
+    if (s.finds.some((f) => f.map === map && g.distance(f.hex, h) <= 3)) score += 2 * difficultySpec(s.difficulty).aggression;
     for (const j of g.within(h, 2)) {
       const r = m.resource[j] ? RESOURCE_IDS[m.resource[j] - 1] : null;
       if (r === 'gold' || r === 'silver') score += 5;
@@ -90,15 +101,6 @@ function route(w: World, s: GameState, map: MapId, from: number, to: number) {
   })?.path ?? null;
 }
 
-function spawn(w: World, s: GameState, crown: CrownId, map: MapId, kind: RivalShip['kind'], target: number | null, strength = 0) {
-  const hex = target != null && kind !== 'privateer' ? startHex(w, crown, map, target) : target ?? startHex(w, crown, map, 0);
-  const ship: RivalShip = { id: s.nextId++, crown, map, hex, kind, target, path: null, trail: [hex], strength };
-  if (target != null && kind !== 'privateer') ship.path = route(w, s, map, hex, target);
-  if (kind !== 'privateer' && !ship.path) return null;
-  s.rivalShips.push(ship);
-  return ship;
-}
-
 function sail(w: World, s: GameState, ship: RivalShip) {
   const g = GRIDS[ship.map];
   const m = w[ship.map];
@@ -114,6 +116,159 @@ function sail(w: World, s: GameState, ship: RivalShip) {
     path.shift();
     ship.trail.push(next);
   }
+}
+
+// ---------- ships: out with a purpose, and home again ----------
+
+const E = RIVAL_ECON;
+const aggression = (s: GameState) => difficultySpec(s.difficulty).aggression;
+const Cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+/** What a rival colony grows for the ships home: by latitude, as the rival merchants always did. */
+const colonyGood = (c: RivalColony): GoodId => { const lat = Math.abs(GRIDS[c.map].lat(c.hex)); return lat < 25 ? 'sugar' : lat < 40 ? 'tobacco' : 'furs'; };
+const seen = (s: GameState, map: MapId, hex: number) => s.fog[map][hex] >= Fog.Charted;
+
+function spawn(w: World, s: GameState, crown: CrownId, map: MapId, kind: RivalShip['kind'], target: number | null, strength = 0, from?: number) {
+  const hex = from ?? (target != null && kind !== 'privateer' ? startHex(w, crown, map, target) : target ?? startHex(w, crown, map, 0));
+  const names = SHIP_NAMES_BY_CROWN[crown];
+  const ship: RivalShip = { id: s.nextId++, crown, map, hex, kind, target, path: null, trail: [hex], strength, name: names[s.nextId % names.length], homeward: false, cargo: null };
+  if (target != null && kind !== 'privateer') ship.path = route(w, s, map, hex, target);
+  if (kind !== 'privateer' && !ship.path) return null;
+  s.rivalShips.push(ship);
+  s.rivals[crown].hulls = Math.max(0, s.rivals[crown].hulls - 1);
+  return ship;
+}
+
+/** The errand is done: turn for the home port, or for the ocean road back to Europe. */
+function turnHome(w: World, s: GameState, ship: RivalShip) {
+  const g = GRIDS[ship.map];
+  ship.homeward = true;
+  ship.target = ship.map === 'old'
+    ? w.old.ports.find((p) => p.id === rivalSpec(ship.crown).home)!.hex
+    : w.new.portals.reduce((b, h) => (g.distance(h, ship.hex) < g.distance(b, ship.hex) ? h : b));
+  ship.path = route(w, s, ship.map, ship.hex, ship.target);
+  if (!ship.path) reachHome(s, ship);
+}
+
+/** Home: the hull is free again, and whatever she carried is sold in the home port. */
+function reachHome(s: GameState, ship: RivalShip) {
+  const r = s.rivals[ship.crown];
+  s.rivalShips = s.rivalShips.filter((x) => x !== ship);
+  r.hulls++;
+  if (!ship.cargo) return;
+  const { good, qty } = ship.cargo;
+  const m = s.markets[rivalSpec(ship.crown).home]?.[good];
+  // they are merchants too: what the home market will not take at a fair price is sold on elsewhere
+  const here = m ? Math.max(0, Math.min(qty, Math.round(m.ref * RIVAL_TRADE.fill - m.stock))) : 0;
+  let value = m ? sellValue(m, here, 0.1) + (qty - here) * m.base * 0.6 : qty * 40;
+  if (m) m.stock += here;
+  value = Math.round(value * E.margin);
+  r.treasury += value;
+  r.revenue += value;
+}
+
+/** A rival ship is gone for good: wrecked, taken or sunk. */
+function loseShip(s: GameState, ship: RivalShip) {
+  s.rivalShips = s.rivalShips.filter((x) => x !== ship);
+  const r = s.rivals[ship.crown];
+  r.built = Math.max(0, r.built - 1);
+}
+
+// ---------- what a crown does next ----------
+
+type Option = { kind: RivalPlanKind; u: number; cost: number; hull: boolean; run: () => boolean };
+
+/** The ventures open to a crown this season, each with how much it wants it and what it costs. */
+function options(w: World, s: GameState, spec: RivalSpec, r: RivalState, rng: Rng, log: Log): Option[] {
+  const out: Option[] = [];
+  const pace = spec.pace * difficultySpec(s.difficulty).rivalPace;
+  const mine = s.rivalColonies.filter((c) => c.crown === spec.id);
+  const atSea = s.rivalShips.filter((x) => x.crown === spec.id);
+  const boards: MapId[] = s.turn >= spec.volta ? ['old', 'new', 'new'] : ['old'];
+  const home = w.old.ports.find((p) => p.id === spec.home)!;
+
+  // a colony short of stores comes first
+  const needy = mine.filter((c) => c.supply <= E.supplyLow && (c.map === 'old' || s.turn >= spec.volta) && !atSea.some((x) => x.kind === 'supply' && x.target === c.hex && x.map === c.map));
+  if (needy.length) {
+    const c = [...needy].sort((a, b) => a.supply - b.supply)[0];
+    out.push({ kind: 'supply', u: 3, cost: E.supply, hull: true, run: () => {
+      if (!spawn(w, s, spec.id, c.map, 'supply', c.hex)) return false;
+      // tools, cloth and wine for the colony are bought in the home market
+      for (const [good, per] of Object.entries(RIVAL_TRADE.buys) as [GoodId, number][]) { const m = s.markets[spec.home]?.[good]; if (m) m.stock = Math.max(0, m.stock - c.pop * per * E.supplyFull); }
+      return true;
+    } });
+  }
+
+  // at war with you: privateers where your ships are, and soldiers for your colonies
+  if (r.relation === 'war') {
+    for (const map of boards.filter((m, i) => boards.indexOf(m) === i)) {
+      if (!s.fleets.some((f) => f.map === map) || atSea.some((x) => x.kind === 'privateer' && x.map === map)) continue;
+      out.push({ kind: 'privateer', u: 1.6 * spec.war, cost: E.privateer, hull: true, run: () => {
+        const base = mine.find((c) => c.map === map);
+        const at = base ? GRIDS[map].neighbors(base.hex).find((h) => isWater(w[map].terrain[h])) ?? base.hex : startHex(w, spec.id, map, s.fleets.find((f) => f.map === map)!.hex);
+        return !!spawn(w, s, spec.id, map, 'privateer', at, 5 + Math.floor((s.turn - (r.warSince ?? s.turn)) / 4) + int(rng, 0, 3));
+      } });
+    }
+    const prey = s.colonies.filter((c) => boards.includes(c.map) && mine.some((x) => x.map === c.map && GRIDS[c.map].distance(x.hex, c.hex) <= E.raidReach)
+      && !atSea.some((x) => x.kind === 'raid' && x.map === c.map && x.target === c.hex));
+    if (prey.length) {
+      out.push({ kind: 'raid', u: 1.3 * spec.war * aggression(s), cost: E.raid, hull: true, run: () => {
+        const c = pick(rng, prey);
+        const base = mine.filter((x) => x.map === c.map).sort((a, b) => GRIDS[c.map].distance(a.hex, c.hex) - GRIDS[c.map].distance(b.hex, c.hex))[0];
+        const from = base ? GRIDS[c.map].neighbors(base.hex).find((h) => isWater(w[c.map].terrain[h])) : undefined;
+        const ship = spawn(w, s, spec.id, c.map, 'raid', c.hex, Math.min(6, 2 + Math.floor((s.turn - (r.warSince ?? s.turn)) / 8)), from);
+        if (ship && seen(s, ship.map, ship.hex)) log('peril', `Soldiers of ${spec.name} have embarked${base ? ` at ${base.name}` : ''}. They are making for ${c.name}.`);
+        return !!ship;
+      } });
+    }
+  }
+
+  // a new colony
+  out.push({ kind: 'settle', u: 2 * (1 - spec.trade) * (mine.length < 3 ? 1.5 : 1), cost: Math.round(E.settlePerPace * pace), hull: true, run: () => {
+    const map = pick(rng, boards);
+    const site = pickSite(w, s, spec.id, map, rng);
+    if (site == null || !spawn(w, s, spec.id, map, 'settlers', site)) return false;
+    log('court', `Word from ${home.name}: ${spec.people} have sent settlers ${map === 'new' ? 'across the ocean' : 'down the African coast'}.`);
+    return true;
+  } });
+
+  // a trading post, sooner where you already profit
+  out.push({ kind: 'trade', u: 2 * spec.trade, cost: Math.round(E.tradePerPace * pace), hull: true, run: () => {
+    const map = pick(rng, boards);
+    const sites = w[map].ports.filter((p) => p.kind === 'native' && !r.posts.includes(p.id));
+    if (!sites.length) return false;
+    const weight = (p: PortDef) => 1 + (s.discovered.includes(p.id) ? aggression(s) : 0) + (s.natives[Nat.nationOfSite(w, p.id)?.id ?? '']?.post ? aggression(s) : 0);
+    let roll = rng() * sites.reduce((t, p) => t + weight(p), 0);
+    const site = sites.find((p) => (roll -= weight(p)) <= 0) ?? sites[0];
+    return !!spawn(w, s, spec.id, map, 'trader', site.hex);
+  } });
+
+  // another hull, when every ship is out
+  if (r.hulls === 0 && r.built < Math.min(E.maxShips, E.baseShips + Math.floor(mine.length / 2))) {
+    out.push({ kind: 'build', u: 1.1, cost: E.shipCost, hull: false, run: () => { r.built++; r.hulls++; return true; } });
+  }
+  return out;
+}
+
+/** Choose by want, with a little chance in it: do it if the money and a ship are there, else save for it. */
+function decide(w: World, s: GameState, spec: RivalSpec, r: RivalState, rng: Rng, log: Log) {
+  if (s.turn < r.next) return;
+  const opts = options(w, s, spec, r, rng, log).map((o) => ({ ...o, u: o.u * (0.8 + 0.4 * rng()) })).sort((a, b) => b.u - a.u);
+  for (const o of opts) {
+    if (o.hull && r.hulls === 0) {
+      // nothing to sail in: a new hull if it can be afforded, otherwise wait for one to come home
+      const build = opts.find((x) => x.kind === 'build');
+      if (build && r.treasury >= build.cost) { r.treasury -= build.cost; build.run(); r.plan = { kind: 'build' }; r.next = s.turn + 1; }
+      else r.plan = { kind: 'saving', for: build ? 'build' : o.kind };
+      return;
+    }
+    if (r.treasury < o.cost) { r.plan = { kind: 'saving', for: o.kind }; return; }
+    if (!o.run()) continue;
+    r.treasury -= o.cost;
+    r.plan = { kind: o.kind };
+    r.next = s.turn + 1;
+    return;
+  }
+  r.plan = { kind: 'idle' };
 }
 
 // ---------- the season ----------
@@ -132,33 +287,22 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
   }
   for (const spec of rivalsOf(s.crown)) {
     const r = s.rivals[spec.id];
-    // new expeditions
-    if (s.turn >= r.next) {
-      const boards: MapId[] = s.turn >= spec.volta ? ['old', 'new', 'new'] : ['old'];
-      const map = pick(rng, boards);
-      const busy = s.rivalShips.some((x) => x.crown === spec.id && x.kind === 'settlers');
-      if (!busy) {
-        if (rng() < spec.trade) {
-          const sites = w[map].ports.filter((p) => p.kind === 'native' && !r.posts.includes(p.id));
-          if (sites.length) spawn(w, s, spec.id, map, 'trader', pick(rng, sites).hex);
-        } else {
-          const site = pickSite(w, s, spec.id, map, rng);
-          if (site != null) spawn(w, s, spec.id, map, 'settlers', site);
-        }
-        // the first sail of any rival is news: the race has begun
-        const first = s.rivalShips.find((x) => x.crown === spec.id);
-        if (first && s.told.first_rival == null) {
-          s.told.first_rival = s.turn;
-          const home = w.old.ports.find((p) => p.id === spec.home);
-          ev({ kind: 'people', title: 'Rival sails', map: first.map, hex: first.hex,
-            text: `Word from ${home?.name ?? 'abroad'}: ${spec.people} have sent ${first.kind === 'trader' ? 'a ship to trade with the peoples of the coast' : 'a ship with settlers to plant a colony'}. You are not the only crown looking beyond the known world; the best coasts will go to whoever reaches them first.` });
-        }
-      }
-      r.next = s.turn + Math.round(Math.max(8, spec.pace - Math.floor(s.turn / 40)) * difficultySpec(s.difficulty).rivalPace);
+    // the purse: what the realm spares for the sea, the posts' trade, and the cost of keeping ships
+    const posts = r.posts.length * E.perPost;
+    r.revenue += posts;
+    r.treasury += E.homeIncome + posts - r.built * E.shipUpkeep;
+
+    const before = s.rivalShips.length;
+    decide(w, s, spec, r, rng, log);
+    // the first sail of any rival is news: the race has begun
+    const first = s.rivalShips.length > before ? s.rivalShips[s.rivalShips.length - 1] : undefined;
+    if (first && s.told.first_rival == null) {
+      s.told.first_rival = s.turn;
+      const home = w.old.ports.find((p) => p.id === spec.home);
+      ev({ kind: 'people', title: 'Rival sails', map: first.map, hex: first.hex,
+        text: `Word from ${home?.name ?? 'abroad'}: ${spec.people} have sent ${first.kind === 'trader' ? 'a ship to trade with the peoples of the coast' : 'a ship with settlers to plant a colony'}. You are not the only crown looking beyond the known world; the best coasts will go to whoever reaches them first.` });
     }
-    // earnings
-    // what their trade earns, on the same scale as the player's sales
-    r.revenue += s.rivalColonies.filter((c) => c.crown === spec.id).reduce((t, c) => t + c.pop * 6, 0) + r.posts.length * 25;
+
     // relations drift, and sour with neighbours too close
     r.attitude += r.attitude > 10 ? -0.5 : r.attitude < 10 ? 0.5 : 0;
     for (const c of s.colonies) {
@@ -166,45 +310,27 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
       if (spec.id === 'portugal' && s.turn > 6 && c.map === 'old') r.attitude -= 2;
       if (spec.id === 'spain' && s.crown === 'portugal' && s.turn > 6 && c.map === 'new') r.attitude -= 1;
     }
+    // the enemy of their enemy
+    for (const foe of r.wars) if (s.rivals[foe].relation === 'war') r.attitude += 0.5;
     r.attitude = Math.max(-100, Math.min(100, r.attitude));
-    if (r.relation === 'peace' && r.attitude < -50 && rng() < 0.15) {
+    if (r.relation === 'peace' && r.attitude < -50 && rng() < 0.15 * spec.war * aggression(s)) {
       r.relation = 'war';
       r.warSince = s.turn;
       log('peril', `${spec.name} declares war on ${me(s)}.`);
       ev({ kind: 'lost', title: `War with ${spec.name}`, map: 'old', hex: w.old.ports.find((p) => p.id === spec.home)!.hex,
-        text: `${spec.name} has declared war. Their privateers will hunt your ships and their soldiers may fall on your colonies. You can make peace at court, or carry the war to their colonies.` });
-    }
-    if (r.relation === 'war') {
-      // privateers where your ships are
-      for (const map of ['old', 'new'] as MapId[]) {
-        if (map === 'new' && s.turn < spec.volta) continue;
-        if (!s.fleets.some((f) => f.map === map)) continue;
-        if (s.rivalShips.some((x) => x.crown === spec.id && x.kind === 'privateer' && x.map === map)) continue;
-        const base = s.rivalColonies.find((c) => c.crown === spec.id && c.map === map);
-        const at = base ? GRIDS[map].neighbors(base.hex).find((h) => isWater(w[map].terrain[h])) ?? base.hex : startHex(w, spec.id, map, s.fleets.find((f) => f.map === map)!.hex);
-        spawn(w, s, spec.id, map, 'privateer', at, 5 + Math.floor((s.turn - (r.warSince ?? s.turn)) / 4) + int(rng, 0, 3));
-      }
-      // raids on colonies near theirs
-      for (const c of s.colonies) {
-        if (!s.rivalColonies.some((x) => x.crown === spec.id && x.map === c.map && GRIDS[c.map].distance(x.hex, c.hex) <= 12) || rng() > 0.2) continue;
-        const raiders = Math.min(6, 2 + Math.floor((s.turn - (r.warSince ?? s.turn)) / 8));
-        const out = assaultColony(s, c, { name: spec.name, units: rivalGarrison(raiders, 0, yearOf(s.turn)), crown: spec.id }, w[c.map].terrain[c.hex], rng);
-        if (out.win) {
-          if (c.pop > 1) c.pop--;
-          for (const k of Object.keys(c.stock) as (keyof Colony['stock'])[]) c.stock[k] = Math.floor((c.stock[k] ?? 0) / 2);
-          log('peril', `${spec.people[0].toUpperCase()}${spec.people.slice(1)} raid ${c.name}: a colonist is killed and the warehouse plundered.`);
-        } else log('peril', `${spec.people[0].toUpperCase()}${spec.people.slice(1)} attack ${c.name}, and are beaten off.`);
-      }
+        text: `${spec.name} has declared war. Their privateers will hunt your ships, and their soldiers will sail against your colonies: watch for their ships. You can make peace at court, or carry the war to their colonies.` });
     }
   }
 
-  // ships sail; arrivals found colonies, open trading posts, or fight
+  crownsAmongThemselves(s, rng, log);
+
+  // ships sail; arrivals found colonies, open trading posts, land soldiers, or come home
   for (const ship of [...s.rivalShips]) {
     const spec = rivalSpec(ship.crown);
     const r = s.rivals[ship.crown];
     const g = GRIDS[ship.map];
-    if (ship.kind === 'privateer') {
-      if (r.relation !== 'war') { s.rivalShips = s.rivalShips.filter((x) => x !== ship); continue; }
+    if (ship.kind === 'privateer' && !ship.homeward) {
+      if (r.relation !== 'war') { turnHome(w, s, ship); continue; }
       const prey = s.fleets.filter((f) => f.map === ship.map).sort((a, b) => g.distance(a.hex, ship.hex) - g.distance(b.hex, ship.hex))[0];
       if (!prey) continue;
       if (g.distance(prey.hex, ship.hex) > 1) {
@@ -218,34 +344,194 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
       continue;
     }
     sail(w, s, ship);
+    // the sea takes its share of every crown's ships
+    if (rng() < E.wreck * (ship.map === 'new' ? 2 : 1)) {
+      if (seen(s, ship.map, ship.hex)) log('peril', `The ${ship.name}, a ship of ${spec.name}, is lost in a storm.`);
+      loseShip(s, ship);
+      continue;
+    }
     if (ship.path && ship.path.length > 1) continue;
-    s.rivalShips = s.rivalShips.filter((x) => x !== ship);
+    if (ship.homeward) { reachHome(s, ship); continue; }
     if (ship.kind === 'trader') {
       const site = w[ship.map].ports.find((p) => p.hex === ship.target);
-      if (!site) continue;
-      const book = s.markets[site.id];
-      for (const m of Object.values(book ?? {})) if (m) m.stock *= 0.6;
-      if (!r.posts.includes(site.id)) {
-        r.posts.push(site.id);
-        if (s.fog[ship.map][site.hex] >= Fog.Charted) log('trade', `${spec.people[0].toUpperCase()}${spec.people.slice(1)} open a trading post at ${site.name}. There will be less to buy there.`);
+      if (site) {
+        const book = s.markets[site.id];
+        for (const m of Object.values(book ?? {})) if (m) m.stock *= 0.6;
+        if (!r.posts.includes(site.id)) {
+          r.posts.push(site.id);
+          const n = Nat.nationOfSite(w, site.id), st = n ? s.natives[n.id] : undefined;
+          if (st) st.crowns[ship.crown] = Math.min(100, (st.crowns[ship.crown] ?? 0) + 20);
+          if (seen(s, ship.map, site.hex)) log('trade', `${Cap(spec.people)} open a trading post at ${site.name}. There will be less to buy there.`);
+        }
       }
-    } else if (ship.target != null && !allColonyHexes(s, ship.map).some((h) => g.distance(h, ship.target!) <= 3)) {
-      const used = s.rivalColonies.map((c) => c.name);
-      const free = NAMES[ship.crown].filter((n) => !used.includes(n));
-      s.rivalColonies.push({ id: `rcol-${s.nextId++}`, crown: ship.crown, name: free.length ? pick(rng, free) : `${spec.name} ${s.nextId}`, map: ship.map, hex: ship.target, pop: 2, level: 'outpost', founded: s.turn, garrison: 1, seen: false });
+    } else if (ship.kind === 'settlers') {
+      if (ship.target != null && !allColonyHexes(s, ship.map).some((h) => g.distance(h, ship.target!) <= 3)) {
+        const used = s.rivalColonies.map((c) => c.name);
+        const free = NAMES[ship.crown].filter((n) => !used.includes(n));
+        s.rivalColonies.push({ id: `rcol-${s.nextId++}`, crown: ship.crown, name: free.length ? pick(rng, free) : `${spec.name} ${s.nextId}`, map: ship.map, hex: ship.target, pop: 2, level: 'outpost', founded: s.turn, garrison: 1, seen: false, supply: E.supplyFull, stock: 0, growth: 0 });
+      }
+    } else if (ship.kind === 'supply') {
+      const c = s.rivalColonies.find((x) => x.crown === ship.crown && x.map === ship.map && x.hex === ship.target);
+      if (c) {
+        c.supply = E.supplyFull;
+        if (c.pop < LEVELS[c.level].cap) c.pop++;
+        // the colony's produce goes home in the same ship
+        const qty = Math.round(c.stock);
+        if (qty > 0) { ship.cargo = { good: colonyGood(c), qty }; c.stock -= qty; }
+      }
+    } else if (ship.kind === 'raid') {
+      const c = s.colonies.find((x) => x.map === ship.map && x.hex === ship.target);
+      if (c && r.relation === 'war') {
+        const out = assaultColony(s, c, { name: spec.name, units: rivalGarrison(ship.strength, 0, yearOf(s.turn)), crown: spec.id }, w[c.map].terrain[c.hex], rng);
+        if (out.win) {
+          if (c.pop > 1) c.pop--;
+          for (const k of Object.keys(c.stock) as (keyof Colony['stock'])[]) c.stock[k] = Math.floor((c.stock[k] ?? 0) / 2);
+          log('peril', `${Cap(spec.people)} land at ${c.name}: a colonist is killed and the warehouse plundered.`);
+        } else log('peril', `${Cap(spec.people)} land at ${c.name}, and are beaten off.`);
+      }
     }
+    turnHome(w, s, ship);
   }
 
-  // their colonies grow, and the ones you can see are noted
-  for (const c of s.rivalColonies) {
-    if ((s.turn - c.founded) % RIVAL_SETTLERS_EVERY === RIVAL_SETTLERS_EVERY - 1 && c.pop < LEVELS[c.level].cap) c.pop++;
-    if (c.pop >= LEVELS[c.level].cap && LEVELS[c.level].next && rng() < 0.25) { c.level = LEVELS[c.level].next!; c.garrison++; }
-    if (!c.seen && s.fog[c.map][c.hex] >= Fog.Charted) {
+  // their colonies live on what the ships bring, as yours do
+  for (const c of [...s.rivalColonies]) {
+    const spec = rivalSpec(c.crown);
+    c.supply = Math.max(0, c.supply - 1);
+    const supplied = c.supply > 0;
+    c.stock += c.pop * RIVAL_TRADE.perSettler * (supplied ? 1 : E.wantWork);
+    c.growth += supplied ? E.births : -E.want;
+    if (c.growth >= 1) { c.growth = c.pop < LEVELS[c.level].cap ? c.growth - 1 : 1; if (c.pop < LEVELS[c.level].cap) c.pop++; }
+    if (c.growth <= -1) { c.growth += 1; if (c.pop > 1) c.pop--; }
+    if (!supplied && c.pop <= 1 && rng() < E.abandon) {
+      s.rivalColonies = s.rivalColonies.filter((x) => x !== c);
+      if (c.seen) log('discovery', `${c.name}, the colony of ${spec.name}, lies abandoned: no ship came, and the last settlers are gone.`);
+      continue;
+    }
+    if (c.pop >= LEVELS[c.level].cap && LEVELS[c.level].next && supplied && rng() < 0.25) { c.level = LEVELS[c.level].next!; c.garrison++; }
+    if (!c.seen && seen(s, c.map, c.hex)) {
       c.seen = true;
-      const spec = rivalSpec(c.crown);
       log('discovery', `Your sailors sight ${c.name}, a colony of ${spec.name}${c.map === 'new' ? ' across the ocean' : ' on the African coast'}.`);
     }
   }
+
+  crownsAndPeoples(w, s, rng, log);
+}
+
+// ---------- the crowns among themselves ----------
+
+const pairs = (s: GameState) => { const rs = rivalsOf(s.crown); return rs.flatMap((a, i) => rs.slice(i + 1).map((b) => [a, b] as const)); };
+
+/** The crowns you do not play quarrel over the same coasts, go to war and make peace without you. */
+function crownsAmongThemselves(s: GameState, rng: Rng, log: Log) {
+  for (const [a, b] of pairs(s)) {
+    const ra = s.rivals[a.id], rb = s.rivals[b.id];
+    const ca = s.rivalColonies.filter((c) => c.crown === a.id), cb = s.rivalColonies.filter((c) => c.crown === b.id);
+    const close = ca.filter((x) => cb.some((y) => y.map === x.map && GRIDS[x.map].distance(x.hex, y.hex) <= 6)).length;
+    let t = ra.toward[b.id] ?? 0;
+    const war = ra.wars.includes(b.id);
+    // old grudges come and go; neighbours overseas make them worse
+    t += (rng() - 0.52) * 2 - Math.min(0.6, close * 0.2);
+    if (!war && t < -40 && rng() < 0.04 * (a.war + b.war) / 2) {
+      ra.wars.push(b.id); rb.wars.push(a.id);
+      ra.toward[b.id] = rb.toward[a.id] = Math.min(t, -60);
+      ra.rivalWarSince[b.id] = rb.rivalWarSince[a.id] = s.turn;
+      log('court', `${Cap(a.name)} and ${b.name} are at war.`);
+      continue;
+    }
+    if (war) {
+      ra.treasury -= E.warCost; rb.treasury -= E.warCost;
+      if (rng() < 0.15) {
+        // one side falls on a colony of the other
+        const [att, def, theirs] = rng() < 0.5 ? [a, b, cb] as const : [b, a, ca] as const;
+        if (theirs.length && s.rivals[att.id].treasury >= 0) {
+          const c = pick(rng, theirs);
+          if (rng() < 0.45) {
+            c.pop--;
+            c.supply = Math.max(0, c.supply - 3);
+            if (c.pop <= 0) {
+              s.rivalColonies = s.rivalColonies.filter((x) => x !== c);
+              if (c.seen) log('peril', `${Cap(att.people)} burn ${c.name}, the colony of ${def.name}.`);
+            } else if (c.seen) log('peril', `${Cap(att.people)} raid ${c.name}, the colony of ${def.name}.`);
+          }
+        }
+      }
+      if (rng() < 0.04) { const loser = s.rivals[rng() < 0.5 ? a.id : b.id]; if (loser.built > 1 && loser.hulls > 0) { loser.built--; loser.hulls--; } }
+      const since = s.turn - (ra.rivalWarSince[b.id] ?? s.turn);
+      if ((since >= 8 && rng() < 0.12) || ra.treasury < -E.warCost * 10 || rb.treasury < -E.warCost * 10) {
+        ra.wars = ra.wars.filter((x) => x !== b.id); rb.wars = rb.wars.filter((x) => x !== a.id);
+        delete ra.rivalWarSince[b.id]; delete rb.rivalWarSince[a.id];
+        // a peace is kept for a while
+        t = 25;
+        log('court', `${Cap(a.name)} and ${b.name} make peace.`);
+      }
+    }
+    ra.toward[b.id] = rb.toward[a.id] = Math.max(-100, Math.min(60, t));
+  }
+}
+
+// ---------- the crowns and the peoples ----------
+
+/** The crown a people counts as a friend, if any. */
+export function friendOf(st: NativeState): CrownId | undefined {
+  const best = (Object.entries(st.crowns) as [CrownId, number][]).sort((a, b) => b[1] - a[1])[0];
+  return best && best[1] >= E.peopleFriend ? best[0] : undefined;
+}
+
+const lands = new WeakMap<NationDef, Set<number>>();
+/** A people's land never changes: work it out once. */
+function landOf(n: NationDef) { let l = lands.get(n); if (!l) { l = new Set(Nat.territory(n)); lands.set(n, l); } return l; }
+
+/** Peoples judge every crown, not only yours: posts win them, settlers on their land anger them, and they raid. */
+function crownsAndPeoples(w: World, s: GameState, rng: Rng, log: Log) {
+  for (const n of Nat.allNations(w)) {
+    const st = s.natives[n.id];
+    if (!st) continue;
+    const on = s.rivalColonies.filter((c) => c.map === n.map);
+    const land = on.length ? landOf(n) : null;
+    for (const spec of rivalsOf(s.crown)) {
+      const r = s.rivals[spec.id];
+      let a = st.crowns[spec.id] ?? 0;
+      const post = r.posts.includes(n.site);
+      const cols = land ? on.filter((c) => c.crown === spec.id && GRIDS[c.map].within(c.hex, 2).some((h) => land.has(h))) : [];
+      if (!post && !cols.length && a === 0) continue;
+      a += a > 0 ? -0.3 : a < 0 ? 0.3 : 0;
+      if (post) a += 1;
+      a -= 1.5 * cols.length;
+      // angry enough, and strong enough: they fall on the settlers
+      if (a <= E.peopleAngry && cols.length && st.warriors >= 4 && !st.siege && st.relation !== 'subject' && rng() < 0.15) {
+        const c = pick(rng, cols);
+        const out = fight(rng, Nat.nativeForce(n, st, 0.5), rivalForce(s, c), w[c.map].terrain[c.hex], 'assault');
+        st.warriors = Math.max(1, Math.round(st.warriors - st.warriors * 0.5 * out.atkLoss));
+        a += 10;
+        if (out.attackerWon) {
+          c.pop--;
+          c.supply = Math.max(0, c.supply - 3);
+          if (c.pop <= 0) {
+            s.rivalColonies = s.rivalColonies.filter((x) => x !== c);
+            if (c.seen || st.met) log('peril', `The ${n.people} burn ${c.name}, the colony of ${spec.name} on their land.`);
+          } else if (c.seen) log('peril', `The ${n.people} raid ${c.name}, the colony of ${spec.name}.`);
+        }
+      }
+      st.crowns[spec.id] = Math.max(-100, Math.min(100, a));
+    }
+    // their friends' enemies are not welcome
+    const friend = friendOf(st);
+    if (friend && st.met && s.rivals[friend].relation === 'war' && st.relation !== 'subject') {
+      Nat.remember(s, st, `Their friends ${rivalSpec(friend).people} speak against you`, -1);
+      s.rivals[friend].revenue += 10;
+    }
+  }
+}
+
+/** What a crown is about, in a few words, for the court. */
+export function rivalDoing(s: GameState, crown: CrownId): string {
+  const r = s.rivals[crown];
+  const WANT: Record<RivalPlanKind, string> = { idle: '', settle: 'a new colony', trade: 'a trading voyage', supply: 'a supply convoy', build: 'a new ship', saving: '', privateer: 'privateers', raid: 'a landing force' };
+  const AT_SEA: Record<RivalShip['kind'], string> = { settlers: 'settlers at sea', trader: 'a trading voyage under way', supply: 'a convoy to its colonies', privateer: 'privateers hunting', raid: 'soldiers at sea' };
+  const out = [...new Set(s.rivalShips.filter((x) => x.crown === crown && !x.homeward).map((x) => AT_SEA[x.kind]))];
+  if (s.rivalShips.some((x) => x.crown === crown && x.homeward)) out.push('ships homeward bound');
+  if (r.plan.kind === 'saving' && r.plan.for) out.push(`saving for ${WANT[r.plan.for]}`);
+  return out.length ? Cap(out.join('; ')) : 'Ships in port';
 }
 
 function fleetGuns(s: GameState, f: Fleet) {
@@ -257,7 +543,7 @@ function seaBattle(s: GameState, f: Fleet, ship: RivalShip, rng: Rng, log: Log, 
   const spec = rivalSpec(ship.crown);
   const a = fleetGuns(s, f), d = ship.strength;
   if (rng() < a / (a + d)) {
-    s.rivalShips = s.rivalShips.filter((x) => x !== ship);
+    loseShip(s, ship);
     const prize = int(rng, 200, 700);
     s.treasury += prize;
     s.prestige += 5;
@@ -296,7 +582,10 @@ export function makePeace(s: GameState, crown: CrownId): Result {
   r.relation = 'peace';
   r.warSince = null;
   r.attitude = Math.max(r.attitude, -30);
-  s.rivalShips = s.rivalShips.filter((x) => !(x.crown === crown && x.kind === 'privateer'));
+  // their privateers and soldiers are called home
+  const recalled = s.rivalShips.filter((x) => x.crown === crown && (x.kind === 'privateer' || x.kind === 'raid') && !x.homeward);
+  s.rivalShips = s.rivalShips.filter((x) => !recalled.includes(x));
+  r.hulls += recalled.length;
   return { ok: true, message: `Peace with ${rivalSpec(crown).name}, for ${cost} ducats.` };
 }
 

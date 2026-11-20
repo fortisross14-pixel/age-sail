@@ -665,8 +665,8 @@ class Scene {
     for (const x of ships) {
       const crown = CROWN[x.crown];
       const node = new Container();
-      node.addChild(new Graphics().ellipse(0, 0, HEX_W * 0.42, HEX_W * 0.17).fill({ color: crown.primary, alpha: 0.6 }).stroke({ width: x.kind === 'privateer' ? 2.4 : 1.4, color: x.kind === 'privateer' ? 0x111111 : crown.secondary }));
-      const sp = new Sprite(this.assets.tex(`ships/${x.kind === 'privateer' ? 'sloop' : x.kind === 'trader' ? 'fluyt' : 'carrack'}`));
+      node.addChild(new Graphics().ellipse(0, 0, HEX_W * 0.42, HEX_W * 0.17).fill({ color: crown.primary, alpha: 0.6 }).stroke({ width: x.kind === 'privateer' || x.kind === 'raid' ? 2.4 : 1.4, color: x.kind === 'privateer' || x.kind === 'raid' ? 0x111111 : crown.secondary }));
+      const sp = new Sprite(this.assets.tex(`ships/${x.kind === 'privateer' ? 'sloop' : x.kind === 'trader' || x.kind === 'supply' ? 'fluyt' : 'carrack'}`));
       sp.anchor.set(0.5, 0.82);
       sp.width = HEX_W * 0.85;
       sp.scale.y = sp.scale.x;

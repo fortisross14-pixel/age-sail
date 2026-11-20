@@ -5,7 +5,7 @@ import { OBJECTIVES, VOYAGE, AMBITIONS, AMBITIONS_AT_ONCE, OPENINGS, objectiveBy
 import { DIFFICULTIES } from '../data/difficulty';
 import { CROWNS, type CrownId } from '../data/rivals';
 import { attention } from '../ui/attention';
-import { wrap, readSave, SAVE_VERSION } from '../save';
+import { wrap, readSave } from '../save';
 
 describe('Phase 1: objectives', () => {
   it('starts with the whole first voyage open and no ambitions yet', () => {
@@ -136,7 +136,7 @@ describe('Phase 1: stories and saves', () => {
     promote(state, best.id, 'explorer', { unit: 'colonist' });
     const old = structuredClone(state) as unknown as Record<string, unknown>;
     delete old.difficulty; delete old.objectives;
-    const r = readSave({ ...wrap(state), saveVersion: SAVE_VERSION - 1, state: old });
+    const r = readSave({ ...wrap(state), saveVersion: 14, state: old });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.migrated).toBe(true);

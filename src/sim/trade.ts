@@ -1,12 +1,10 @@
 /**
  * The living market: factories that trade for you in European ports, regional tastes and shocks
- * that move demand, and rival merchants who bring their colonies' goods home.
+ * that move demand. (Rival cargoes come home in their own ships: see `rivals.ts`.)
  */
 import { GOODS, GOOD_INFO, type GoodId } from '../data/goods';
-import { FACTORY, REGION_OF, REGION_NAME, TASTE, SHOCKS, SHOCK_CHANCE, RIVAL_TRADE, type Region } from '../data/trade';
-import { rivalsOf, rivalSpec } from '../data/rivals';
+import { FACTORY, REGION_OF, REGION_NAME, TASTE, SHOCKS, SHOCK_CHANCE, type Region } from '../data/trade';
 import type { RealmId } from '../data/realms';
-import { GRIDS } from './hex';
 import { mulberry32, hashSeed, int, pick } from './rng';
 import { buyCost, sellValue, unitPrice } from './market';
 import type { Fleet, GameState, MarketGood, PortDef, World } from './types';
@@ -48,26 +46,6 @@ export function shockSeason(s: GameState, log: Log) {
   const region = pick(rng, REGIONS.filter((r) => !s.shocks.some((x) => x.region === r)));
   s.shocks.push({ kind: k.id, region, since: s.turn, until: s.turn + int(rng, k.seasons[0], k.seasons[1]) });
   log('trade', k.text.replace('{region}', REGION_NAME[region]));
-}
-
-/** Rival crowns ship their colonies' goods into their home ports, and buy tools, cloth and wine there. */
-export function rivalMerchants(w: World, s: GameState) {
-  for (const r of rivalsOf(s.crown)) {
-    const book = s.markets[rivalSpec(r.id).home];
-    if (!book) continue;
-    for (const c of s.rivalColonies.filter((x) => x.crown === r.id)) {
-      const lat = Math.abs(GRIDS[c.map].lat(c.hex));
-      const g: GoodId = lat < 25 ? 'sugar' : lat < 40 ? 'tobacco' : 'furs';
-      const m = book[g];
-      // they are merchants too: they ship home while it pays, and stop once the market is well stocked
-      if (m) m.stock += Math.max(0, Math.min(c.pop * RIVAL_TRADE.perSettler, m.ref * RIVAL_TRADE.fill - m.stock));
-      for (const [good, per] of Object.entries(RIVAL_TRADE.buys) as [GoodId, number][]) {
-        const mm = book[good];
-        if (mm) mm.stock = Math.max(0, mm.stock - c.pop * per);
-      }
-    }
-  }
-  void w;
 }
 
 // ---------- factories ----------

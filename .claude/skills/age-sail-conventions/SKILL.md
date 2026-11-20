@@ -47,8 +47,13 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   `nativeForce`, `rivalForce`, `freeForce`); unit numbers live in `src/data/army.ts`. Player-ordered
   battles push a `kind: 'battle'` event with the report. Check odds with `tools/battles.ts`.
   Count soldiers with `isMilitary(type)`, never `type === 'infantry'`.
+- **Rival crowns** (`src/sim/rivals.ts`, numbers in `RIVAL_ECON`): each has a treasury, hulls and a
+  plan. A new thing a rival can do is an `Option` in `options()` with a want (`u`), a cost and a
+  `run`; `decide` picks. Every ship must come from a hull (`spawn`) and return it (`reachHome`) or
+  be lost (`loseShip`): `hulls + ships at sea === built` is tested. Change a people's regard for a
+  crown through `st.crowns[crown]`; show what a rival does through `rivalDoing`.
 - **Markets** move in `seasonTick`: `src/sim/trade.ts` adds regional taste and shocks to consumption
-  (`demandFactor`), rival merchants, and factories (`factorySeason`); numbers in `src/data/trade.ts`.
+  (`demandFactor`), and factories (`factorySeason`); rival cargoes arrive with their ships; numbers in `src/data/trade.ts`.
 - **Objectives** (the first voyage, advisers' ambitions): words, order and rewards in
   `src/data/objectives.ts`, conditions in `src/sim/objectives.ts` (`MET`, one function per id).
   A first-voyage step can carry `inScreen` (the hint shown inside the screen it opens) and `point`
