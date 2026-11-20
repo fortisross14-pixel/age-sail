@@ -16,7 +16,7 @@ import { CROWN } from '../render/palette';
 import { fmt } from './format';
 import { Tabs } from './Drawers';
 import { ColonyCard, TaxRate } from './CitiesDrawer';
-import { Art } from './theme/Art';
+import { Art, Medal } from './theme/Art';
 import { Frame } from './theme/Frame';
 import { Icon, Crest, type IconName } from './theme/icons';
 import { sfx } from './sound';
@@ -107,8 +107,8 @@ function Overview({ city }: { city: City }) {
     <>
       <div className="sec">What {port.name} is</div>
       <div className="roles">
-        {city.id === mainPort(game) && <span className="role-chip"><Icon name="court" size={18} tone="ink" />Capital and main port</span>}
-        {roles.map((b) => <span key={b} className="role-chip"><Icon name={b as IconName} size={18} tone="ink" />{ROLE[b]} {ROMAN[city.buildings[b]]}</span>)}
+        {city.id === mainPort(game) && <span className="role-chip"><Medal name="court" size={26} fallback={<Icon name="court" size={18} tone="ink" />} />Capital and main port</span>}
+        {roles.map((b) => <span key={b} className="role-chip"><Medal name={b} size={26} fallback={<Icon name={b as IconName} size={18} tone="ink" />} />{ROLE[b]} {ROMAN[city.buildings[b]]}</span>)}
         {!roles.length && <span className="muted">Nothing built yet. What you build here decides what it becomes.</span>}
       </div>
       <div className="sec">At a glance</div>
@@ -346,7 +346,7 @@ function CityList({ onPick }: { onPick: (id: string) => void }) {
   return (
     <>
       <header className="drawer-head">
-        <span className="adm-medal" aria-hidden><Icon name="cities" size={26} /></span>
+        <span className="adm-medal" aria-hidden><Medal name="cities" size={60} fallback={<Icon name="cities" size={26} />} /></span>
         <div><h2>Your cities</h2><div className="sub">{all.length} cities of {realmSpec(game.crown).name} · {game.colonies.length} colon{game.colonies.length === 1 ? 'y' : 'ies'}</div></div>
       </header>
       <div className="tiles">

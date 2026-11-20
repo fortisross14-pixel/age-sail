@@ -1,115 +1,127 @@
-# Art requests for M10: the Admiralty interface
+# Art requests: the Admiralty interface
 
-The interface is built and waiting for these sheets. Every picture has a named slot in the
-game (`src/ui/theme/Art.tsx`); until a sheet arrives, the slot shows an ink sprite or a gold icon.
+**How to use these.** One prompt makes one image: paste one at a time, each in a new message.
+Attach the Admiralty concept image and `icons.png` (the medallion sheet) as style references
+every time. Save each result in `art/source/ui/` under its file name and I'll cut it in.
 
-**For every prompt:** attach the Admiralty concept image (navy lacquer, gold-leaf frames, parchment
-panels) as the style reference, and ask for a **transparent background**. Keep the grid exact
-and the gaps wide and empty, so each picture can be cut out cleanly. No text, letters or numbers
-anywhere. Save each sheet in `art/source/ui/` under the file name shown.
+**Why they look like this.** The icon sheet came out best when every item sat in its own framed
+cell on a plain background. So every prompt asks for a strict grid of framed tiles on flat navy:
+easy for ChatGPT to draw, easy for me to cut, no transparency needed.
+
+Every prompt starts with the same style paragraph, so the sheets match:
+
+> **Style:** painted game-interface art for a historical strategy game, matching the attached
+> references: deep navy enamel, polished gold leaf with a soft top-left light, warm parchment,
+> rich but clean detail, crisp edges. No text, letters, numbers or labels anywhere.
 
 ---
 
-## 1. Icon set: `icons.png` (most needed)
+## Done
 
-> A sprite sheet of 24 game interface icons in a strict grid of 6 columns by 4 rows, each icon
-> centred in its cell with wide empty gaps, on a transparent background. Style: the attached
-> concept art — polished gold-leaf metal with a thin dark outline and a soft highlight, like
-> engraved brass inlay, readable at 32 pixels, consistent stroke weight and lighting from the top
-> left. No text, letters or numbers. In order:
-> Row 1: a walled town with towers, wooden barrels with grain sacks, a galleon under sail, a royal
-> crown, an open book with a glass flask, a rolled scroll with a wax seal.
-> Row 2: a globe, a castle keep, a small ship with an arrow, three curving wind lines, a cluster
-> of three hexagons, an open eye.
-> Row 3: a stack of gold coins, a five-pointed star, a cogwheel, a question mark seal (no letters,
-> just a curl and dot shape), a parchment scroll with a quill, two silhouettes of people.
-> Row 4: an anchor, crossed swords, a church with a cross, a domed hall with a mortarboard shape,
-> a market stall with scales, a hammer and chisel.
+- **1. `icons.png`**: the 24 gold-on-navy medallions. Cut and in the game (dock, rail, HUD,
+  stats, screen headers, city roles).
 
-## 2. Building illustrations: `buildings.png`
+## 2. `buildings.png`
 
-> A sprite sheet of 12 building illustrations for a historical strategy game set in 1490–1650, in
-> a strict grid of 4 columns by 3 rows with wide empty gaps, on a transparent background. Style:
-> the attached concept art — richly painted, warm, detailed miniatures in three-quarter view from
-> slightly above, each on a small patch of ground or quay, same scale and lighting from the top
-> left. No text, letters, numbers, frames or labels. In order:
-> Row 1: a small wooden dock with one crane (docks I), a stone dockyard with a ship on the slipway
-> (docks II), a great royal dockyard with a galleon in frame and two cranes (docks III), a timber
-> barracks with a drill yard and pikes (barracks I).
-> Row 2: a stone barracks with towers, banners and soldiers drilling (barracks II), a stone church
-> with a bell tower and friary (church), a cloistered college with a small dome (university I),
-> a grand university with a dome, library and observatory tower (university II).
-> Row 3: a covered market with striped awnings and stalls (market I), a stone exchange with
-> arcades, warehouses and a crane (market II), a warehouse with barrels and a hoist (spare), a
-> star-shaped stone fortress with cannon (spare).
+> Style: painted game-interface art for a historical strategy game, matching the attached
+> references: deep navy enamel, polished gold leaf with a soft top-left light, warm parchment,
+> rich but clean detail, crisp edges. No text, letters, numbers or labels anywhere.
+>
+> A landscape image with a strict grid of 4 columns and 3 rows of square tiles, all the same
+> size, separated by even gaps of flat plain navy. Each tile has a light parchment background and
+> a thin gold border, and shows one building of 1500s Europe as a small painted miniature in
+> three-quarter view, centred, on a little patch of ground or quay, the same scale in every tile:
+> 1 small wooden dock with a crane · 2 stone dockyard with a ship on the slipway · 3 great royal
+> dockyard with a galleon being built · 4 timber barracks with pikes ·
+> 5 stone barracks with towers and banners · 6 stone church with a bell tower · 7 small college
+> with a cloister · 8 grand university with a dome ·
+> 9 market with striped awnings · 10 stone exchange with arcades and a crane · 11 warehouse with
+> barrels · 12 star-shaped fortress with cannon.
 
-## 3. City panoramas: `cities.png`
+## 3. `crests.png`
 
-> A sheet of 8 wide panoramic city views, each 3 times as wide as it is tall, stacked in a single
-> column with wide empty gaps, on a transparent background. Style: the attached concept art —
-> a painted skyline under a pale sky with soft clouds, gently fading to transparent on the left
-> edge, warm afternoon light. No text or labels. In order: Sevilla on the Guadalquivir with its
-> cathedral tower and ships at the quay; Lisboa on the Tagus with the tower at Belém; London on
-> the Thames with the bridge and the Tower; La Rochelle with its two harbour towers; Antwerpen on
-> the Scheldt with the cathedral spire; a generic southern port city; a generic walled inland city
-> on a hill; a small fishing town.
+> Style: (the same paragraph)
+>
+> A landscape image with a strict grid of 5 columns and 3 rows on flat plain navy, evenly
+> spaced. Each cell holds one heraldic shield, all the same shape and size (a rounded heater
+> shield with a thin gold rim), simple and bold so each reads when small:
+> Castile (red and gold, a castle) · Portugal (white with small blue shields, red border) ·
+> England (red, gold lions) · France (blue, gold fleurs-de-lis) · the Netherlands (orange, a
+> lion) ·
+> the Ottomans (green, a crescent) · Morocco (red, a gold star knot) · Venice (red, a gold
+> winged lion) · Genoa (white, a red cross) · the Papal States (red, crossed gold keys) ·
+> Naples (blue and gold) · the Hanse (red and white halves, a ship) · Denmark (red, a white
+> cross) · Scotland (blue, a white saltire) · the Empire (gold, a black double-headed eagle).
 
-## 4. Coats of arms: `crests.png`
+## 4. `portraits-men.png`
 
-> A sheet of 15 heraldic shields in a strict grid of 5 columns by 3 rows with wide empty gaps, on
-> a transparent background. Every shield the same shape and size (a rounded heater shield with a
-> thin gold rim), painted in the attached concept's style, simplified so each reads at 40 pixels.
-> No text or mottos. In order: Castile (red and gold, castle), Portugal (white with blue shields
-> and a red border), England (red with gold lions), France (blue with gold fleurs-de-lis), the
-> Netherlands (orange and blue with a lion); the Ottomans (green with a crescent), Morocco (red with
-> a gold star knot), Venice (red with a gold winged lion), Genoa (white with a red cross), the
-> Papal States (gold crossed keys on red); Naples (blue and gold), the Hanse (red and white halves
-> with a ship), Denmark (red with a white cross), Scotland (blue with a white saltire), the Empire
-> (gold with a black double-headed eagle).
+> Style: (the same paragraph)
+>
+> A landscape image with a strict grid of 4 columns and 3 rows on flat plain navy. Each cell
+> holds one oval portrait in a thin gold frame, all the same size: head and shoulders,
+> three-quarter view, a painted miniature with warm light. Men of a European royal court around
+> 1500–1600, ages rising from about 20 (top left) to about 70 (bottom right): a young courtier ·
+> a navigator in a cap · an explorer in a morion helmet · a soldier in a breastplate ·
+> a merchant in a fur-trimmed coat · a Dominican friar · a scholar with spectacles · a nobleman
+> with a ruff ·
+> a sea captain · a royal secretary · a bishop · a grizzled old admiral.
 
-## 5. Court portraits: `portraits.png`
+## 5. `portraits-women.png`
 
-> A square sprite sheet of 24 bust portraits for a historical strategy game set in 1490–1650, in a
-> strict grid of 6 columns by 4 rows with wide empty gaps, on a transparent background. Style: the
-> attached concept art — richly painted, warm light from the top left, like small oil portraits;
-> every portrait the same framing (head and shoulders, three-quarter view, the same size), no frame,
-> no text. People of a European royal court, each clearly different in age, face and dress: rows
-> 1–2 men, rows 3–4 women; in each row, ages run from about 20 on the left to about 70 on the right.
-> Mix the dress of Castile, Portugal, England, France and the Netherlands: a weathered sea captain,
-> a navigator in a cap, an explorer in a morion helmet, a soldier in a breastplate, a merchant in a
-> fur-trimmed coat, a Dominican friar, a bishop, a scholar with spectacles, a nobleman with a ruff,
-> a grizzled admiral, a young courtier, a royal secretary; a noblewoman in a French hood, a
-> merchant's widow, a lady-in-waiting, an abbess, a woman scholar, a Dutch burgher's wife in a white
-> cap, an English lady with a ruff, a court physician, an elderly dowager, a young heiress, a
-> cartographer, a diplomat.
+> Style: (the same paragraph)
+>
+> A landscape image with a strict grid of 4 columns and 3 rows on flat plain navy. Each cell
+> holds one oval portrait in a thin gold frame, all the same size: head and shoulders,
+> three-quarter view, a painted miniature with warm light. Women of a European royal court
+> around 1500–1600, ages rising from about 20 (top left) to about 70 (bottom right): a young
+> heiress · a lady-in-waiting · a cartographer · a Dutch burgher's wife in a white cap ·
+> a noblewoman in a French hood · a woman scholar · a merchant's widow · an English lady with a
+> ruff ·
+> a court physician · a diplomat · an abbess · an elderly dowager.
 
-## 6. Units and ships: `units.png`
+## 6. `units.png`
 
-> A sprite sheet of 10 painted figures in a strict grid of 5 columns by 2 rows with wide empty
-> gaps, on a transparent background, in the attached concept's style, each standing on a small
-> hexagonal base of ground or sea, same scale and lighting. No text. Row 1: a colonist with an axe
-> and bundle, an infantryman with pike and morion, a musketeer, a friar with a cross, an explorer
-> with a spyglass and cloak. Row 2: a merchant with a ledger, a caravel, a carrack, a galleon, a
-> fluyt.
+> Style: (the same paragraph)
+>
+> A landscape image with a strict grid of 5 columns and 2 rows of square tiles, all the same
+> size, separated by even gaps of flat plain navy. Each tile has a light parchment background and
+> a thin gold border, and shows one painted miniature, centred, the same scale in every tile:
+> a colonist with an axe and bundle · a pikeman in a morion · a musketeer · a friar holding a
+> cross · an explorer with a spyglass and cloak ·
+> a merchant with a ledger · a caravel at sea · a carrack at sea · a galleon at sea · a Dutch
+> fluyt at sea.
 
-## 7. Title screen: `title.png`
+## 7. `cities.png`
 
-> A wide painting, 16 by 9, for the title screen of a strategy game about the age of sail: a fleet
-> of caravels and a galleon leaving a sunlit Iberian harbour at dawn toward an open ocean, an old
-> chart and brass instruments in the foreground on a navy lacquer desk with gold inlay, in the
-> attached concept's warm painted style. Leave the centre third calm and uncluttered for a title
-> and buttons. No text.
+> Style: (the same paragraph)
+>
+> A landscape image with a strict grid of 2 columns and 4 rows of wide panels, each panel three
+> times as wide as it is tall, all the same size, separated by even gaps of flat plain navy, no
+> frames. Each panel is a painted city skyline across water under a pale sky with soft clouds:
+> Sevilla with its cathedral tower and ships at the quay · Lisboa on the river with a fortified
+> tower · London with a long bridge and a white castle · La Rochelle with two harbour towers ·
+> Antwerpen with a tall cathedral spire · a sunny southern port · a walled inland city on a hill ·
+> a small fishing town.
+
+## 8. `title.png`
+
+> Style: (the same paragraph)
+>
+> A wide 16:9 painting for a game's title screen: caravels and a galleon leaving a sunlit
+> Iberian harbour at dawn for the open ocean; in the foreground, the edge of a navy-lacquered desk
+> with gold inlay, an old sea chart, a brass astrolabe and a compass. Keep the middle third calm
+> and empty for the title and buttons.
 
 ---
 
 ### Where each sheet goes
 
-| Sheet | Game slots |
+| Sheet | In the game |
 |---|---|
-| icons | `icon/cities` … `icon/chronicle` (dock), HUD and rail buttons, stats, building and skill marks |
-| buildings | `building/docks` (I–III), `building/barracks`, `building/church`, `building/university`, `building/market` |
-| cities | `city/seville`, `city/lisbon`, `city/london`, `city/larochelle`, `city/antwerp`, plus port, inland and town for the rest |
-| crests | the HUD crest, city headers, the Crowns standings, the menu |
-| portraits | court cards and courtier details |
-| units | `unit/colonist`, `unit/infantry`, `unit/missionary`, `ship/caravel`, `ship/carrack`, `ship/galleon`, leaders |
+| icons (done) | dock, rail, HUD buttons and stats, screen headers, city roles |
+| buildings | city building places, the building card, the build list (docks I–III, barracks I–II, church, university I–II, market I–II; 11–12 spare) |
+| crests | your arms in the HUD and city headers, the crown picker, Crowns standings, map realm labels |
+| portraits | court cards and the courtier detail (men and women, by age) |
+| units | recruitment cards, explorer commissions, fleet lists |
+| cities | the picture in each city screen's header (capitals; the rest by kind) |
 | title | the menu background |

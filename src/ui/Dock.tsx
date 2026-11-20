@@ -1,6 +1,6 @@
 import { useStore, newWorldOpen, type DrawerId } from '../store';
 import { Icon, type IconName } from './theme/icons';
-import { Art } from './theme/Art';
+import { Medal } from './theme/Art';
 import { getView } from './MapCanvas';
 
 const ITEMS: { id: DrawerId; label: string; icon: IconName; key: string }[] = [
@@ -31,7 +31,7 @@ export function Dock() {
       {ITEMS.map((it) => (
         <button key={it.id} className={`dock-btn ${drawer === it.id ? 'on' : ''}`} onClick={() => set({ drawer: drawer === it.id ? null : it.id })}
           title={`${it.label} (${it.key})`} aria-pressed={drawer === it.id}>
-          <Art slot={`icon/${it.id}`} fallback={<Icon name={it.icon} size={40} />} />
+          <Medal name={it.id} size={54} fallback={<Icon name={it.icon} size={40} />} />
           <span>{it.label}</span>
           {(badge[it.id] ?? 0) > 0 && <span className="badge" title={`${badge[it.id]} ${why[it.id]}`}>{badge[it.id]}</span>}
         </button>
@@ -62,13 +62,13 @@ export function Rail() {
   const other = map === 'old' ? (open ? (game.newWorldFound ? 'the New World' : 'the Mar Océano') : 'the unknown west (locked)') : 'the Old World';
   return (
     <nav className="rail" aria-label="Map tools">
-      <button className={`adm-medal ${map === 'new' ? 'on' : ''}`} onClick={() => setMap(map === 'old' ? 'new' : 'old')} data-tip={`Show ${other} (M)`} aria-label={`Show ${other}`}><Icon name="globe" size={28} /></button>
-      <button className="adm-medal" onClick={() => getView()?.home()} data-tip="Back to your capital" aria-label="Back to your capital"><Icon name="home" size={26} /></button>
-      <button className="adm-medal" onClick={next} data-tip="Next fleet (Tab)" aria-label="Next fleet"><Icon name="next" size={26} /></button>
-      <button className={`adm-medal ${showWind ? 'on' : ''}`} onClick={() => set({ showWind: !showWind })} data-tip="Winds (V)" aria-label="Winds" aria-pressed={showWind}><Icon name="wind" size={26} /></button>
-      <button className={`adm-medal ${showGrid ? 'on' : ''}`} onClick={() => set({ showGrid: !showGrid })} data-tip="Hex grid (G)" aria-label="Hex grid" aria-pressed={showGrid}><Icon name="grid" size={26} /></button>
-      <button className={`adm-medal ${highlightAll ? 'on' : ''}`} onClick={() => set({ highlightAll: !highlightAll })} data-tip="Show what you can click (Alt)" aria-label="Show what you can click" aria-pressed={highlightAll}><Icon name="eye" size={26} /></button>
-      <button className="adm-medal" onClick={() => set({ showHelp: true })} data-tip="How to play (H)" aria-label="How to play"><Icon name="help" size={26} /></button>
+      <button className={`adm-medal ${map === 'new' ? 'on' : ''}`} onClick={() => setMap(map === 'old' ? 'new' : 'old')} data-tip={`Show ${other} (M)`} aria-label={`Show ${other}`}><Medal name="globe" size={58} fallback={<Icon name="globe" size={28} />} /></button>
+      <button className="adm-medal" onClick={() => getView()?.home()} data-tip="Back to your capital" aria-label="Back to your capital"><Medal name="home" size={58} fallback={<Icon name="home" size={26} />} /></button>
+      <button className="adm-medal" onClick={next} data-tip="Next fleet (Tab)" aria-label="Next fleet"><Medal name="next" size={58} fallback={<Icon name="next" size={26} />} /></button>
+      <button className={`adm-medal ${showWind ? 'on' : ''}`} onClick={() => set({ showWind: !showWind })} data-tip="Winds (V)" aria-label="Winds" aria-pressed={showWind}><Medal name="wind" size={58} fallback={<Icon name="wind" size={26} />} /></button>
+      <button className={`adm-medal ${showGrid ? 'on' : ''}`} onClick={() => set({ showGrid: !showGrid })} data-tip="Hex grid (G)" aria-label="Hex grid" aria-pressed={showGrid}><Medal name="grid" size={58} fallback={<Icon name="grid" size={26} />} /></button>
+      <button className={`adm-medal ${highlightAll ? 'on' : ''}`} onClick={() => set({ highlightAll: !highlightAll })} data-tip="Show what you can click (Alt)" aria-label="Show what you can click" aria-pressed={highlightAll}><Medal name="eye" size={58} fallback={<Icon name="eye" size={26} />} /></button>
+      <button className="adm-medal" onClick={() => set({ showHelp: true })} data-tip="How to play (H)" aria-label="How to play"><Medal name="help" size={58} fallback={<Icon name="help" size={26} />} /></button>
     </nav>
   );
 }

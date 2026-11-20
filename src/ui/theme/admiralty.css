@@ -582,3 +582,18 @@ button.link { background: none; border: 0; box-shadow: none; padding: 0; min-hei
 .good-row .g-trade button { min-height: 30px; padding: 3px 9px; font-size: 14px; }
 .port-market h3 { font-size: 26px; margin: 0 0 2px; }
 @media (max-width: 980px) { .split { grid-template-columns: 1fr; } .good-row { grid-template-columns: 40px 1fr 56px 56px; } .good-row .g-trend { display: none; } .good-row .g-trade { grid-column: 1 / -1; } }
+
+/* ---------- painted medallions (art/source/ui/icons.png) ---------- */
+.medal-img { display: block; border-radius: 50%; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .55)); transition: filter .2s, transform .25s var(--ease-spring); }
+.adm-medal:has(.medal-img), .adm-square:has(.medal-img) { background: none !important; box-shadow: none !important; border: 0; overflow: visible; }
+.adm-medal:has(.medal-img) .medal-img { width: 100%; height: 100%; }
+.adm-medal:has(.medal-img):hover:not(:disabled) .medal-img, .adm-square:has(.medal-img):hover:not(:disabled) .medal-img { filter: drop-shadow(0 0 8px rgba(255, 206, 110, .65)) drop-shadow(0 3px 4px rgba(0, 0, 0, .55)) brightness(1.1); }
+.adm-medal.on:has(.medal-img) .medal-img, .adm-square.on:has(.medal-img) .medal-img { filter: drop-shadow(0 0 10px rgba(255, 206, 110, .95)) drop-shadow(0 0 3px rgba(255, 230, 160, .9)); }
+.adm-medal:has(.medal-img):active .medal-img, .adm-square:has(.medal-img):active .medal-img { transform: scale(.94); }
+.rail .adm-medal:has(.medal-img) { width: 58px; height: 58px; }
+.drawer-head .adm-medal:has(.medal-img) { width: 60px; height: 60px; }
+.hud-tools .adm-square:has(.medal-img) { width: 50px; height: 50px; }
+.dock-btn .medal-img { width: 54px; height: 54px; }
+.dock-btn.on .medal-img { filter: drop-shadow(0 0 8px rgba(255, 240, 200, .8)) drop-shadow(0 2px 3px rgba(60, 35, 5, .6)); }
+.hud .stat .medal-img { width: 44px; height: 44px; }
+.role-chip .medal-img { width: 26px; height: 26px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .4)); }

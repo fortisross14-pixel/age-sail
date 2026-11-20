@@ -8,6 +8,7 @@ import { eraAt } from '../data/eras';
 import { fmt } from './format';
 import { spriteUrl } from '../render/assets';
 import { Icon, Crest } from './theme/icons';
+import { Medal } from './theme/Art';
 import { sfx } from './sound';
 
 const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th'];
@@ -40,26 +41,26 @@ export function Hud() {
       </div>
       <span className="hud-sep" />
       <div className="stat" title="Treasury, in ducats">
-        <img src={spriteUrl('goods/gold')} alt="" />
+        <Medal name="coins" size={44} fallback={<img src={spriteUrl('goods/gold')} alt="" />} />
         <div><div className="stat-value">{fmt(game.treasury)}</div><div className="stat-label">ducats</div></div>
       </div>
       <span className="hud-sep" />
       <div className="stat" title="Prestige: from discoveries, victories and great deeds">
-        <Icon name="star" size={30} />
+        <Medal name="star" size={44} fallback={<Icon name="star" size={30} />} />
         <div><div className="stat-value">{fmt(game.prestige)}</div><div className="stat-label">prestige</div></div>
       </div>
       <span className="hud-sep" />
       <button className="stat plain" onClick={() => set({ drawer: 'court', courtTab: 'crowns' })}
         title={`Score: ${sc.pop} colonists ×10, ${sc.territory} hexes of territory ×2, ${sc.commerce} from ${fmt(game.revenue)} ducats of sales`}>
-        <Icon name="court" size={30} />
+        <Medal name="court" size={44} fallback={<Icon name="court" size={30} />} />
         <div><div className="stat-value">{fmt(sc.total)}</div><div className="stat-label">score ({ORDINAL[rank - 1]} of 5)</div></div>
       </button>
       <div className="spacer" />
       <div className="hud-tools">
-        <button className={`adm-square ${drawer === 'chronicle' ? 'on' : ''}`} onClick={() => toggle('chronicle')} title="Chronicle (6)" aria-label="Chronicle"><Icon name="chronicle" size={26} /></button>
-        <button className={`adm-square ${drawer === 'research' ? 'on' : ''}`} onClick={() => toggle('research')} title="Research (5)" aria-label="Research"><Icon name="research" size={26} /></button>
-        <button className={`adm-square ${drawer === 'court' ? 'on' : ''}`} onClick={() => toggle('court')} title="Court (4)" aria-label="Court"><Icon name="units" size={26} /></button>
-        <button className={`adm-square ${showSettings ? 'on' : ''}`} onClick={() => { sfx(showSettings ? 'close' : 'open'); set({ showSettings: !showSettings }); }} title="Settings" aria-label="Settings"><Icon name="settings" size={26} /></button>
+        <button className={`adm-square ${drawer === 'chronicle' ? 'on' : ''}`} onClick={() => toggle('chronicle')} title="Chronicle (6)" aria-label="Chronicle"><Medal name="chronicle" size={50} fallback={<Icon name="chronicle" size={26} />} /></button>
+        <button className={`adm-square ${drawer === 'research' ? 'on' : ''}`} onClick={() => toggle('research')} title="Research (5)" aria-label="Research"><Medal name="research" size={50} fallback={<Icon name="research" size={26} />} /></button>
+        <button className={`adm-square ${drawer === 'court' ? 'on' : ''}`} onClick={() => toggle('court')} title="Court (4)" aria-label="Court"><Medal name="people" size={50} fallback={<Icon name="units" size={26} />} /></button>
+        <button className={`adm-square ${showSettings ? 'on' : ''}`} onClick={() => { sfx(showSettings ? 'close' : 'open'); set({ showSettings: !showSettings }); }} title="Settings" aria-label="Settings"><Medal name="settings" size={50} fallback={<Icon name="settings" size={26} />} /></button>
       </div>
       <button className="end-turn" onClick={() => void endTurn()} disabled={busy} title={idle ? `${idle} fleet${idle > 1 ? 's' : ''} without orders (Enter)` : 'End the season (Enter)'}>
         {busy ? 'The season passes…' : 'End Season'}

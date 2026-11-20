@@ -3,6 +3,7 @@ import { useStore, type DrawerId } from '../store';
 import type { GameState } from '../sim/types';
 import { realmSpec } from '../data/realms';
 import { Frame } from './theme/Frame';
+import { Medal } from './theme/Art';
 import { Icon, type IconName } from './theme/icons';
 import { sfx } from './sound';
 import { GOOD_INFO, GOODS, type GoodId } from '../data/goods';
@@ -56,7 +57,7 @@ export function Drawer() {
       <button className="adm-medal adm-close" onClick={() => set({ drawer: null })} aria-label="Close" title="Close (Esc)"><Icon name="close" size={20} /></button>
       {head && (
         <header className="drawer-head">
-          <span className="adm-medal" aria-hidden><Icon name={head.icon} size={26} /></span>
+          <span className="adm-medal" aria-hidden><Medal name={head.icon} size={60} fallback={<Icon name={head.icon} size={26} />} /></span>
           <div><h2>{head.title}</h2><div className="sub">{head.sub(game)}</div></div>
         </header>
       )}

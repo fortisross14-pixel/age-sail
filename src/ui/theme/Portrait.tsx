@@ -3,14 +3,14 @@ import { ageOf } from '../../sim/court';
 import { Art } from './Art';
 
 /**
- * A courtier's portrait. The painted sheet (art/PROMPTS.md, portraits.png) has men in rows 1–2 and
- * women in rows 3–4, ages 20 to 70 across; a person keeps the same picture as they age within a
- * decade. Until the sheet arrives, a drawn bust on a lacquer medallion stands in.
+ * A courtier's portrait. The painted sheets (art/PROMPTS.md: portraits-men.png and
+ * portraits-women.png) hold 12 faces each, ages rising from about 20 to about 70; a person gets the
+ * face nearest their age, so they keep it for a few years before looking older. Until the sheets
+ * arrive, a drawn bust on a lacquer medallion stands in. Courtiers are all men for now.
  */
 export function portraitSlot(p: Person, turn: number) {
-  const col = Math.max(0, Math.min(5, Math.floor((ageOf(p, turn) - 20) / 10)));
-  const row = p.id % 2;
-  return `portrait/${row * 6 + col + 1}`;
+  const n = Math.max(0, Math.min(11, Math.round(((ageOf(p, turn) - 20) / 50) * 11)));
+  return `portrait/men-${n + 1}`;
 }
 
 const HATS = ['', 'M26 30c0-10 9-15 19-14 10-1 17 5 17 13-4-3-9-4-18-4s-14 2-18 5z', 'M22 28c2-9 14-13 25-12 11 1 18 6 18 11-7-2-15-3-23-2-8 0-14 2-20 3z',
