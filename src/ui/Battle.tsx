@@ -79,7 +79,7 @@ export function BattleReportView({ r }: { r: BattleReport }) {
     <div className="battle-report">
       <div className="battle-sides">
         <SideCard side={r.attacker} won={r.attackerWon} morale={r.morale.atk} />
-        <span className="vs" aria-hidden>⚔</span>
+        <span className="vs" aria-hidden><Art slot="misc/gun" fallback={<>⚔</>} /></span>
         <SideCard side={r.defender} won={!r.attackerWon} morale={r.morale.def} />
       </div>
       <div className="rounds">

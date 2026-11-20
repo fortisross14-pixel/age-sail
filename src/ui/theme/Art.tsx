@@ -7,11 +7,13 @@ import type { ReactNode } from 'react';
  */
 const ICONS = ['cities', 'markets', 'fleets', 'court', 'research', 'chronicle', 'globe', 'home', 'next', 'wind', 'grid', 'eye',
   'coins', 'star', 'settings', 'help', 'quill', 'people', 'docks', 'barracks', 'church', 'university', 'market', 'construction'];
-/** cut from the sheets in art/source/ui (icons, buildings, units, cities, portraits, crests) */
+/** cut from the sheets in art/source/ui (icons, buildings, units, cities, portraits, crests, walls) */
 export const PAINTED = new Set<string>([
   ...ICONS.map((n) => `icon/${n}`),
   ...['barracks-1', 'barracks-2', 'church-1', 'docks-1', 'docks-2', 'docks-3', 'fortress-1', 'market-1', 'market-2', 'university-1', 'university-2', 'warehouse-1'].map((n) => `building/${n}`),
-  ...['archer', 'cannon', 'cavalry', 'explorer', 'infantry', 'mortar', 'musketeer', 'swordsman'].map((n) => `unit/${n}`),
+  ...['archer', 'cannon', 'cavalry', 'colonist', 'explorer', 'infantry', 'missionary', 'mortar', 'musketeer', 'swordsman'].map((n) => `unit/${n}`),
+  ...['0', '1', '2', '3'].map((n) => `wall/${n}`),
+  ...['camp', 'wagon', 'gun'].map((n) => `misc/${n}`),
   ...['caravel', 'carrack', 'galleon', 'warship'].map((n) => `ship/${n}`),
   ...['antwerp', 'inland', 'larochelle', 'lisbon', 'london', 'port', 'seville', 'town'].map((n) => `city/${n}`),
   ...['men-1', 'men-10', 'men-11', 'men-12', 'men-2', 'men-3', 'men-4', 'men-5', 'men-6', 'men-7', 'men-8', 'men-9', 'women-1', 'women-10', 'women-11', 'women-12', 'women-2', 'women-3', 'women-4', 'women-5', 'women-6', 'women-7', 'women-8', 'women-9'].map((n) => `portrait/${n}`),

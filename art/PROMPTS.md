@@ -31,8 +31,8 @@ Every prompt starts with the same style paragraph, describing the concept art's 
 - `settlements.png`: 18 colonies (6 kinds × outpost, town, city) on the map; they also draw
   Europe's cities and native trading grounds
 - `title.png`: the title screen
-
-Still wanted, if you like: a colonist and a missionary in the units style.
+- `walls.png`: walls by level (colony card), the army camp (army card), the supply wagon (rations),
+  the field gun (battle report), and the colonist and the friar (recruitment, commissions)
 
 ## Wanted for M11 (natives and sieges)
 

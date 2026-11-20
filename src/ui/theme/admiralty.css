@@ -690,3 +690,15 @@ b.bad { color: var(--oxblood-hi); }
 .notice.shock { padding: 6px 10px; border-radius: 4px; background: rgba(184, 134, 47, .14); border-left: 3px solid var(--gold-mid); margin: 6px 0; font-size: 13.5px; }
 .factory-head { display: grid; gap: 4px; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 249, 232, .7); }
 .factory-head .adm-gold-btn { justify-self: start; }
+
+/* walls, camp and wagon art */
+.walls-row { align-items: center; }
+.wall-art { width: 64px; height: 64px; display: inline-flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.wall-art img { width: 100%; height: 100%; object-fit: cover; }
+.wall-art.next { width: 44px; height: 44px; opacity: .75; }
+.party-art { width: 62px; height: 62px; display: inline-flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--gold-mid); }
+.party-art img { width: 100%; height: 100%; object-fit: cover; }
+.wagon { display: inline-flex; width: 22px; height: 22px; vertical-align: -5px; border-radius: 4px; overflow: hidden; }
+.wagon img { width: 100%; height: 100%; object-fit: cover; }
+.battle-sides .vs { width: 70px; }
+.battle-sides .vs img { width: 70px; border-radius: 8px; }

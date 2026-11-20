@@ -12,6 +12,8 @@ import { rivalForce } from '../sim/rivals';
 import { freeForce } from '../sim/empire';
 import { battleOdds, partyForce } from '../sim/battle';
 import { ArmyRow } from './Battle';
+import { Art } from './theme/Art';
+import { isMilitary } from '../data/army';
 import { CROWN } from '../render/palette';
 import { GOOD_INFO, type GoodId } from '../data/goods';
 import { ShipIcon } from './Icon';
@@ -135,7 +137,9 @@ function PartyCard({ partyId }: { partyId: number }) {
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   return (
     <div className="selection" role="region" aria-label={`Selected party ${p.name}`}>
-      <img src={`${import.meta.env.BASE_URL}sprites/${units[0] ? UNIT_INFO[units[0].type].sprite : 'units/scout'}.png`} alt="" height={54} />
+      <span className="party-art">{units.some((u) => isMilitary(u.type))
+        ? <Art slot="misc/camp" fallback={<img src={`${import.meta.env.BASE_URL}sprites/${UNIT_INFO[units[0].type].sprite}.png`} alt="" height={54} />} />
+        : <Art slot={`unit/${units[0]?.type ?? 'explorer'}`} fallback={<img src={`${import.meta.env.BASE_URL}sprites/${units[0] ? UNIT_INFO[units[0].type].sprite : 'units/scout'}.png`} alt="" height={54} />} />}</span>
       <div className="sel-main">
         <div className="sel-title">
           <b>{p.name}</b>
@@ -146,7 +150,7 @@ function PartyCard({ partyId }: { partyId: number }) {
           {(() => {
             const need = Math.max(0, partyNeed(game, p) - partyForage(world, p));
             const seasons = need > 0 ? Math.floor(p.food / need) : Infinity;
-            return <span className={seasons <= 1 ? 'bad' : ''} title={`${Math.floor(p.food)} rations. The party eats ${partyNeed(game, p).toFixed(1)} a season and forages ${partyForage(world, p)} here. Beside one of your colonies it restocks from the warehouse.`}>🍞 {Math.floor(p.food)} · {seasons === Infinity ? 'living off the land' : `${seasons} season${seasons === 1 ? '' : 's'}`}</span>;
+            return <span className={seasons <= 1 ? 'bad' : ''} title={`${Math.floor(p.food)} rations. The party eats ${partyNeed(game, p).toFixed(1)} a season and forages ${partyForage(world, p)} here. Beside one of your colonies it restocks from the warehouse.`}><span className="wagon"><Art slot="misc/wagon" fallback={<>🍞</>} /></span> {Math.floor(p.food)} · {seasons === Infinity ? 'living off the land' : `${seasons} season${seasons === 1 ? '' : 's'}`}</span>;
           })()}
         </div>
         <ArmyRow units={units} />
