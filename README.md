@@ -7,7 +7,7 @@ fresh every game.
 
 ## Now playing: v0.18
 
-Phase 4, depth (second half): slavery as the period had it, with its costs and a law that ends it; three races to win beside the score; three scenarios with a goal and a year; favours bought with prestige; fights at sea in three rounds with a report; five more buildings at home; and a late game in which colonies that break away must be recognised, retaken or lost to a rival's protection.
+Phase 4, depth (second half): slavery as the period had it, with its costs and a law that ends it; three races to win beside the score; three scenarios with a goal and a year; favours bought with prestige; fights at sea in three rounds with a report; five more buildings at home; and a late game in which colonies that break away must be recognised, retaken or lost to a rival's protection. A fourth scenario begins in 1690 with an empire to hold together; free states form leagues and send militia against your colonies; and an ally at war asks you to choose.
 
 From v0.17, depth (first half): a research tree of 32 subjects in four branches that unlock ships, soldiers, the star fort, laws and alliances; nine laws, of which a realm keeps only a few; funded scientific expeditions; and Europe as a place to act in (Court, Europe): envoys, gifts, trade treaties, pacts and alliances with fourteen realms, their wars to join or stand aside from, letters of marque, corsairs and tribute, and a Levant spice trade that an Ottoman war can cut.
 

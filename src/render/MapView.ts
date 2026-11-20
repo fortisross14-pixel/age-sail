@@ -635,7 +635,7 @@ class Scene {
     const cols = state.rivalColonies.filter((c) => c.map === g.id && fog[c.hex] >= Fog.Charted);
     const ships = state.rivalShips.filter((x) => x.map === g.id && fog[x.hex] >= Fog.Explored);
     const free = state.freeStates.filter((c) => c.map === g.id);
-    const key = `${cols.map((c) => `${c.id}${c.pop}${c.level}`).join(',')}|${ships.map((x) => `${x.id}@${x.hex}`).join(',')}|${free.map((f) => f.id + f.pop).join(',')}|${fogKey}`;
+    const key = `${cols.map((c) => `${c.id}${c.pop}${c.level}`).join(',')}|${ships.map((x) => `${x.id}@${x.hex}`).join(',')}|${free.map((f) => f.id + f.pop).join(',')}|${state.rebels.map((r) => `${r.id}@${r.hex}`).join(',')}|${fogKey}`;
     if (key === this.lastRivals) return;
     this.lastRivals = key;
     this.rivalLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
@@ -667,6 +667,15 @@ class Scene {
       plate.position.set(g.cx(f.hex), g.cy(f.hex) + HEX_R * 0.75);
       this.plates.push(plate);
       this.rivalLayer.addChild(plate);
+    }
+    for (const r of state.rebels.filter((x) => x.map === g.id && fog[x.hex] >= Fog.Charted)) {
+      const node = new Container();
+      node.addChild(new Graphics().ellipse(0, 0, HEX_W * 0.42, HEX_W * 0.17).fill({ color: 0x3b3b3b, alpha: 0.7 }).stroke({ width: 2.4, color: 0x111111 }));
+      const sp = new Sprite(this.assets.tex('units/pikeman'));
+      sp.anchor.set(0.5, 0.82); sp.width = HEX_W * 0.85; sp.scale.y = sp.scale.x;
+      node.addChild(sp);
+      node.position.set(g.cx(r.hex), g.cy(r.hex));
+      this.rivalShipLayer.addChild(node);
     }
     for (const x of ships) {
       const crown = CROWN[x.crown];

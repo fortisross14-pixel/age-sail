@@ -14,7 +14,8 @@ import * as Dyn from './dynasty';
 import * as Eur from './europe';
 import * as Slv from './slavery';
 import * as Vic from './victory';
-import type { FavourId, ScenarioId } from '../data/scenarios';
+import { CRISIS, scenarioById, type FavourId, type ScenarioId } from '../data/scenarios';
+import { VOYAGE } from '../data/objectives';
 import { SLAVERY } from '../data/slavery';
 import type { Treaty } from '../data/diplomacy';
 import { courtYear, onPromotion } from './court';
@@ -34,8 +35,8 @@ import { initialCourt, newPetitioners, leaderOf, personById, skill, salary, deat
 import { RANK_INFO, UNIT_INFO } from '../data/court';
 import { WALLS, isMilitary } from '../data/army';
 import {
-  Fog, dateLabel, seasonOf, yearOf, nextTurnStart,
-  type Fleet, type GameState, type World, type PortDef, type ChronicleEntry, type MapData, type ProjectKind, type GameEvent,
+  Fog, dateLabel, seasonOf, yearOf, nextTurnStart, emptyAccount,
+  type Colony, type Fleet, type GameState, type World, type PortDef, type ChronicleEntry, type MapData, type ProjectKind, type GameEvent,
   type Person, type UnitType, type TradeRoute, type Rank, type City, type Stance,
 } from './types';
 export { leaderOf };
@@ -333,7 +334,7 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
     surveyed: { old: new Array(GRIDS.old.N).fill(0), new: new Array(GRIDS.new.N).fill(0) },
     rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0, natives: Nat.initNatives(world), rivals: Riv.initRivals(crown), rivalColonies: [], rivalShips: [],
     freeStates: [], endTurn: (until - 1492) * 4, ended: false, taxRate: 'normal', loans: [], told: {},
-    victory: null, scenario: scenario ? { id: scenario, done: null } : null, europe: Eur.initEurope(crown), euroWars: [], marque: false, laws: [], expedition: null, flags: {}, pending: [], dynasty: Dyn.initialDynasty(crown, (() => { let k = 0; return () => -(++k); })()), eraPath: null, land: null,
+    rebels: [], victory: null, scenario: scenario ? { id: scenario, done: null } : null, europe: Eur.initEurope(crown), euroWars: [], marque: false, laws: [], expedition: null, flags: {}, pending: [], dynasty: Dyn.initialDynasty(crown, (() => { let k = 0; return () => -(++k); })()), eraPath: null, land: null,
     adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
     chronicle: [], events: [], factories: [], shocks: [], nextId: 1, newWorldFound: false,
     research: { known: [...(spec.edge.startTechs ?? [])], current: null, progress: 0, pending: 0 },
@@ -352,7 +353,72 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
   newPetitioners(state, rng, () => state.nextId++);
   log(state, 'court', `${dateLabel(0)}. Two ships wait in ${home.name}. Choose a leader from your court and send them south along the African coast, or west into the unknown.`);
   log(state, 'court', 'Your pilots warn that no ship that sails far into the open Mar Océano has come back.');
+  const sc = scenarioById(scenario ?? undefined);
+  if (sc?.from) inherit(world, state, sc.from, rng);
   return { world, state };
+}
+
+/** A stretch of coast across the ocean that nobody holds: as far from other settlements as can be found. */
+function emptyCoast(world: World, s: GameState, rng: Rng): number | null {
+  const g = GRIDS.new, m = world.new;
+  const held = [...s.colonies, ...s.rivalColonies, ...s.freeStates].filter((c) => c.map === 'new').map((c) => c.hex);
+  for (const gap of [5, 4, 3, 2]) {
+    const ok = [...Array(g.N).keys()].filter((h) => !isWater(m.terrain[h]) && g.neighbors(h).some((j) => isWater(m.terrain[j]))
+      && !m.ports.some((p) => g.distance(p.hex, h) <= 2) && !held.some((x) => g.distance(x, h) <= gap));
+    if (ok.length) return ok[int(rng, 0, ok.length - 1)];
+  }
+  return null;
+}
+
+/**
+ * Begin late: the years to `year` are played out with no one on the throne (the rivals settle, trade
+ * and fight; Europe has its wars; rulers die and are succeeded), and then you inherit an empire
+ * that someone else built: colonies old enough to think for themselves, and one already gone.
+ */
+function inherit(world: World, s: GameState, year: number, rng: Rng) {
+  while (yearOf(s.turn) < year) {
+    seasonTick(world, s);
+    while (s.events.length) { if (s.events[0].choices) Story.resolveStory(world, s, 0, () => {}); else s.events.shift(); }
+  }
+  s.endTurn = Math.max(s.endTurn, (1750 - 1492) * 4);
+  s.ended = false; s.victory = null; s.pending = [];
+  s.treasury = CRISIS.treasury; s.prestige = 20; s.loans = []; s.revenue = 0;
+  // the scenario is judged from now, not on the years nobody played
+  if (s.scenario) s.scenario.done = null;
+  for (const t of TECHS.slice(0, CRISIS.subjects)) if (!s.research.known.includes(t.id)) s.research.known.push(t.id);
+  // rest the list on its foundations: anything known needs what it stands on
+  for (let pass = 0; pass < 6; pass++) for (const id of [...s.research.known]) for (const r of techById(id).requires) if (!s.research.known.includes(r)) s.research.known.push(r);
+  s.research.current = TECHS.find((t) => techAvailable(s, t.id))?.id ?? null;
+  s.research.progress = 0;
+  const home = portById(world, mainPort(s))!;
+  s.people = initialCourt(rng, () => s.nextId++, yearOf(s.turn), s.crown, home.id, crownSpec(s.crown).edge.court ?? 0);
+  s.petitioners = [];
+  s.fleets = [];
+  for (const type of ['galleon', 'galleon', 'carrack'] as const) { const ship = newShip(s, type, rng); s.fleets.push(makeFleet(s, fleetName(ship.name), [ship], home)); }
+  s.newWorldFound = true;
+  const g = GRIDS.new;
+  const names = ['Nueva Esperanza', 'Santa Cruz', 'Puerto Rico', 'San Miguel', 'La Asunción', 'Villa del Rey'];
+  const levels: Colony['level'][] = ['city', 'town', 'town', 'town', 'outpost'];
+  for (let k = 0; k < CRISIS.colonies + 1; k++) {
+    const hex = emptyCoast(world, s, rng);
+    if (hex == null) continue;
+    for (const h of g.within(hex, 6)) if (s.fog.new[h] < Fog.Explored) s.fog.new[h] = Fog.Explored;
+    if (k === CRISIS.colonies) { s.freeStates.push({ id: `free-${s.nextId++}`, name: names[k], map: 'new', hex, pop: 7, level: 'town', since: s.turn - 8 }); continue; }
+    const level = levels[k] ?? 'town';
+    const c: Colony = {
+      id: `col-${s.nextId++}`, name: names[k], map: 'new', hex, founded: s.turn - 240 - k * 20, pop: Col.LEVELS[level].cap - int(rng, 0, 2), level,
+      stock: { food: 60, cloth: 30, wine: 30, tools: 20, timber: 40, stone: 20 }, growth: 0, loyalty: int(rng, CRISIS.loyalty[0], CRISIS.loyalty[1]), charter: false, unrest: false, newcomers: 0, walls: 1, last: emptyAccount(),
+    };
+    s.colonies.push(c);
+    s.units.push({ id: s.nextId++, type: 'infantry', fleet: null, city: null, party: null, colony: c.id });
+  }
+  // nobody needs teaching how to sail in 1690
+  for (const o of VOYAGE) s.objectives.done[o.id] = s.turn;
+  // and what the empire already has is not an achievement of yours: tick it without reward
+  s.objectives.catchUp = true;
+  checkObjectives(world, s);
+  s.chronicle = s.chronicle.slice(-6);
+  log(s, 'court', `${year}. You come to the throne of an empire you did not build: ${s.colonies.length} colonies across the ocean, none of them sure of you, and ${s.freeStates[s.freeStates.length - 1]?.name ?? 'one town'} already lost.`);
 }
 
 // ---------- commands ----------
@@ -740,6 +806,11 @@ export function landCaptives(s: GameState, fleetId: number): CommandResult {
   return Slv.landCaptives(s, f, f.at ? Col.colonyById(s, f.at) : undefined);
 }
 export function favour(s: GameState, id: FavourId): CommandResult { return Vic.favour(s, id, (k, t) => log(s, k, t)); }
+export function engageRebels(world: World, s: GameState, partyId: number, rebelId: number, stance: Stance = 'assault'): CommandResult {
+  const p = Land.partyById(s, partyId);
+  if (!p) return fail('No such party.');
+  return Emp.engageRebels(world, s, p, rebelId, (k, t) => log(s, k, t), (e) => event(s, e), stance);
+}
 export function recognise(s: GameState, freeId: string): CommandResult { return Emp.recognise(s, freeId, (k, t) => log(s, k, t)); }
 export function sendEnvoy(s: GameState, realm: string): CommandResult { return Eur.sendEnvoy(s, realm); }
 export function sendGift(s: GameState, realm: string): CommandResult { return Eur.sendGift(s, realm); }

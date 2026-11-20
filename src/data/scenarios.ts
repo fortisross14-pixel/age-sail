@@ -2,8 +2,9 @@
  * Scenarios: a goal and a year to reach it by, on top of the ordinary game. Reaching it is a win
  * to be proud of; missing it ends nothing: the voyage goes on as a free game. Provisional numbers.
  */
-export type ScenarioId = 'charge' | 'spice' | 'crossing';
-export type ScenarioGoal = { kind: 'treasury' | 'sales' | 'newColony'; need: number };
+export type ScenarioId = 'charge' | 'spice' | 'crossing' | 'crisis';
+/** `hold` is judged in the last year, not before: keep at least this many colonies until then. */
+export type ScenarioGoal = { kind: 'treasury' | 'sales' | 'newColony' | 'hold'; need: number };
 
 export interface Scenario {
   id: ScenarioId;
@@ -14,6 +15,8 @@ export interface Scenario {
   blurb: string;
   /** how the goal reads in the objectives panel */
   ask: string;
+  /** begins in this year, with an empire already made (the years before are played out without you) */
+  from?: number;
 }
 
 export const SCENARIOS: Scenario[] = [
@@ -23,7 +26,12 @@ export const SCENARIOS: Scenario[] = [
     blurb: 'Pepper, gold and dyes from the African coast, sold wherever they are dearest, before your rivals own the trade.', ask: '30,000 ducats of sales, all told' },
   { id: 'crossing', name: 'Beyond the ocean', by: 1510, goal: { kind: 'newColony', need: 1 },
     blurb: 'Master the ocean winds, find land in the west, and plant a colony there that lasts.', ask: 'A colony across the Mar Océano' },
+  { id: 'crisis', name: 'The restless empire', by: 1720, from: 1690, goal: { kind: 'hold', need: 4 },
+    blurb: 'It is 1690. You inherit five colonies across the ocean, a generation that has never seen the mother country, and one town that has already thrown off your rule. Hold the empire together for thirty years.', ask: 'Still four colonies or more in 1720' },
 ];
+
+/** What the heir to a restless empire starts with. */
+export const CRISIS = { colonies: 5, loyalty: [28, 42] as [number, number], treasury: 6000, subjects: 22 };
 export const scenarioById = (id: string | undefined) => SCENARIOS.find((x) => x.id === id);
 
 /**

@@ -53,6 +53,11 @@ export function attention(g: GameState, world: World): Attention[] {
     else if (c.last.hungry) out.push({ id: `hungry-${c.id}`, urgent: true, go: { drawer: 'cities', colony: c.id }, text: `${c.name} is going hungry.` });
   }
 
+  for (const r of g.rebels) {
+    const c = g.colonies.find((x) => x.map === r.map && x.hex === r.target);
+    if (c) out.push({ id: `rebels-${r.id}`, urgent: true, go: { drawer: 'cities', colony: c.id }, text: `${r.name} is marching on ${c.name}.` });
+  }
+
   // worth a look, but no reason to stop the turn
   for (const f of g.fleets) {
     if (!f.at && f.supplies <= 2) out.push({ id: `stores-${f.id}`, urgent: false, go: { fleet: f.id }, text: `${f.name} has food for ${plural(Math.max(0, f.supplies), 'season', 'seasons')}.` });

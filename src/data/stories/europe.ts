@@ -90,6 +90,16 @@ export const EUROPE: StoryDef[] = [
     ],
   },
   {
+    id: 'ally_calls', family: 'europe', chained: true,
+    title: '{realm} calls on its ally',
+    text: 'War has come between {realm} and {foe}, over {cause}. The ambassador of {realm} lays your treaty of alliance on the table and asks when your ships will sail.',
+    choices: [
+      { label: 'Honour the alliance', hint: 'You enter the war beside them: 40 ducats a season, and the enemy’s ports close to you', effects: [['special', 'allyJoin'], ['prestige', 5]], text: 'Your word is kept. The ports of {foe} are closed to your flag.' },
+      { label: 'Send money instead of ships', effects: [['ducats', -500], ['special', 'allyGold']], text: 'A chest of ducats is not a fleet, but it is something. The alliance holds.' },
+      { label: 'This is not our war', hint: 'The alliance falls to a pact; they think much worse of you', effects: [['special', 'allySpurn'], ['prestige', -6]], text: 'The ambassador gathers his papers. What was an alliance is a pact of friendship, and a cool one.' },
+    ],
+  },
+  {
     id: 'hanse_quarrel', family: 'europe', again: 60, when: [['chance', 0.5]],
     title: 'The towns of the North close their ports',
     text: 'The merchants of the Hanse accuse your sailors of piracy in the Baltic and have shut their harbours to your flag until someone pays.',

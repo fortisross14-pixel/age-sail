@@ -63,7 +63,7 @@ export function rich(crown: CrownId = 'spain') {
   s.dynasty.ties = ['venice'];
   if (!s.dynasty.consort) s.dynasty.consort = { id: -50, name: 'Bianca', sex: s.dynasty.ruler.sex === 'm' ? 'f' : 'm', born: 1520, gift: 'commerce', from: 'venice' };
   if (!s.dynasty.heirs.length) s.dynasty.heirs.push({ id: -51, name: 'Test', sex: 'm', born: 1530, gift: 'commerce' });
-  return { w, s, ctx: { courtier: a.id, other: b.id, fleet: f1.id, colony: 'col-b', people: n0.id, crown: others[0], realm: 'venice', n: 3 } };
+  return { w, s, ctx: { courtier: a.id, other: b.id, fleet: f1.id, colony: 'col-b', people: n0.id, crown: others[0], realm: 'venice', foe: 'genoa', cause: 'an old quarrel', war: 1, n: 3 } };
 }
 
 const outcomes = (d: StoryDef): Outcome[] => d.choices.flatMap((c) => (c.else ? [c, c.else] : [c]));

@@ -20,6 +20,7 @@ import { allNations, remember, territory } from './natives';
 import { score } from './colony';
 import { rivalScore } from './rivals';
 import { styled, titleOf, heirOf, chooseEraPath, royalAge } from './dynasty';
+import { joinWar } from './europe';
 
 type Log = (kind: 'discovery' | 'peril' | 'court' | 'trade', text: string) => void;
 type Ctx = Record<string, string | number>;
@@ -175,6 +176,7 @@ export function fill(text: string, w: World, s: GameState, ctx: Ctx): string {
     heir: heir ? `${heir.sex === 'm' ? 'Prince' : 'Princess'} ${heir.name}` : 'the heir',
     house: h.houses[Number(ctx.n ?? 0) % h.houses.length], school: h.school, bankers: h.bankers, saint: h.saint, court: h.court,
     land: s.land?.name ?? 'the New World',
+    foe: ctx.foe ? realmSpec(ctx.foe as RealmId).name : undefined, cause: ctx.cause != null ? String(ctx.cause) : undefined,
   };
   return text.replace(/\{([a-z.]+)\}/gi, (m, k: string) => vars[k] ?? m);
 }
@@ -210,6 +212,9 @@ function hintOf(ch: ChoiceDef, w: World, s: GameState, ctx: Ctx): string | undef
 // ---------- deeds ----------
 
 function special(name: string, w: World, s: GameState, ctx: Ctx) {
+  if (name === 'allyJoin') { joinWar(s, Number(ctx.war), String(ctx.realm), () => {}); return; }
+  if (name === 'allySpurn') { const st = s.europe[String(ctx.realm)]; if (st) { st.treaty = 'pact'; st.attitude = Math.max(-100, st.attitude - 25); } return; }
+  if (name === 'allyGold') { const st = s.europe[String(ctx.realm)]; if (st) st.attitude = Math.min(100, st.attitude + 8); return; }
   if (name === 'chartCoast') {
     const map = ctx.map as 'old' | 'new';
     for (const h of GRIDS[map].within(Number(ctx.hex), 6)) if (s.fog[map][h] < Fog.Charted) s.fog[map][h] = Fog.Charted;

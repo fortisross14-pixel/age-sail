@@ -218,6 +218,9 @@ function PartyCard({ partyId }: { partyId: number }) {
         {!preview && units.length > 0 && game.rivalShips.filter((x) => x.kind === 'army' && x.map === p.map && g.distance(x.hex, p.hex) <= 1).map((x) => (
           <button key={x.id} className="danger" title={`Soldiers of ${rivalSpec(x.crown).name} on the march: about ${x.strength} companies.`} onClick={() => void run({ kind: 'engage', party: p.id, ship: x.id, stance })}>Give battle to {rivalSpec(x.crown).people}</button>
         ))}
+        {!preview && units.length > 0 && game.rebels.filter((x) => x.map === p.map && g.distance(x.hex, p.hex) <= 1).map((x) => (
+          <button key={x.id} className="danger" title={`${x.name}: about ${x.strength} companies of armed settlers.`} onClick={() => void run({ kind: 'engageRebels', party: p.id, rebels: x.id, stance })}>Give battle to the militia</button>
+        ))}
         {!preview && ships.map((f) => (
           <button key={f.id} onClick={async () => {
             if (await run({ kind: 'boardParty', party: p.id, fleet: f.id })) useStore.getState().selectFleet(f.id);

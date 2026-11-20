@@ -8,6 +8,7 @@ import { VOYAGE, type ObjectiveDef } from '../data/objectives';
 import { activeAmbitions, objectiveDone, objectiveProgress, rewardOf, rewardText, voyageDone } from '../sim/objectives';
 import { portById } from '../sim/game';
 import { scenarioProgress } from '../sim/victory';
+import { scenarioById } from '../data/scenarios';
 import { crownSpec } from '../data/rivals';
 import { difficultySpec } from '../data/difficulty';
 import { fmt } from './format';
@@ -147,13 +148,20 @@ export function Welcome() {
   if (!show || !game || !world) return null;
   const crown = crownSpec(game.crown);
   const d = difficultySpec(game.difficulty);
+  const sc = scenarioById(game.scenario?.id);
+  const late = sc?.from ? sc : null;
   return (
     <div className="modal-back">
       <div className="modal welcome" role="dialog" aria-label="Your realm">
         <h2>Your realm</h2>
+        {late ? <>
+          <p>{late.blurb}</p>
+          <p>You have {game.colonies.length} colonies, {game.fleets.length} ships in {portById(world, crown.home)?.name} and {fmt(game.treasury)} ducats. <b>Cities</b> shows each colony’s loyalty and what moves it: taxes, charters, festivals, garrisons, the laws you keep. <b>Court, Crowns</b> lists the colonies that have broken away: recognise them, or send soldiers. The goal is in the panel on the right.</p>
+        </> : <>
         <p>It is 1492, and you rule {crown.name}. Two ships wait in {portById(world, crown.home)?.name}, with a colonist, a soldier, your court and {fmt(game.treasury)} ducats. South lies the African coast beyond Cape Bojador, uncharted and different every voyage. West lies the open Mar Océano: pilots say no ship that sails far into it comes back.</p>
         <p>{OPENINGS[game.crown]?.welcome}</p>
         <p>Your advisers have set out a <b>first voyage</b>, step by step, in the panel on the right. Each step says how, and <b>Show me</b> opens the right screen. Nothing forces the order: this is your realm.</p>
+        </>}
         <p className="muted small">{d.name}: {d.blurb} The full guide is under the question mark, or <kbd>H</kbd>.</p>
         <div className="row center">
           <button className="primary" autoFocus onClick={() => set({ showWelcome: false })}>Set out</button>

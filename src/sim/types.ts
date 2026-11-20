@@ -139,6 +139,9 @@ export interface Person {
 export interface RealmState { attitude: number; treaty: Treaty; /** the season your last envoy or proposal was heard */ envoy: number; /** you pay their corsairs to leave you alone */ tribute: boolean }
 export interface EuroWar { id: number; a: string; b: string; cause: string; since: number; until: number; side: string | null }
 
+/** Militia of a free state marching overland to raise, or take, one of your colonies. */
+export interface RebelArmy { id: number; free: string; name: string; map: MapId; hex: number; target: number; path: number[]; strength: number; trail: number[] }
+
 /** One of the ruling house. */
 export interface Royal { id: number; name: string; numeral?: number; sex: 'm' | 'f'; born: number; gift: Gift; from?: string; frail?: number }
 export interface MarriageOffer { id: number; realm: string; name: string; sex: 'm' | 'f'; born: number; gift: Gift; dowry: number }
@@ -537,6 +540,8 @@ export interface GameState {
   euroWars: EuroWar[];
   /** letters of marque are out */
   marque: boolean;
+  /** armed men of the free states on the march against your colonies */
+  rebels: RebelArmy[];
   /** the first crown to win one of the races, and which */
   victory: { kind: VictoryKind; crown: CrownId; turn: number } | null;
   /** a scenario chosen on the menu, and how it ended */

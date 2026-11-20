@@ -5,7 +5,8 @@
  *
  * Text may use {courtier} {courtier.first} {other} {other.first} {fleet} {colony} {people} {crown}
  * {crown.people} {realm} {capital} {me} {ruler} {ruler.title} {heir} {house} {school} {bankers}
- * {saint} {court} {land}. A story may only name a subject it binds in `about`.
+ * {saint} {court} {land}; a follow-up may also use what its sender put in its context ({foe},
+ * {cause}). A story may only name a subject it binds in `about`.
  */
 export type Family = 'sea' | 'court' | 'colonies' | 'peoples' | 'crowns' | 'europe' | 'eras' | 'dynasty' | 'history';
 

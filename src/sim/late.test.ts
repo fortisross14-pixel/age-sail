@@ -266,3 +266,73 @@ describe('Phase 4: saves, second half', () => {
     expect(r.state.turn).toBe(state.turn + 12);
   });
 });
+
+describe('Phase 4: the last three', () => {
+  it('an ally at war calls on you, and the answer changes the alliance', async () => {
+    const { tell } = await import('./stories');
+    const { chooseStory } = await import('./game');
+    const set = () => {
+      const g = newGame(1492);
+      g.state.europe.venice.treaty = 'alliance';
+      g.state.euroWars.push({ id: 5, a: 'venice', b: 'genoa', cause: 'the eastern trade', since: 0, until: 99, side: null });
+      g.state.events = [];
+      expect(tell(g.world, g.state, 'ally_calls', { realm: 'venice', foe: 'genoa', war: 5, cause: 'the eastern trade' }, (e) => g.state.events.push(e))).toBe(true);
+      expect(g.state.events[0].text).toContain('Genoa');
+      return g;
+    };
+    const yes = set(); chooseStory(yes.world, yes.state, 0);
+    expect(yes.state.euroWars[0].side).toBe('venice');
+    const no = set(); chooseStory(no.world, no.state, 2);
+    expect(no.state.europe.venice.treaty).toBe('pact');
+    expect(no.state.euroWars[0].side).toBeNull();
+  });
+
+  it('free states in league send their militia against your colonies, and soldiers can meet it', async () => {
+    const { engageRebels } = await import('./game');
+    const { world, state } = newGame(1492);
+    const g = GRIDS.old, h = site(world);
+    const land = g.within(h, 4).filter((x) => x !== h && !isWater(world.old.terrain[x]));
+    const c = colony('col-l', h, { loyalty: 90 });
+    state.colonies.push(c);
+    state.freeStates.push({ id: 'free-a', name: 'Alfa', map: 'old', hex: land[0], pop: 9, level: 'town', since: 0 }, { id: 'free-b', name: 'Beta', map: 'old', hex: land[land.length - 1], pop: 9, level: 'town', since: 0 });
+    seasons(world, state, 1);
+    expect(state.flags.league).toBeDefined();
+    let marched = false;
+    for (let i = 0; i < 120 && !marched; i++) { c.stock.food = 400; c.loyalty = 90; seasons(world, state, 1); marched = state.chronicle.some((x) => /militia of (Alfa|Beta) marches on/.test(x.text)); }
+    expect(marched).toBe(true);
+    state.rebels.push({ id: 31, free: 'free-a', name: 'The militia of Alfa', map: 'old', hex: land[1], target: h, path: [land[1], h], strength: 2, trail: [] });
+    state.parties.push({ id: 77, name: 'Guard', map: 'old', hex: land[1], leader: null, moves: 3, order: null, trail: [], food: 50 });
+    for (let k = 0; k < 8; k++) state.units.push({ id: state.nextId++, type: 'musketeer', fleet: null, city: null, party: 77 });
+    state.events = [];
+    expect(engageRebels(world, state, 77, 31).ok).toBe(true);
+    expect(state.events[0].kind).toBe('battle');
+    expect(recognise(state, 'free-a').ok).toBe(true);
+    expect(state.rebels.some((r) => r.free === 'free-a')).toBe(false);
+  });
+
+  it('the restless empire begins in 1690 with colonies to hold, and is judged in 1720', () => {
+    const { world, state } = newGame(1492, 1650, 'england', 'captain', 'crisis');
+    expect(1492 + Math.floor(state.turn / 4)).toBe(1690);
+    expect(state.colonies.length).toBeGreaterThanOrEqual(4);
+    expect(state.freeStates.length).toBeGreaterThanOrEqual(1);
+    expect(state.people.filter((p) => p.alive).length).toBeGreaterThanOrEqual(9);
+    expect(state.fleets.length).toBe(3);
+    expect(state.rivalColonies.length).toBeGreaterThan(10);
+    expect(state.events).toEqual([]);
+    expect(state.scenario?.done).toBeNull();
+    expect(state.endTurn).toBeGreaterThanOrEqual((1750 - 1492) * 4);
+    seasons(world, state, 2);
+    expect(state.scenario?.done).toBeNull();
+    const again = newGame(1492, 1650, 'england', 'captain', 'crisis').state;
+    expect(again.colonies.map((c) => c.hex)).toEqual(newGame(1492, 1650, 'england', 'captain', 'crisis').state.colonies.map((c) => c.hex));
+    const won = structuredClone(state);
+    won.turn = (1720 - 1492) * 4;
+    while (won.colonies.length < 4) won.colonies.push(structuredClone(state.colonies[0]));
+    seasonTick(world, won);
+    expect(won.scenario?.done).toBe('won');
+    const lost = structuredClone(state);
+    lost.colonies = lost.colonies.slice(0, 2);
+    seasonTick(world, lost);
+    expect(lost.scenario?.done).toBe('lost');
+  }, 120000);
+});

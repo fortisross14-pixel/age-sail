@@ -52,19 +52,21 @@ export function checkVictory(w: World, s: GameState, log: Log, ev: Ev, hex: numb
 export function scenarioProgress(s: GameState) {
   const sc = scenarioById(s.scenario?.id);
   if (!sc || !s.scenario) return null;
-  const have = sc.goal.kind === 'treasury' ? s.treasury : sc.goal.kind === 'sales' ? s.revenue : s.colonies.filter((c) => c.map === 'new').length;
+  const have = sc.goal.kind === 'treasury' ? s.treasury : sc.goal.kind === 'sales' ? s.revenue : sc.goal.kind === 'hold' ? s.colonies.length : s.colonies.filter((c) => c.map === 'new').length;
   return { scenario: sc, have: Math.max(0, Math.floor(have)), need: sc.goal.need, done: s.scenario.done, left: sc.by - yearOf(s.turn) };
 }
 
 export function checkScenario(s: GameState, log: Log, ev: Ev, hex: number) {
   const p = scenarioProgress(s);
   if (!p || p.done) return;
-  if (p.have >= p.need) {
+  // a holding goal is lost the moment too few are left, and won only when the year comes
+  const hold = p.scenario.goal.kind === 'hold';
+  if (hold ? p.left <= 0 && p.have >= p.need : p.have >= p.need) {
     s.scenario!.done = 'won';
     s.prestige += 25;
     log('court', `${p.scenario.name}: done, in ${yearOf(s.turn)}. +25 prestige.`);
     ev({ kind: 'tech', title: `${p.scenario.name}: achieved`, map: 'old', hex, text: `${p.scenario.ask}, with ${Math.max(0, p.left)} year${p.left === 1 ? '' : 's'} to spare. The court gives thanks, and the chroniclers sharpen their pens. The voyage goes on as a free game.` });
-  } else if (p.left < 0) {
+  } else if (hold ? p.have < p.need : p.left < 0) {
     s.scenario!.done = 'lost';
     s.prestige -= 10;
     log('court', `${p.scenario.name}: the year ${p.scenario.by} has passed, and it is not done.`);

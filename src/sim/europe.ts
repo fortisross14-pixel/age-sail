@@ -201,7 +201,9 @@ export function europeSeason(w: World, s: GameState, log: Log, onFleetLost: (f: 
       if (!s.shocks.some((x) => x.region === region)) s.shocks.push({ kind: 'war', region, since: s.turn, until: s.turn + 8 });
       const levant = a === 'ottoman' && (b === 'venice' || b === 'genoa');
       log('court', `War in Europe: ${name(a)} and ${name(b)} fight over ${cause}.${levant ? ' The spice road through the Levant is cut: pepper will be dear in Italy.' : ''} You may take a side in Court, Europe.`);
-      for (const side of [a, b]) if (treatyWith(s, side) === 'alliance') log('court', `Your ally ${name(side)} looks to you for help.`);
+      // an ally at war calls on you: the answer is yours, and it is remembered
+      const war = s.euroWars[s.euroWars.length - 1];
+      for (const side of [a, b]) if (treatyWith(s, side) === 'alliance') s.pending.push({ story: 'ally_calls', at: s.turn, ctx: { realm: side, foe: side === a ? b : a, war: war.id, cause } });
     }
   }
 

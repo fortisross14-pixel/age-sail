@@ -120,7 +120,7 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | Phase 1 | **The first hour** (v0.14): objectives (a first voyage of eight steps, then advisers' ambitions with rewards), an objectives panel with "Show me", a short welcome in place of the help wall, a tabbed guide, End Turn reminders with a count on the button, three difficulty levels, and small interface fixes. Items P1-01 to P1-23 below | 22 of 23 done; P1-20 (watching new players) needs people |
 | Phase 2 | **A world that pushes back** (v0.15): rivals with a treasury, ships that sail out and home, colonies that live on convoys, and plans chosen by what they want and can afford; crowns that fight each other; peoples who judge every crown and fight their own wars; soldiers that come by sea where you can see them. Items P2-01 to P2-15 below | done |
 | Phase 3 | **Stories and dynasty** (v0.16): 114 stories as data with chains, written for any crown; a ruling house with heirs, regencies, successions and royal marriages; courtiers who remember, want and can be lost to a rival; three historical set pieces per crown; eras that open with a choice of path; the land and colonies named by the player; the reign told back. Items P3-01 to P3-14 below | done |
-| Phase 4 | **Depth** (v0.18): a research tree of 32 subjects, ten laws, scientific expeditions; European diplomacy, wars to join, corsairs and the Levant trade; slavery, with what it costs and a law that ends it; three races to win beside the score; three scenarios; uses for prestige; fights at sea in three rounds; five more buildings; free states to recognise or retake, and ambitions for the later ages. Items P4-01 to P4-20 below | 17 of 20 done |
+| Phase 4 | **Depth** (v0.18): a research tree of 32 subjects, ten laws, scientific expeditions; European diplomacy, wars to join, corsairs and the Levant trade; slavery, with what it costs and a law that ends it; three races to win beside the score; four scenarios, one of which begins in 1690; uses for prestige; fights at sea in three rounds; five more buildings; free states to recognise or retake, and ambitions for the later ages. Items P4-01 to P4-20 below | done |
 | Phase 5 | Interface depth: outliner, nested tooltips, ledger, turn summary, map modes, save slots | next |
 | Phase 6 | Balance (was Pass 3): numbers in one place, autoplay harness, retune the five crowns. Deliberately late | deferred |
 | Phase 7 | Technical and visual polish: music, portraits, event paintings, a living map, the open engineering items. Deliberately last | deferred |
@@ -204,8 +204,8 @@ phase; nothing is renumbered.
 | 1 | The first hour | 23 | 22 |
 | 2 | A world that pushes back | 15 | 15 |
 | 3 | Stories and dynasty | 14 | 14 |
-| 4 | Depth | 20 | 17 |
-| 5 | Interface depth | 13 | 0 |
+| 4 | Depth | 20 | 20 |
+| 5 | Interface depth | 18 | 0 |
 | 6 | Balance (deferred) | 10 | 0 |
 | 7 | Technical and visual polish (deferred) | 14 | 0 |
 
@@ -309,9 +309,9 @@ Goal: enough to decide for a 200-turn game, and more than one way to win it.
 | P4-15 | How they are acquired: bought at trading grounds on the African coast, which offer the prisoners of that people's own wars (more while it is at war), and taken when one of your parties storms a village | M5 | done |
 | P4-16 | How they are used: put ashore at a colony, where they work its land beside the colonists, or sold in the ports of Iberia, Italy and the Maghreb. The money goes to the treasury and is not counted as commerce | M5 | done |
 | P4-17 | What it costs: about one in ten dies each season at sea and one in fourteen each year in the fields; some flee; where they far outnumber the settlers they rise unless soldiers hold them down; the peoples they were taken from remember it. The law of abolition (natural philosophy) forbids the trade and frees everyone, half of whom stay as settlers. No objective, ambition or score counts any of it, and a test says so | M5 | done |
-| P4-18 | A fourth scenario that starts late: an empire in 1690 with restless colonies, to be held together (needs a way to start a game from a prepared state) | G2 | open |
-| P4-19 | Free states that raise armies, band together and carry a war of independence to your loyal colonies | G2 | open |
-| P4-20 | An ally's call to war that matters: answering it or refusing it changes the alliance | M2 | open |
+| P4-18 | A fourth scenario, the restless empire: the years to 1690 are played out with no one on the throne (about four seconds), and you inherit five old colonies of doubtful loyalty and one already lost; keep four until 1720 | G2 | done |
+| P4-19 | Free states arm: two or more that you have not come to terms with form a league; their militia marches overland on your colonies, where a party can meet it in the field; a colony it breaks into is shaken, and goes over to them if its loyalty is low | G2 | done |
+| P4-20 | An ally at war calls on you with a card: honour the alliance (you enter the war), send money instead, or refuse (the alliance falls to a pact and they think much worse of you) | M2 | done |
 
 ### Phase 5: Interface depth
 
@@ -333,6 +333,11 @@ Function only: looks are Phase 7.
 | P5-11 | Keys: rebinding, and a key list that reads from the same table the game uses | U6 | open |
 | P5-12 | Compare cities and colonies in one table (people, output, loyalty, needs), sortable | U3 | open |
 | P5-13 | Standing fleet orders: explore by itself, go home and resupply, patrol a coast | G5 | open |
+| P5-14 | The guide and the first-time hints brought up to date with everything added since Phase 1: Europe, the dynasty, laws, expeditions, captives, free states, scenarios | G3 | open |
+| P5-15 | Court has six tabs and Research carries laws and expeditions at its foot: regroup them (people and dynasty; peoples; crowns and Europe; a screen of its own for laws) so nothing is found by scrolling | U3 | open |
+| P5-16 | Hovering or selecting anything on the map that is not yours says what it is and where it is going: rival ships and armies, militia, free states | U4 | open |
+| P5-17 | The research tree drawn as a tree, with lines from each subject to what it opens, what each subject unlocks shown as icons, and a queue of subjects to study next | U3 | open |
+| P5-18 | A report card for every kind of outcome the player now meets only as a line of news: a rising, a succession, a treaty, a war's end, an expedition's return | U5 | open |
 
 ### Phase 6: Balance (deferred)
 

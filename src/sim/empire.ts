@@ -5,11 +5,12 @@ import { mulberry32, hashSeed, int } from './rng';
 import { LEVELS, score } from './colony';
 import { rivalScore } from './rivals';
 import { rivalsOf, rivalSpec } from '../data/rivals';
-import { fight, casualties, recordLosses, blood, partyForce, type Force } from './battle';
+import { fight, casualties, recordLosses, blood, partyForce, assaultColony, type Force } from './battle';
+import { planLand } from './land';
 import { isMilitary } from '../data/army';
 import { realmMods, judgeEra, eraCard } from './dynasty';
 import { BUILDING_FX } from '../data/city';
-import { yearOf, emptyAccount, type Stance, type Colony, type GameEvent, type GameState, type World, type Party } from './types';
+import { Fog, yearOf, emptyAccount, type Stance, type Colony, type GameEvent, type GameState, type World, type Party } from './types';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -24,6 +25,10 @@ export const FREE = {
   recognisePrestige: 8, trade: 4,
   /** seasons before a rival crown may recognise one you have neither retaken nor recognised, and the chance each season after */
   foreignAfter: 24, foreignChance: 0.05,
+  /** a free state of this many people may send its militia against a colony within `marchReach` hexes by land; the chance each season, doubled once the free states are in league */
+  musterPop: 5, muster: 0.04, marchReach: 12, marchPace: 2,
+  /** what a colony loses in loyalty when the militia breaks in; under `defect` it goes over to them */
+  shaken: 25, defect: 20,
 };
 
 export const TAX = { low: { per: 3, loyalty: 8 }, normal: { per: 5, loyalty: 0 }, high: { per: 8, loyalty: -12 } } as const;
@@ -130,6 +135,47 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
     f.by = patron.id;
     log('court', `${patron.name} recognises ${f.name} as a free state and promises to defend it. To retake it now would mean war.`);
   }
+  // free states in league: two or more that you have not come to terms with make common cause
+  const loose = s.freeStates.filter((f) => !f.recognised);
+  if (loose.length >= 2 && s.flags.league == null) {
+    s.flags.league = s.turn;
+    log('peril', `${loose.map((f) => f.name).join(' and ')} form a league of free states, and call on every colony to join them.`);
+    ev({ kind: 'lost', title: 'A league of free states', map: loose[0].map, hex: loose[0].hex,
+      text: `${loose.map((f) => f.name).join(' and ')} have sworn to stand together. They will arm, and their militia will march on your loyal colonies to raise them or take them. Recognise them, retake them, or meet their soldiers in the field.` });
+  }
+  if (loose.length < 2) delete s.flags.league;
+  // their militia marches
+  for (const f of loose) {
+    if (f.pop < FREE.musterPop || s.rebels.some((r) => r.free === f.id) || rng() >= FREE.muster * (s.flags.league != null ? 2 : 1)) continue;
+    const g = GRIDS[f.map];
+    const near = s.colonies.filter((c) => c.map === f.map && g.distance(c.hex, f.hex) <= FREE.marchReach).sort((a, b) => g.distance(a.hex, f.hex) - g.distance(b.hex, f.hex));
+    for (const c of near) {
+      const road = planLand(g, w[f.map], open(f.map), f.hex, c.hex, 99, 99);
+      if (!road) continue;
+      s.rebels.push({ id: s.nextId++, free: f.id, name: `The militia of ${f.name}`, map: f.map, hex: f.hex, target: c.hex, path: road.path, strength: Math.max(2, Math.floor(f.pop / 3)), trail: [f.hex] });
+      log('peril', `The militia of ${f.name} marches on ${c.name}.`);
+      break;
+    }
+  }
+  for (const r of [...s.rebels]) {
+    r.trail = [r.hex];
+    for (let k = 0; k < FREE.marchPace && r.path.length > 1; k++) { r.path.shift(); r.hex = r.path[0]; r.trail.push(r.hex); }
+    if (r.path.length > 1) continue;
+    s.rebels = s.rebels.filter((x) => x !== r);
+    const c = s.colonies.find((x) => x.map === r.map && x.hex === r.target);
+    const f = s.freeStates.find((x) => x.id === r.free);
+    if (!c || !f || f.recognised) continue;
+    const out = assaultColony(s, c, { name: r.name, units: Array.from({ length: r.strength }, () => ({ type: 'infantry' as const, vet: 0 })) }, w[c.map].terrain[c.hex], rng);
+    if (!out.win) { log('peril', `The militia of ${f.name} is beaten off at ${c.name}.`); c.loyalty = Math.min(100, c.loyalty + 5); continue; }
+    c.loyalty = Math.max(0, c.loyalty - FREE.shaken);
+    if (c.loyalty < FREE.defect) {
+      s.colonies = s.colonies.filter((x) => x !== c);
+      s.units = s.units.filter((u) => u.colony !== c.id);
+      s.freeStates.push({ id: `free-${s.nextId++}`, name: c.name, map: c.map, hex: c.hex, pop: c.pop, level: c.level, since: s.turn });
+      log('peril', `${c.name} opens its gates to the militia of ${f.name} and declares itself free.`);
+      ev({ kind: 'lost', title: `${c.name} goes over`, map: c.map, hex: c.hex, text: `The militia of ${f.name} is welcomed into ${c.name}. Your officers are put on a ship, and another colony is lost to the league.` });
+    } else log('peril', `The militia of ${f.name} breaks into ${c.name}. They are driven out in the end, but the town is shaken and many listened to them.`);
+  }
   // free states grow slowly
   for (const f of s.freeStates) if ((s.turn - f.since) % 6 === 5 && f.pop < LEVELS[f.level].cap) f.pop++;
   // the end of the age
@@ -158,12 +204,41 @@ export function standings(w: World, s: GameState) {
   ].sort((a, b) => b.total - a.total);
 }
 
+const openFog = new Map<string, number[]>();
+/** Militia know their own country: every hex is open to them. */
+function open(map: 'old' | 'new') { let f = openFog.get(map); if (!f) { f = new Array(GRIDS[map].N).fill(Fog.Explored); openFog.set(map, f); } return f; }
+
+/** Meet a free state's militia in the field with a party beside it. */
+export function engageRebels(w: World, s: GameState, p: Party, rebelId: number, log: Log, ev: Ev, stance: Stance = 'assault'): Result {
+  const r = s.rebels.find((x) => x.id === rebelId);
+  if (!r) return fail('No such force.');
+  if (r.map !== p.map || GRIDS[p.map].distance(p.hex, r.hex) > 1) return fail('The party must stand beside them.');
+  const mine = partyForce(s, p);
+  if (!mine.units.length) return fail('The party has no one who can fight.');
+  const rng = mulberry32(hashSeed(s.seed, s.turn, r.id, 93));
+  const theirs: Force = { name: r.name, units: Array.from({ length: r.strength }, () => ({ type: 'infantry' as const, vet: 0 })) };
+  const out = fight(rng, mine, theirs, w[p.map].terrain[r.hex], stance);
+  const dead = casualties(rng, s.units.filter((u) => u.party === p.id), out.atkLoss);
+  s.units = s.units.filter((u) => !dead.includes(u));
+  recordLosses(out.report.attacker, dead);
+  const theirDead = casualties(rng, theirs.units, out.defLoss);
+  recordLosses(out.report.defender, theirDead);
+  let text: string;
+  if (out.attackerWon) { s.rebels = s.rebels.filter((x) => x !== r); blood(s.units.filter((u) => u.party === p.id)); s.prestige += 4; text = `Royal soldiers scatter ${r.name.toLowerCase()} on the march.`; }
+  else { r.strength = Math.max(1, r.strength - theirDead.length); text = `${r.name} beats off the royal soldiers and marches on.`; }
+  if (!s.units.some((u) => u.party === p.id)) s.parties = s.parties.filter((x) => x !== p);
+  log('peril', text);
+  ev({ kind: 'battle', title: out.attackerWon ? 'The militia scattered' : 'Beaten by the militia', map: p.map, hex: r.hex, text, battle: out.report });
+  return { ok: true };
+}
+
 /** Come to terms with a colony that broke away: it stops stirring up its neighbours, and trades with you. */
 export function recognise(s: GameState, freeId: string, log: Log): Result {
   const f = s.freeStates.find((x) => x.id === freeId);
   if (!f) return fail('No such place.');
   if (f.recognised) return fail(`${f.name} is recognised already.`);
   f.recognised = true;
+  s.rebels = s.rebels.filter((r) => r.free !== f.id);
   s.prestige -= FREE.recognisePrestige;
   log('court', `You recognise ${f.name} as a free state. Its merchants are welcome in your ports, and yours in theirs.`);
   return { ok: true, message: `${f.name} is recognised. −${FREE.recognisePrestige} prestige; it will trade with you.` };

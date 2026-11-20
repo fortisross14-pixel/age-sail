@@ -67,6 +67,7 @@ export type Command =
   | { kind: 'landCaptives'; fleet: number }
   | { kind: 'favour'; favour: FavourId }
   | { kind: 'recognise'; free: string }
+  | { kind: 'engageRebels'; party: number; rebels: number; stance?: Stance }
   | { kind: 'envoy'; realm: string }
   | { kind: 'realmGift'; realm: string }
   | { kind: 'treaty'; realm: string; treaty: 'trade' | 'pact' | 'alliance' }
@@ -171,6 +172,7 @@ const api = {
       case 'sellCaptives': result = G.sellCaptives(world, state, c.fleet, c.qty); break;
       case 'landCaptives': result = G.landCaptives(state, c.fleet); break;
       case 'favour': result = G.favour(state, c.favour); break;
+      case 'engageRebels': result = G.engageRebels(world, state, c.party, c.rebels, c.stance); break;
       case 'recognise': result = G.recognise(state, c.free); break;
       case 'envoy': result = G.sendEnvoy(state, c.realm); break;
       case 'realmGift': result = G.sendGift(state, c.realm); break;
