@@ -1,3 +1,4 @@
+import { isMilitary } from '../data/army';
 import { Application, Container, Graphics, Sprite, Text, Texture, TilingSprite, CanvasSource } from 'pixi.js';
 import { SHIPS } from '../data/ships';
 import { SEA_LABELS } from '../data/europe';
@@ -572,7 +573,7 @@ class Scene {
         this.partySprites.set(p.id, ps);
       }
       const units = state.units.filter((u) => u.party === p.id);
-      const lead = units.find((u) => u.type === 'infantry') ?? units[0];
+      const lead = units.find((u) => isMilitary(u.type)) ?? units[0];
       ps.fig.texture = this.assets.tex(lead ? UNIT_INFO[lead.type].sprite : 'units/scout');
       ps.fig.height = HEX_R * 1.6;
       ps.fig.scale.x = ps.fig.scale.y;

@@ -2,6 +2,7 @@
 import { T, isWater } from '../data/terrain';
 import { UNIT_INFO } from '../data/court';
 import { UNIT_SPECS, RESOURCES, RESOURCE_IDS } from '../data/city';
+import { COMBAT, FORAGE, CARRY, RATIONS, LANDING_FOOD, STARVING, isMilitary } from '../data/army';
 import { GRIDS, type Grid } from './hex';
 import { mulberry32, hashSeed, int } from './rng';
 import { leaderOf, personById, skill } from './court';
@@ -109,7 +110,7 @@ function rumour(world: World, s: GameState, p: Party, log: (kind: 'discovery' | 
   const leader = personById(s, p.leader);
   const units = partyUnits(s, p);
   const who = leader?.name ?? p.name;
-  const guarded = units.some((u) => u.type === 'infantry') || skill(leader, 'military') >= 3;
+  const guarded = units.some((u) => isMilitary(u.type)) || skill(leader, 'military') >= 3;
   const welcome = skill(leader, 'diplomacy') * 0.06 + (units.some((u) => u.type === 'missionary') ? 0.1 : 0);
   const roll = rng();
   const g = GRIDS[p.map];
@@ -177,9 +178,14 @@ export function landParty(world: World, s: GameState, f: Fleet, hex: number, wit
   const units = s.units.filter((u) => u.fleet === f.id);
   const leader = withLeader ? leaderOf(s, f) : undefined;
   if (!units.length && !leader) return fail('No one aboard to put ashore.');
+  // they take the food in the hold, up to what they can carry, and a few days' biscuit from the ship's stores
+  const carry = units.length * CARRY;
+  const fromHold = Math.min(f.cargo.food ?? 0, carry);
+  if (fromHold) { f.cargo.food = (f.cargo.food ?? 0) - fromHold; if (!f.cargo.food) delete f.cargo.food; }
   const p: Party = {
     id: s.nextId++, name: leader ? `${leader.name.split(' ')[0]}’s party` : 'Landing party', map: f.map, hex,
     leader: leader?.id ?? null, moves: 0, order: null, trail: [hex],
+    food: fromHold + Math.max(1, units.length) * LANDING_FOOD * RATIONS,
   };
   for (const u of units) { u.fleet = null; u.party = p.id; }
   if (leader) { f.leader = null; f.route = null; leader.fleet = null; }
@@ -210,10 +216,41 @@ export function boardParty(s: GameState, p: Party, f: Fleet): Result {
   if (units.length + (leader ? 1 : 0) > room) return fail(`Not enough room aboard ${f.name}.`);
   for (const u of units) { u.party = null; u.fleet = f.id; }
   if (leader) { f.leader = leader.id; leader.fleet = f.id; }
+  const food = Math.floor(p.food ?? 0);
+  if (food > 0) f.cargo.food = (f.cargo.food ?? 0) + food;
   s.parties = s.parties.filter((x) => x !== p);
   return { ok: true, message: `${p.name} is back aboard ${f.name}.` };
 }
 
 export function previewParty(world: World, s: GameState, p: Party, dest: number) {
   return planLand(GRIDS[p.map], world[p.map], s.fog[p.map], p.hex, dest, p.moves, partyMaxMoves(s, p));
+}
+
+/** What a party eats in a season: half its rations; the rest it finds on the way. */
+export const partyNeed = (s: GameState, p: Party) => partyUnits(s, p).reduce((t, u) => t + COMBAT[u.type].food, 0) * RATIONS;
+/** What it can forage where it stands. */
+export const partyForage = (world: World, p: Party) => FORAGE[world[p.map].terrain[p.hex]] ?? 0;
+
+/**
+ * A season in the field: the party eats, forages, draws on a colony it stands beside, or starves.
+ * A small band lives off the land; an army needs food sent after it.
+ */
+export function supplyParty(world: World, s: GameState, p: Party, log: (kind: 'discovery' | 'peril', text: string) => void) {
+  const units = partyUnits(s, p);
+  if (!units.length) return;
+  const g = GRIDS[p.map];
+  const home = s.colonies.find((c) => c.map === p.map && g.distance(c.hex, p.hex) <= 1);
+  if (home) {
+    const want = Math.max(0, units.length * CARRY - p.food);
+    const take = Math.min(want, Math.floor(home.stock.food ?? 0));
+    if (take > 0) { home.stock.food = (home.stock.food ?? 0) - take; p.food += take; }
+  }
+  const need = Math.max(0, partyNeed(s, p) - partyForage(world, p));
+  if (p.food >= need) { p.food = Math.round((p.food - need) * 10) / 10; return; }
+  p.food = 0;
+  const rng = mulberry32(hashSeed(s.seed, s.turn, p.id, 61));
+  const n = Math.max(1, Math.round(units.length * STARVING));
+  const gone = [...units].sort(() => rng() - 0.5).slice(0, n);
+  s.units = s.units.filter((u) => !gone.includes(u));
+  log('peril', `${p.name} has run out of food. ${gone.map((u) => UNIT_INFO[u.type].name).join(', ')} desert or die of hunger. Send food, or bring them back to the ships.`);
 }

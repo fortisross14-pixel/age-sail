@@ -3,14 +3,17 @@
  * to alliances, setting rivals against each other, and conquest. Battles are a matter of numbers.
  */
 import { crownSpec } from '../data/rivals';
-import { T, isWater } from '../data/terrain';
+import { isWater } from '../data/terrain';
 import { UNIT_INFO } from '../data/court';
 import { GOOD_INFO, type GoodId } from '../data/goods';
 import { GRIDS } from './hex';
 import { mulberry32, hashSeed, int, type Rng } from './rng';
 import { personById, skill } from './court';
-import type { Colony, Fleet, GameEvent, GameState, NationDef, NativeState, Party, World, MapId, Person } from './types';
-import { NATIVE, DEFENCE } from '../data/colony';
+import type { Colony, Fleet, GameEvent, GameState, NationDef, NativeState, Party, World, MapId, Person, Stance, Unit } from './types';
+import { NATIVE } from '../data/colony';
+import { COMBAT } from '../data/army';
+import { fight, battleOdds, casualties, recordLosses, blood, partyForce, colonyForce, assaultColony, type Force } from './battle';
+export { partyForce, colonyForce };
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -92,55 +95,57 @@ export function besieging(w: World, s: GameState, c: Colony): NationDef | undefi
   return allNations(w).find((n) => s.natives[n.id]?.siege?.colony === c.id);
 }
 
-const soldiersIn = (s: GameState, c: Colony) => s.units.filter((u) => u.colony === c.id && u.type === 'infantry').length;
-/** A colony's strength behind its palisade: soldiers, settlers and walls. */
-export const palisade = (s: GameState, c: Colony) => soldiersIn(s, c) * DEFENCE.soldier + c.pop * DEFENCE.settler + DEFENCE.base
-  + (c.level === 'town' ? DEFENCE.town : c.level === 'city' ? DEFENCE.city : 0);
+/** A rough single number for a colony's strength, to pick the weakest (the battle itself decides). */
+export const palisade = (s: GameState, c: Colony) => {
+  const f = colonyForce(s, c);
+  return f.units.reduce((t, u) => t + COMBAT[u.type].hp + COMBAT[u.type].shock, 0) * (1 + 0.5 * (f.walls ?? 0));
+};
 const nameOf = (n: NationDef) => `the ${n.people}`;
 
 // ---------- strength and battle ----------
 
-const UNIT_STRENGTH = { infantry: 4, colonist: 1, missionary: 0.3 } as const;
-
-export function partyStrength(s: GameState, p: Party): number {
-  const units = s.units.filter((u) => u.party === p.id);
-  const l = personById(s, p.leader);
-  return units.reduce((t, u) => t + UNIT_STRENGTH[u.type], 0) + (l ? 1 + skill(l, 'military') : 0);
+/** A people's warriors at a place: the share of them who come, behind the empire's walls at its capital. */
+export function nativeForce(n: NationDef, st: NativeState, share = 1, hex?: number): Force {
+  return { name: `the ${n.people}`, units: [], warriors: Math.max(0.5, st.warriors * share), empire: n.empire, natives: true, nation: n.id, walls: hex === n.siteHex && n.empire ? 1 : 0 };
 }
 
-export function defenceOf(w: World, n: NationDef, st: NativeState, hex: number): number {
-  const t = w[n.map].terrain[hex];
-  let d = st.warriors;
-  if (t === T.Forest || t === T.Jungle || t === T.Hills) d *= 1.25;
-  if (hex === n.siteHex) d *= n.empire ? 1.4 : 1.2;
-  return d;
-}
-
-/** Peoples allied with you who are rivals of the target fight on your side. */
+/** Peoples allied with you who are rivals of the target send half their warriors. */
 export function alliedHelp(w: World, s: GameState, target: NationDef): number {
   return allNations(w)
     .filter((o) => o.map === target.map && o.id !== target.id && s.natives[o.id]?.relation === 'allied' && (o.rivals.includes(target.id) || target.rivals.includes(o.id)))
     .reduce((t, o) => t + s.natives[o.id].warriors * 0.5, 0);
 }
 
-/** Odds of the attacker winning. */
+/** Your army for an attack on a people, with your allies' warriors at its side. */
+export function attackForce(w: World, s: GameState, p: Party, target: NationDef): Force {
+  const f = partyForce(s, p);
+  const allies = alliedHelp(w, s, target);
+  return allies ? { ...f, warriors: allies } : f;
+}
+
+/** The chance an attack on a village succeeds, for the player to weigh before ordering it. */
+export function attackOdds(w: World, s: GameState, p: Party, hex: number, stance: Stance = 'assault'): number {
+  const n = w[p.map].nations.find((x) => x.siteHex === hex || x.villages.includes(hex));
+  if (!n) return 0;
+  return battleOdds(attackForce(w, s, p, n), nativeForce(n, s.natives[n.id], 1, hex), w[p.map].terrain[hex], stance);
+}
+
 export const odds = (a: number, d: number) => (a + d > 0 ? a / (a + d) : 0);
 
+/** Native warriors against warriors (peoples set on each other): a plain contest of numbers. */
 function battle(rng: Rng, a: number, d: number) {
   const win = rng() < odds(a, d);
   const ratio = win ? d / Math.max(1, a) : a / Math.max(1, d);
   return { win, winnerLoss: Math.min(0.6, 0.15 + 0.35 * ratio), loserLoss: 0.5 + rng() * 0.3 };
 }
 
-function killUnits(s: GameState, p: Party, frac: number, rng: Rng): string[] {
-  const units = s.units.filter((u) => u.party === p.id);
-  const n = Math.min(units.length, Math.round(units.length * frac));
-  // soldiers stand in front
-  const order = [...units].sort((x, y) => UNIT_STRENGTH[y.type] - UNIT_STRENGTH[x.type] + (rng() - 0.5) * 0.1);
-  const dead = order.slice(0, n);
+/** Kill a share of a party's companies; returns their names for the chronicle. */
+function killUnits(s: GameState, p: Party, frac: number, rng: Rng): Unit[] {
+  const dead = casualties(rng, s.units.filter((u) => u.party === p.id), frac);
   s.units = s.units.filter((u) => !dead.includes(u));
-  return dead.map((u) => UNIT_INFO[u.type].name.toLowerCase());
+  return dead;
 }
+const names = (dead: Unit[]) => dead.map((u) => UNIT_INFO[u.type].name.toLowerCase()).join(', ');
 
 // ---------- commands ----------
 
@@ -262,7 +267,7 @@ export function foundMission(w: World, s: GameState, from: { fleet?: Fleet; part
 }
 
 /** Attack a village (or the trading ground) beside the party. */
-export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, log: Log, ev: Ev): Result {
+export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, log: Log, ev: Ev, stance: Stance = 'assault'): Result {
   const g = GRIDS[p.map];
   if (hex !== p.hex && !g.neighbors(p.hex).includes(hex)) return fail('The party must stand beside the village.');
   const n = w[p.map].nations.find((x) => x.siteHex === hex || x.villages.includes(hex));
@@ -270,48 +275,53 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
   const st = s.natives[n.id];
   if (st.lost.includes(hex)) return fail('That village is already abandoned.');
   if (st.relation === 'subject') return fail(`${nameOf(n)} are already your subjects.`);
-  const a = partyStrength(s, p) + alliedHelp(w, s, n);
-  const d = defenceOf(w, n, st, hex);
-  if (a <= 0) return fail('The party has no one who can fight.');
-  const firstWar = st.relation !== 'war';
+  const mine = attackForce(w, s, p, n);
+  if (!mine.units.length) return fail('The party has no one who can fight.');
   st.relation = 'war';
   st.met = true;
   for (const [id, o] of Object.entries(s.natives)) if (id !== n.id && o.met && o.relation !== 'subject') remember(s, o, `You made war on ${nameOf(n)}`, -10);
-  const r = battle(rng, a, d);
+  const theirs = nativeForce(n, st, 1, hex);
+  const out = fight(rng, mine, theirs, w[p.map].terrain[hex], stance);
   const leader = personById(s, p.leader);
   const who = leader?.name ?? p.name;
-  if (r.win) {
-    const dead = killUnits(s, p, r.winnerLoss * 0.6, rng);
-    st.warriors = Math.max(0, Math.round(st.warriors * (1 - r.loserLoss)));
+  const dead = killUnits(s, p, out.atkLoss, rng);
+  const fallen = st.warriors * out.defLoss;
+  recordLosses(out.report.attacker, dead);
+  recordLosses(out.report.defender, [], fallen);
+  st.warriors = Math.max(out.attackerWon ? 0 : 1, Math.round(st.warriors - fallen));
+  const loss = dead.length ? ` The party loses ${names(dead)}.` : '';
+  let title: string;
+  let text: string;
+  if (out.attackerWon) {
+    blood(s.units.filter((u) => u.party === p.id));
     st.lost.push(hex);
     remember(s, st, 'You burned their villages', -40);
     const all = [n.siteHex, ...n.villages].every((h) => st.lost.includes(h));
-    const loss = dead.length ? ` The party loses ${dead.join(', ')}.` : '';
     if (hex === n.siteHex || all || st.warriors < 3) {
       st.relation = 'subject';
+      st.siege = null;
       const loot = n.empire ? int(rng, 3000, 6000) : int(rng, 300, 900);
       s.treasury += loot;
       s.prestige += n.empire ? 40 : 10;
-      log('peril', `${who} defeats ${nameOf(n)}.${loss} They submit to you and must pay tribute. Spoils worth ${loot} ducats are sent home.`);
-      ev({ kind: 'people', title: n.empire ? 'An empire falls' : `The ${n.people} submit`, map: n.map, hex,
-        text: `${who}’s party has defeated ${nameOf(n)}${n.empire ? ', the greatest power of these lands' : ''}. They are your subjects now, paying tribute. Every other people has heard of it.` });
+      title = n.empire ? 'An empire falls' : `The ${n.people} submit`;
+      text = `${who} defeats ${nameOf(n)}${n.empire ? ', the greatest power of these lands' : ''}.${loss} They submit and must pay tribute. Spoils worth ${loot} ducats are sent home.`;
     } else {
-      log('peril', `${who} takes a village of ${nameOf(n)}; its people flee inland.${loss} ${nameOf(n)} still have ${st.warriors} warriors.`);
+      title = `A village of the ${n.people} taken`;
+      text = `${who} takes a village of ${nameOf(n)}; its people flee inland.${loss} ${cap(nameOf(n))} still have ${st.warriors} warriors.`;
     }
-    return { ok: true };
+  } else {
+    remember(s, st, 'You attacked them', -30);
+    title = 'Repulsed';
+    text = `${cap(nameOf(n))} beat back ${who}’s attack.${loss}`;
+    if (leader && !s.units.some((u) => u.party === p.id) && rng() < 0.5) {
+      leader.alive = false;
+      leader.died = s.turn;
+      s.parties = s.parties.filter((x) => x !== p);
+      text += ` ${leader.name} falls in the fighting.`;
+    }
   }
-  const dead = killUnits(s, p, r.loserLoss, rng);
-  st.warriors = Math.max(1, Math.round(st.warriors * (1 - r.winnerLoss * 0.5)));
-  remember(s, st, 'You attacked them', -30);
-  let msg = `${nameOf(n)} beat back ${who}’s attack.${dead.length ? ` The party loses ${dead.join(', ')}.` : ''}`;
-  if (leader && !s.units.some((u) => u.party === p.id) && rng() < 0.5) {
-    leader.alive = false;
-    leader.died = s.turn;
-    s.parties = s.parties.filter((x) => x !== p);
-    msg += ` ${leader.name} falls in the fighting.`;
-  }
-  log('peril', msg);
-  if (firstWar) ev({ kind: 'lost', title: 'Repulsed', map: n.map, hex, text: msg });
+  log('peril', text);
+  ev({ kind: 'battle', title, text, map: n.map, hex, battle: out.report });
   return { ok: true };
 }
 
@@ -320,18 +330,16 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** A season of siege: one assault on the palisade. The colony can fall, and burn. */
-function siegeSeason(s: GameState, n: NationDef, st: NativeState, rng: Rng, log: Log, ev: Ev) {
+function siegeSeason(w: World, s: GameState, n: NationDef, st: NativeState, rng: Rng, log: Log, ev: Ev) {
   const c = s.colonies.find((x) => x.id === st.siege!.colony);
   if (!c) { st.siege = null; return; }
   const who = cap(nameOf(n));
-  const r = battle(rng, st.warriors * NATIVE.assault, palisade(s, c));
+  const r = assaultColony(s, c, nativeForce(n, st, NATIVE.assault), w[c.map].terrain[c.hex], rng);
+  st.warriors = Math.max(1, Math.round(st.warriors - st.warriors * NATIVE.assault * r.lost));
   if (r.win) {
-    const dead = Math.min(c.pop, c.pop >= 6 ? 2 : 1);
+    const dead = Math.min(c.pop, Math.max(1, r.settlers));
     c.pop -= dead;
     for (const k of Object.keys(c.stock) as GoodId[]) c.stock[k] = Math.floor((c.stock[k] ?? 0) / 2);
-    const soldier = s.units.find((u) => u.colony === c.id && u.type === 'infantry');
-    if (soldier && rng() < 0.5) s.units = s.units.filter((u) => u !== soldier);
-    st.warriors = Math.max(1, Math.round(st.warriors * (1 - r.winnerLoss * 0.5)));
     if (c.pop <= 0) {
       s.colonies = s.colonies.filter((x) => x !== c);
       s.units = s.units.filter((u) => u.colony !== c.id);
@@ -343,10 +351,9 @@ function siegeSeason(s: GameState, n: NationDef, st: NativeState, rng: Rng, log:
         text: `${who} broke into ${c.name} at dawn. The houses and the warehouse are ashes, the settlers dead or carried off. The coast is theirs again.` });
       return;
     }
-    log('peril', `${who} break into ${c.name}: ${dead} settler${dead > 1 ? 's' : ''} killed and the warehouse plundered before they are driven out. ${c.pop} left.`);
+    log('peril', `${who} break into ${c.name}: ${dead} settler${dead > 1 ? 's' : ''} killed${r.soldiers ? ` and ${r.soldiers} compan${r.soldiers > 1 ? 'ies' : 'y'} lost` : ''}, the warehouse plundered before they are driven out. ${c.pop} left.`);
   } else {
-    st.warriors = Math.max(1, Math.round(st.warriors * (1 - r.loserLoss * 0.4)));
-    log('peril', `${who} throw themselves at the palisade of ${c.name} and are beaten back.`);
+    log('peril', `${who} throw themselves at the ${c.walls ? 'walls' : 'palisade'} of ${c.name} and are beaten back${r.soldiers ? `, though ${r.soldiers} compan${r.soldiers > 1 ? 'ies' : 'y'} of the garrison fall` : ''}.`);
   }
   // they go home when the siege has cost too much, when tempers cool, or for their own harvest
   const tooLong = s.turn - st.siege!.since >= NATIVE.siegeSeasons;
@@ -405,7 +412,7 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
     if (st.relation === 'subject') s.treasury += Math.round(st.warriors * 4 + 20);
     // a siege under way: an assault each season, until the colony falls or they give up
     if (st.siege) {
-      siegeSeason(s, n, st, rng, log, _ev);
+      siegeSeason(w, s, n, st, rng, log, _ev);
       continue;
     }
     if (!isHostile(st) || st.warriors < 2) continue;
@@ -422,24 +429,24 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
     // otherwise they raid colonies near their land
     for (const c of reach) {
       if (rng() > 0.3) continue;
-      const r = battle(rng, st.warriors * 0.5, palisade(s, c));
+      const r = assaultColony(s, c, nativeForce(n, st, 0.5), w[c.map].terrain[c.hex], rng);
+      st.warriors = Math.max(1, Math.round(st.warriors - st.warriors * 0.5 * r.lost));
       if (r.win) {
         if (c.pop > 1) c.pop--;
         for (const k of Object.keys(c.stock) as GoodId[]) c.stock[k] = Math.floor((c.stock[k] ?? 0) / 2);
         log('peril', `${cap(nameOf(n))} raid ${c.name}: a colonist is killed and the warehouse plundered.`);
       } else {
-        st.warriors = Math.max(1, st.warriors - 2);
-        log('peril', `${cap(nameOf(n))} raid ${c.name}, but the settlers drive them off.`);
+        log('peril', `${cap(nameOf(n))} raid ${c.name}, but the ${r.garrison ? 'garrison' : 'settlers'} drive them off.`);
       }
     }
     // ambushes on parties in their land
     for (const p of [...s.parties]) {
       if (p.map !== n.map || !land.has(p.hex) || rng() > 0.25) continue;
-      const r = battle(rng, st.warriors * 0.35, partyStrength(s, p) + 0.5);
-      if (r.win) {
-        const dead = killUnits(s, p, 0.5, rng);
-        log('peril', `${nameOf(n)} ambush ${p.name}${dead.length ? `: ${dead.join(', ')} are killed` : ''}.`);
-      } else log('peril', `${nameOf(n)} ambush ${p.name}, and are driven off.`);
+      const out = fight(rng, nativeForce(n, st, 0.35), partyForce(s, p), w[p.map].terrain[p.hex], 'assault');
+      const dead = killUnits(s, p, out.defLoss, rng);
+      st.warriors = Math.max(1, Math.round(st.warriors - st.warriors * 0.35 * out.atkLoss));
+      if (out.attackerWon) log('peril', `${cap(nameOf(n))} ambush ${p.name}${dead.length ? `: ${names(dead)} are killed` : ''}.`);
+      else { blood(s.units.filter((u) => u.party === p.id)); log('peril', `${cap(nameOf(n))} ambush ${p.name}, and are driven off${dead.length ? `, but ${names(dead)} fall` : ''}.`); }
     }
   }
   void isWater;

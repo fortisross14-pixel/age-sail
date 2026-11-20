@@ -92,7 +92,7 @@ export interface Ship {
 export type Skill = 'navigation' | 'military' | 'commerce' | 'construction' | 'diplomacy';
 export const SKILLS: Skill[] = ['navigation', 'military', 'commerce', 'construction', 'diplomacy'];
 export type Rank = 'courtier' | 'explorer' | 'merchant' | 'governor';
-export type UnitType = 'colonist' | 'infantry' | 'missionary';
+export type UnitType = 'colonist' | 'missionary' | 'infantry' | 'swordsman' | 'archer' | 'musketeer' | 'cavalry' | 'cannon';
 export type TraitId = 'learned' | 'hardy' | 'bold' | 'shrewd' | 'pious' | 'ambitious';
 
 /** A member of the court. */
@@ -126,6 +126,8 @@ export interface Unit {
   city: string | null;
   party: number | null;
   colony?: string | null;
+  /** battles survived and won: 0, 1 or 2 (veteran ranks) */
+  vet?: number;
 }
 
 /** People and units ashore, exploring on foot. */
@@ -138,6 +140,8 @@ export interface Party {
   moves: number;
   order: number[] | null;
   trail: number[];
+  /** food carried, in rations (a company eats one a season, half of it foraged) */
+  food: number;
 }
 
 export type ColonyLevel = 'outpost' | 'town' | 'city';
@@ -158,6 +162,8 @@ export interface Colony {
   growth: number;
   /** settlers who arrived this turn and are still seasoning: they eat but do not work yet */
   newcomers: number;
+  /** 0 none, 1 palisade, 2 stone walls, 3 star fort */
+  walls: number;
   /** 0..100: how loyal the settlers are to the Crown */
   loyalty: number;
   /** a royal charter: self-government and half taxes, in return for loyalty */
@@ -341,7 +347,9 @@ export interface ChronicleEntry {
 export interface EventChoice { label: string; hint?: string }
 
 export interface GameEvent {
-  kind: 'landfall' | 'people' | 'lost' | 'tech' | 'story' | 'era' | 'end';
+  kind: 'landfall' | 'people' | 'lost' | 'tech' | 'story' | 'era' | 'end' | 'battle';
+  /** for battles: the report */
+  battle?: BattleReport;
   /** for stories with choices: which story, and what it is about */
   story?: string;
   ctx?: Record<string, string | number>;
@@ -351,6 +359,36 @@ export interface GameEvent {
   map: MapId;
   hex: number;
 }
+
+/** One side of a battle, as the report shows it. */
+export interface BattleSide {
+  name: string;
+  /** a courtier who led them */
+  general?: number;
+  /** a crown's arms, or a native people */
+  crown?: CrownId;
+  nation?: string;
+  /** companies by type: how many fought, how many were lost */
+  units: { type: UnitType; n: number; lost: number }[];
+  /** native warriors: how many fought, how many fell */
+  warriors?: { n: number; lost: number };
+  walls?: number;
+}
+
+/** What happened in a battle, round by round, for the report. */
+export interface BattleReport {
+  attacker: BattleSide;
+  defender: BattleSide;
+  /** damage each side dealt in the fire, melee and pursuit rounds */
+  rounds: { name: 'Fire' | 'Melee' | 'Pursuit'; atk: number; def: number }[];
+  /** morale left at the end, 0..100 */
+  morale: { atk: number; def: number };
+  attackerWon: boolean;
+  stance: Stance;
+  terrain: string;
+}
+
+export type Stance = 'assault' | 'steady';
 
 export interface GameState {
   seed: number;

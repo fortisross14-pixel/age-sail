@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
+import { COMBAT, MILITARY, isMilitary } from '../data/army';
 import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import { SHIPS, type ShipType } from '../data/ships';
@@ -304,21 +305,31 @@ function Recruitment({ city }: { city: City }) {
   return (
     <>
       {p && <div className="detail-card" style={{ gridTemplateColumns: '1fr' }}><b>Under way: {projectLabel(p)}</b><span className="muted">{p.turnsLeft} season{p.turnsLeft === 1 ? '' : 's'} to go. One project at a time.</span></div>}
-      <div className="sec">Units</div>
-      <div className="offer-cards">
-        {(['colonist', 'infantry', 'missionary'] as UnitType[]).map((u) => {
-          const c = offer({ kind: 'unit', unit: u });
-          return (
-            <div key={u} className={`offer-card ${c.allowed ? '' : 'locked'}`} title={UNIT_INFO[u].blurb}>
-              {unitArt(u)}
-              <b>{UNIT_INFO[u].name}</b>
-              <span className="meta">{fmt(c.cost)} · {c.build} season{c.build > 1 ? 's' : ''} · upkeep {UNIT_SPECS[u].upkeep}</span>
-              {c.allowed ? <button className="adm-gold-btn" disabled={!!p || game.treasury < c.cost} onClick={() => void run({ kind: 'project', city: city.id, project: { kind: 'unit', unit: u } })}>Train</button>
-                : <span className="meta">{c.why}</span>}
-            </div>
-          );
-        })}
-      </div>
+      {([['Settlers and friars', ['colonist', 'missionary']], ['Soldiers', MILITARY]] as [string, UnitType[]][]).map(([title, list]) => (
+        <Fragment key={title}>
+          <div className="sec">{title}</div>
+          <div className="offer-cards">
+            {list.map((u) => {
+              const c = offer({ kind: 'unit', unit: u });
+              const k = COMBAT[u];
+              return (
+                <div key={u} className={`offer-card ${c.allowed ? '' : 'locked'}`} title={UNIT_INFO[u].blurb}>
+                  {unitArt(u)}
+                  <b>{UNIT_INFO[u].name}</b>
+                  {isMilitary(u) && (
+                    <span className="pips" aria-label={`Fire ${k.fire}, melee ${k.shock}, toughness ${k.hp}`}>
+                      <span title="Fire">🏹 {k.fire}</span><span title="Melee">⚔ {k.shock}</span><span title="Toughness">⛨ {k.hp}</span>{k.pursuit >= 2 && <span title="Pursuit">🐎 {k.pursuit}</span>}
+                    </span>
+                  )}
+                  <span className="meta">{fmt(c.cost)} · {c.build} season{c.build > 1 ? 's' : ''} · upkeep {UNIT_SPECS[u].upkeep}</span>
+                  {c.allowed ? <button className="adm-gold-btn" disabled={!!p || game.treasury < c.cost} onClick={() => void run({ kind: 'project', city: city.id, project: { kind: 'unit', unit: u } })}>Train</button>
+                    : <span className="meta">{c.why}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </Fragment>
+      ))}
       {!city.inland && <>
         <div className="sec">Ships</div>
         <div className="offer-cards">

@@ -20,7 +20,7 @@ export const BUILDINGS: Record<BuildingId, BuildingSpec> = {
   barracks: {
     name: 'Barracks', blurb: 'A drill yard and an armoury for soldiers bound overseas.',
     levels: [{ cost: 0, build: 0 }, { cost: 1500, build: 2 }, { cost: 3000, build: 3 }],
-    effect: ['', 'Trains infantry.', 'Trains infantry faster and cheaper.'],
+    effect: ['', 'Trains pikemen, swordsmen and crossbowmen.', 'Also trains arquebusiers, lancers and field guns, and every company faster and cheaper.'],
   },
   church: {
     name: 'Church', blurb: 'A great church with a friary, sending friars to the peoples beyond the sea.',
@@ -55,13 +55,21 @@ export const CITY_SIZE: Record<1 | 2 | 3, { slots: number; taxes: number }> = {
   1: { slots: 3, taxes: 6 },
 };
 
-export interface UnitSpec { cost: number; build: number; needs: BuildingId | null; upkeep: number; moves: number }
+/** What a unit costs and needs: the building, and the level of it (barracks II for horse, guns and arquebuses). */
+export interface UnitSpec { cost: number; build: number; needs: BuildingId | null; level?: number; upkeep: number; moves: number }
 
 export const UNIT_SPECS: Record<UnitType, UnitSpec> = {
   colonist: { cost: 300, build: 1, needs: null, upkeep: 4, moves: 3 },
-  infantry: { cost: 500, build: 2, needs: 'barracks', upkeep: 8, moves: 3 },
   missionary: { cost: 400, build: 1, needs: 'church', upkeep: 4, moves: 3 },
+  infantry: { cost: 500, build: 2, needs: 'barracks', upkeep: 8, moves: 3 },
+  swordsman: { cost: 550, build: 2, needs: 'barracks', upkeep: 8, moves: 3 },
+  archer: { cost: 450, build: 2, needs: 'barracks', upkeep: 7, moves: 3 },
+  musketeer: { cost: 700, build: 2, needs: 'barracks', level: 2, upkeep: 10, moves: 3 },
+  cavalry: { cost: 900, build: 2, needs: 'barracks', level: 2, upkeep: 14, moves: 5 },
+  cannon: { cost: 1000, build: 3, needs: 'barracks', level: 2, upkeep: 12, moves: 2 },
 };
+/** The order units are offered in. */
+export const UNIT_ORDER: UnitType[] = ['colonist', 'missionary', 'infantry', 'swordsman', 'archer', 'musketeer', 'cavalry', 'cannon'];
 
 export type ResourceId = 'gold' | 'silver' | 'fertile' | 'timber' | 'furs' | 'dyes' | 'spices';
 

@@ -4,11 +4,14 @@ import { fmt } from './format';
 import { GRIDS } from '../sim/hex';
 import { isWater } from '../data/terrain';
 import { UNIT_INFO } from '../data/court';
-import { partyMaxMoves, partyUnits } from '../sim/land';
+import { partyMaxMoves, partyUnits, partyNeed, partyForage } from '../sim/land';
 import { personById } from '../sim/court';
 import { canFound, foundingNeeds } from '../sim/colony';
-import { nationOfSite, partyStrength, defenceOf, alliedHelp, odds } from '../sim/natives';
-import { rivalColonyDefence } from '../sim/rivals';
+import { nationOfSite, attackForce, nativeForce } from '../sim/natives';
+import { rivalForce } from '../sim/rivals';
+import { freeForce } from '../sim/empire';
+import { battleOdds, partyForce } from '../sim/battle';
+import { ArmyRow } from './Battle';
 import { CROWN } from '../render/palette';
 import { GOOD_INFO, type GoodId } from '../data/goods';
 import { ShipIcon } from './Icon';
@@ -122,6 +125,14 @@ function PartyCard({ partyId }: { partyId: number }) {
   const leader = personById(game, p.leader);
   const units = partyUnits(game, p);
   const ships = game.fleets.filter((f) => f.map === p.map && (f.hex === p.hex || g.neighbors(p.hex).includes(f.hex)));
+  const stance = useStore((s) => s.stance);
+  const beside = (h: number) => h === p.hex || g.neighbors(p.hex).includes(h);
+  const frees = game.freeStates.filter((f) => f.map === p.map && beside(f.hex));
+  const rivals = game.rivalColonies.filter((c) => c.map === p.map && beside(c.hex));
+  const villages = world[p.map].nations.flatMap((n) => [n.siteHex, ...n.villages].filter((h) => beside(h) && !game.natives[n.id].lost.includes(h)).map((h) => ({ n, h }))).slice(0, 2);
+  const mine = partyForce(game, p);
+  const hasTargets = units.length > 0 && (frees.length > 0 || rivals.length > 0 || villages.some(({ n }) => game.natives[n.id].relation !== 'subject'));
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
   return (
     <div className="selection" role="region" aria-label={`Selected party ${p.name}`}>
       <img src={`${import.meta.env.BASE_URL}sprites/${units[0] ? UNIT_INFO[units[0].type].sprite : 'units/scout'}.png`} alt="" height={54} />
@@ -132,8 +143,13 @@ function PartyCard({ partyId }: { partyId: number }) {
         </div>
         <div className="sel-stats">
           <span title="Movement left this season">🥾 {p.moves}/{partyMaxMoves(game, p)}</span>
-          {units.map((u) => <span key={u.id}>{UNIT_INFO[u.type].name}</span>)}
+          {(() => {
+            const need = Math.max(0, partyNeed(game, p) - partyForage(world, p));
+            const seasons = need > 0 ? Math.floor(p.food / need) : Infinity;
+            return <span className={seasons <= 1 ? 'bad' : ''} title={`${Math.floor(p.food)} rations. The party eats ${partyNeed(game, p).toFixed(1)} a season and forages ${partyForage(world, p)} here. Beside one of your colonies it restocks from the warehouse.`}>🍞 {Math.floor(p.food)} · {seasons === Infinity ? 'living off the land' : `${seasons} season${seasons === 1 ? '' : 's'}`}</span>;
+          })()}
         </div>
+        <ArmyRow units={units} />
         {preview && preview.party === p.id ? (
           <div className="sel-plan"><b>{preview.turns > 1 ? `${preview.turns} seasons` : 'This season'}</b> on foot</div>
         ) : p.order ? (
@@ -153,28 +169,29 @@ function PartyCard({ partyId }: { partyId: number }) {
           </>
         )}
         {!preview && p.order && <button onClick={() => void run({ kind: 'stopParty', party: p.id })}>Halt</button>}
-        {!preview && game.freeStates.filter((f) => f.map === p.map && (f.hex === p.hex || g.neighbors(p.hex).includes(f.hex))).map((f) => (
-          <button key={f.id} className="danger" onClick={() => void run({ kind: 'retake', party: p.id, free: f.id })}>
-            Retake {f.name} · {Math.round(odds(partyStrength(game, p), f.pop * 1.5 + (f.level === 'town' ? 4 : f.level === 'city' ? 8 : 0)) * 100)}%
+        {!preview && hasTargets && (
+          <span className="stance" role="radiogroup" aria-label="How to attack">
+            <button role="radio" aria-checked={stance === 'assault'} className={stance === 'assault' ? 'on' : ''} title="Hit hard: more damage dealt, and more taken" onClick={() => set({ stance: 'assault' })}>Assault</button>
+            <button role="radio" aria-checked={stance === 'steady'} className={stance === 'steady' ? 'on' : ''} title="Hold back: fewer losses on both sides" onClick={() => set({ stance: 'steady' })}>Steady</button>
+          </span>
+        )}
+        {!preview && frees.map((f) => (
+          <button key={f.id} className="danger" onClick={() => void run({ kind: 'retake', party: p.id, free: f.id, stance })}>
+            Retake {f.name} · {pct(battleOdds(mine, freeForce(f), world[f.map].terrain[f.hex], stance))}
           </button>
         ))}
-        {!preview && game.rivalColonies.filter((c) => c.map === p.map && (c.hex === p.hex || g.neighbors(p.hex).includes(c.hex))).map((c) => {
-          const o = odds(partyStrength(game, p), rivalColonyDefence(c));
-          return (
-            <button key={c.id} className="danger" title={`Your strength ${partyStrength(game, p).toFixed(1)} against ${rivalColonyDefence(c)}. ${game.rivals[c.crown].relation === 'war' ? '' : 'This means war.'}`}
-              onClick={() => void run({ kind: 'storm', party: p.id, colony: c.id })}>Storm {c.name} ({CROWN[c.crown].name}) · {Math.round(o * 100)}%</button>
-          );
-        })}
-        {!preview && world[p.map].nations.flatMap((n) => [n.siteHex, ...n.villages].filter((h) => (h === p.hex || g.neighbors(p.hex).includes(h)) && !game.natives[n.id].lost.includes(h)).map((h) => ({ n, h }))).slice(0, 2).map(({ n, h }) => {
+        {!preview && rivals.map((c) => (
+          <button key={c.id} className="danger" title={game.rivals[c.crown].relation === 'war' ? 'Storm the colony' : 'This means war.'}
+            onClick={() => void run({ kind: 'storm', party: p.id, colony: c.id, stance })}>Storm {c.name} ({CROWN[c.crown].name}) · {pct(battleOdds(mine, rivalForce(game, c), world[c.map].terrain[c.hex], stance))}</button>
+        ))}
+        {!preview && villages.map(({ n, h }) => {
           const st = game.natives[n.id];
           if (st.relation === 'subject') return null;
-          const a = partyStrength(game, p) + alliedHelp(world, game, n);
-          const o = odds(a, defenceOf(world, n, st, h));
           return (
             <span key={h} className="row" style={{ margin: 0 }}>
               {units.some((u) => u.type === 'missionary') && !st.mission && <button onClick={() => void run({ kind: 'mission', party: p.id })}>Mission to the {n.people}</button>}
-              <button className="danger" title={`Your strength ${a.toFixed(1)} against about ${defenceOf(world, n, st, h).toFixed(0)}. War with them; every people will resent it.`}
-                onClick={() => void run({ kind: 'attack', party: p.id, hex: h })}>Attack the {n.people} · {Math.round(o * 100)}%</button>
+              <button className="danger" title={`About ${st.warriors} warriors. War with them; every people will resent it.`}
+                onClick={() => void run({ kind: 'attack', party: p.id, hex: h, stance })}>Attack the {n.people} · {pct(battleOdds(attackForce(world, game, p, n), nativeForce(n, st, 1, h), world[p.map].terrain[h], stance))}</button>
             </span>
           );
         })}

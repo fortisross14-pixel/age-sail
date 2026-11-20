@@ -1,6 +1,5 @@
 /** Colonies overseas and the colonial tax rate, shown in the Cities panel's list. */
 import { useStore } from '../store';
-import { UNIT_INFO } from '../data/court';
 import { fmt } from './format';
 import { GoodIcon } from './Icon';
 import { GOODS, GOOD_INFO, NEEDS, LUXURIES, LUXURY_NEED, type GoodId } from '../data/goods';
@@ -11,6 +10,8 @@ import { loyaltyFactors, loyaltyTarget, colonyTaxes, TAX } from '../sim/empire';
 import { cargoUsed, cargoCapacity } from '../sim/game';
 import { getView } from './MapCanvas';
 import { turnLabel } from '../sim/types';
+import { ArmyRow } from './Battle';
+import { WALLS } from '../data/army';
 
 export function ColonyCard({ colonyId }: { colonyId: string }) {
   const game = useStore((s) => s.game)!;
@@ -93,7 +94,22 @@ export function ColonyCard({ colonyId }: { colonyId: string }) {
             {!stock.length && <span className="muted small">Empty.</span>}
           </div>
 
-          {garrison.length > 0 && <div className="small">Stationed here: {garrison.map((u) => UNIT_INFO[u.type].name).join(', ')}.</div>}
+          <h4>Garrison and walls</h4>
+          <ArmyRow units={garrison} />
+          {(() => {
+            const w = c.walls ?? 0;
+            const next = WALLS[w + 1];
+            return (
+              <div className="row small">
+                <span><b>{WALLS[w].name}</b>{w ? '' : ': only a fence of stakes'}.</span>
+                {next && <button disabled={(w + 1 === 3 && c.level === 'outpost') || Object.entries(next.needs).some(([g, n]) => (c.stock[g as GoodId] ?? 0) < (n as number))}
+                  title={`Walls make the defenders much harder to break; field guns breach them.${w + 1 === 3 && c.level === 'outpost' ? ' A star fort needs a town.' : ''}`}
+                  onClick={() => void run({ kind: 'walls', colony: c.id })}>
+                  Raise {next.name.toLowerCase()} · {Object.entries(next.needs).map(([g, n]) => `${n} ${GOOD_INFO[g as GoodId].name.toLowerCase()}`).join(', ')}
+                </button>}
+              </div>
+            );
+          })()}
 
           {next && (
             <>

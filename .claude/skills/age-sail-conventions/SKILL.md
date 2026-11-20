@@ -43,6 +43,10 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
 - **Colonies and natives** tune in `src/data/colony.ts` (births and deaths, seasoning, garrison food,
   siege thresholds). Change a people's attitude with `remember(s, st, why, delta)` so the player can
   see the reason, never by writing `attitude` directly.
+- **Battles** go through `fight()` in `src/sim/battle.ts` with `Force`s (`partyForce`, `colonyForce`,
+  `nativeForce`, `rivalForce`, `freeForce`); unit numbers live in `src/data/army.ts`. Player-ordered
+  battles push a `kind: 'battle'` event with the report. Check odds with `tools/battles.ts`.
+  Count soldiers with `isMilitary(type)`, never `type === 'infantry'`.
 - **The world is regenerated from the seed on load**, not saved. Any change to `mapgen.ts`
   output changes every existing save's map: bump the generator version (see Saves).
 

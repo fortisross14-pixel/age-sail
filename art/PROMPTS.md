@@ -68,6 +68,22 @@ Still wanted, if you like: a colonist and a missionary in the units style.
 > siege) · a burned palisade with smoke (a destroyed colony) · a native village of round
 > houses · a palisaded colony with a cross and a flag.
 
+## Wanted for M12 (armies and walls)
+
+### 11. `walls.png`
+
+> Style: (the same paragraph)
+>
+> A landscape image with a strict grid of 4 columns and 2 rows of square tiles, all the same
+> size, separated by even gaps of flat plain navy. Each tile has a light parchment background and
+> a thin gold border, and shows one painted miniature in three-quarter view, centred, on a patch
+> of ground, the same scale in every tile:
+> a small colony behind a fence of sharpened stakes · the same colony behind a timber palisade
+> with a gate tower · a stone curtain wall with round towers · a star-shaped fort with angled
+> bastions and cannon ·
+> an army camp of tents, a flag and a cooking fire · a supply wagon with barrels and sacks · a
+> field gun firing with smoke · a colonist and a friar side by side (for the units sheet).
+
 ## 2. `buildings.png`
 
 > Style: full-colour, hand-painted illustrations for a premium

@@ -7,7 +7,7 @@ import { generateWorld } from './mapgen';
 import { previewParty } from './land';
 import * as G from './game';
 import { DEFAULT_UNTIL } from '../data/eras';
-import type { GameState, World, ProjectKind, Rank, UnitType, TradeRoute } from './types';
+import type { GameState, World, ProjectKind, Rank, UnitType, TradeRoute, Stance } from './types';
 
 export type Command =
   | { kind: 'buy'; fleet: number; good: GoodId; qty: number }
@@ -45,15 +45,16 @@ export type Command =
   | { kind: 'incorporate'; nation: string }
   | { kind: 'tradingPost'; fleet: number }
   | { kind: 'mission'; fleet?: number; party?: number }
-  | { kind: 'attack'; party: number; hex: number }
+  | { kind: 'attack'; party: number; hex: number; stance?: Stance }
+  | { kind: 'walls'; colony: string }
   | { kind: 'declareWar'; crown: CrownId }
   | { kind: 'charter'; colony: string }
   | { kind: 'festival'; colony: string }
   | { kind: 'taxRate'; rate: 'low' | 'normal' | 'high' }
   | { kind: 'choose'; index: number }
-  | { kind: 'retake'; party: number; free: string }
+  | { kind: 'retake'; party: number; free: string; stance?: Stance }
   | { kind: 'rivalPeace'; crown: CrownId }
-  | { kind: 'storm'; party: number; colony: string }
+  | { kind: 'storm'; party: number; colony: string; stance?: Stance }
   | { kind: 'dismissEvent' };
 
 let world: World | null = null;
@@ -124,15 +125,16 @@ const api = {
       case 'incorporate': result = G.incorporateNation(world, state, c.nation); break;
       case 'tradingPost': result = G.tradingPost(world, state, c.fleet); break;
       case 'mission': result = G.mission(world, state, { fleet: c.fleet, party: c.party }); break;
-      case 'attack': result = G.attackVillage(world, state, c.party, c.hex); break;
+      case 'attack': result = G.attackVillage(world, state, c.party, c.hex, c.stance); break;
+      case 'walls': result = G.buildWalls(state, c.colony); break;
       case 'declareWar': result = G.declareWar(state, c.crown); break;
       case 'charter': result = G.grantCharter(state, c.colony); break;
       case 'festival': result = G.holdFestival(state, c.colony); break;
       case 'taxRate': result = G.setTaxRate(state, c.rate); break;
       case 'choose': result = G.chooseStory(world, state, c.index); break;
-      case 'retake': result = G.retakeFree(state, c.party, c.free); break;
+      case 'retake': result = G.retakeFree(world, state, c.party, c.free, c.stance); break;
       case 'rivalPeace': result = G.rivalPeace(state, c.crown); break;
-      case 'storm': result = G.stormColony(world, state, c.party, c.colony); break;
+      case 'storm': result = G.stormColony(world, state, c.party, c.colony, c.stance); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
     return { result, state };

@@ -5,8 +5,11 @@ import {
   provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
   slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost, landParty, moveParty, boardParty, citySlots, slotsUsedIn,
   foundColony, upgradeColony, colonyTransfer, allyNation, incorporateNation, attackVillage, tradingPost, declareWar, rivalPeace, stormColony,
-  grantCharter, setTaxRate, chooseStory,
+  grantCharter, setTaxRate, chooseStory, buildWalls,
 } from './game';
+import { battleOdds, type Force } from './battle';
+import { T } from '../data/terrain';
+import type { UnitType } from './types';
 import { makeMarket, unitPrice, buyCost, sellValue } from './market';
 import { planRoute } from './sailing';
 import { OLD, NEW } from './hex';
@@ -605,7 +608,7 @@ describe('M6: native peoples', () => {
     st.met = true; st.contact = 0; st.epidemic = true; st.attitude = -90; st.warriors = 30;
     const hex = OLD.neighbors(n.siteHex).find((h) => world.old.terrain[h] > 1)!;
     state.colonies.push({ id: 'col-s', name: 'Testa', map: 'old', hex, founded: 0, pop: 2, level: 'outpost', stock: { food: 40 }, growth: 0, loyalty: 80,
-      charter: false, unrest: false, newcomers: 0, last: emptyAccount() });
+      charter: false, unrest: false, newcomers: 0, walls: 0, last: emptyAccount() });
     let besieged = false;
     for (let k = 0; k < 40 && state.colonies.length; k++) {
       seasonTick(world, state);
@@ -630,7 +633,7 @@ describe('M6: native peoples', () => {
     state.natives[other.id].met = true;
     const before = state.natives[other.id].attitude;
     for (let k = 0; k < 6; k++) state.units.push({ id: 800 + k, type: 'infantry', fleet: null, city: null, party: 700 });
-    state.parties.push({ id: 700, name: 'Test column', map: 'old', hex: OLD.neighbors(n.siteHex).find((h) => world.old.terrain[h] > 1)!, leader: null, moves: 3, order: null, trail: [] });
+    state.parties.push({ id: 700, name: 'Test column', map: 'old', hex: OLD.neighbors(n.siteHex).find((h) => world.old.terrain[h] > 1)!, leader: null, moves: 3, order: null, trail: [], food: 20 });
     state.natives[n.id].warriors = 6;
     let tries = 0;
     while (state.natives[n.id].relation !== 'subject' && tries++ < 6 && state.parties.length) attackVillage(world, state, 700, n.siteHex);
@@ -644,7 +647,7 @@ describe('M6: native peoples', () => {
     const st = state.natives[n.id];
     st.met = true; st.contact = 0; st.epidemic = true; st.attitude = -80; st.warriors = 30;
     state.colonies.push({ id: 'col-x', name: 'Test', map: 'old', hex: n.villages[0], founded: 0, pop: 4, level: 'outpost', stock: { food: 40, cloth: 40, wine: 40 }, growth: 0, loyalty: 80, charter: false, unrest: false,
-      newcomers: 0, last: emptyAccount() });
+      newcomers: 0, walls: 0, last: emptyAccount() });
     for (let k = 0; k < 8; k++) endTurn(world, state);
     expect(state.chronicle.some((c) => c.text.includes('raid Test'))).toBe(true);
   });
@@ -695,7 +698,7 @@ describe('M7: rival crowns', () => {
     state.units.push({ id: 901, type: 'colonist', fleet: null, city: null, party: 950 });
     const hex = g.within(rc.hex, 2).find((h) => world[rc.map].terrain[h] > 1 && h !== rc.hex && g.neighbors(h).some((j) => world[rc.map].terrain[j] <= 1))!;
     state.surveyed[rc.map][hex] = 1;
-    state.parties.push({ id: 950, name: 'P', map: rc.map, hex, leader: null, moves: 3, order: null, trail: [] });
+    state.parties.push({ id: 950, name: 'P', map: rc.map, hex, leader: null, moves: 3, order: null, trail: [], food: 20 });
     expect(canFound(world, state, state.parties[0]).why).toContain(rc.name);
   });
 
@@ -709,7 +712,7 @@ describe('M7: rival crowns', () => {
     const g = rc.map === 'old' ? OLD : NEW;
     const beside = g.neighbors(rc.hex).find((h) => world[rc.map].terrain[h] > 1)!;
     for (let k = 0; k < 10; k++) state.units.push({ id: 960 + k, type: 'infantry', fleet: null, city: null, party: 951 });
-    state.parties.push({ id: 951, name: 'Column', map: rc.map, hex: beside, leader: null, moves: 3, order: null, trail: [] });
+    state.parties.push({ id: 951, name: 'Column', map: rc.map, hex: beside, leader: null, moves: 3, order: null, trail: [], food: 20 });
     let tries = 0;
     while (state.rivalColonies.includes(rc) && state.units.some((u) => u.party === 951) && tries++ < 5) stormColony(world, state, 951, rc.id);
     expect(state.colonies.some((c) => c.name === rc.name) || tries > 0).toBe(true);
@@ -731,7 +734,7 @@ describe('M8: the long game', () => {
   const testColony = (state: ReturnType<typeof newGame>['state'], world: ReturnType<typeof newGame>['world'], pop = 8) => {
     const hex = [...Array(NEW.N).keys()].find((h) => world.new.terrain[h] > 1)!;
     const c = { id: 'col-t', name: 'Testa', map: 'new' as const, hex, founded: 0, pop, level: 'town' as const, stock: { food: 100, cloth: 100, wine: 100 }, growth: 0,
-      loyalty: 80, charter: false, unrest: false, newcomers: 0, last: emptyAccount() };
+      loyalty: 80, charter: false, unrest: false, newcomers: 0, walls: 0, last: emptyAccount() };
     state.colonies.push(c);
     return c;
   };
@@ -807,5 +810,60 @@ describe('M11 calendar', () => {
     state.turn = (1550 - 1492) * 4;
     endTurn(world, state);
     expect(state.turn).toBe((1551 - 1492) * 4);
+  });
+});
+
+describe('M12 armies', () => {
+  const army = (...types: UnitType[]): Force => ({ name: 'a', units: types.map((type) => ({ type, vet: 0 })) });
+  const warriors = (w: number): Force => ({ name: 'n', units: [], warriors: w, natives: true });
+
+  it('mixed arms beat the same number of pikes; firearms beat bows', () => {
+    const pikes = battleOdds(army('infantry', 'infantry', 'infantry', 'infantry'), warriors(10), T.Plains);
+    const bows = battleOdds(army('infantry', 'infantry', 'archer', 'archer'), warriors(10), T.Plains);
+    const guns = battleOdds(army('infantry', 'infantry', 'musketeer', 'musketeer'), warriors(10), T.Plains);
+    expect(bows).toBeGreaterThan(pikes);
+    expect(guns).toBeGreaterThanOrEqual(bows);
+  });
+
+  it('horse fights worse in forest than on the plains; walls hold until guns breach them', () => {
+    const horse = army('cavalry', 'cavalry', 'cavalry');
+    expect(battleOdds(horse, warriors(9), T.Plains)).toBeGreaterThan(battleOdds(horse, warriors(9), T.Forest));
+    const garrison = (walls: number): Force => ({ ...army('infantry', 'infantry', 'colonist', 'colonist'), walls });
+    const foot = army(...Array<UnitType>(5).fill('infantry'));
+    expect(battleOdds(foot, garrison(2), T.Plains)).toBeLessThan(battleOdds(foot, garrison(0), T.Plains));
+    const guns = army(...Array<UnitType>(3).fill('infantry'), 'cannon', 'cannon');
+    expect(battleOdds(guns, garrison(2), T.Plains)).toBeGreaterThan(battleOdds(foot, garrison(2), T.Plains));
+  });
+
+  it('an attack on a village gives a report, and survivors of a victory become veterans', () => {
+    const { world, state } = newGame(1492);
+    const n = world.old.nations.find((x) => !x.empire)!;
+    state.natives[n.id].warriors = 4;
+    for (let k = 0; k < 5; k++) state.units.push({ id: 880 + k, type: k < 3 ? 'swordsman' : 'musketeer', fleet: null, city: null, party: 701 });
+    state.parties.push({ id: 701, name: 'Column', map: 'old', hex: OLD.neighbors(n.siteHex).find((h) => world.old.terrain[h] > 1)!, leader: null, moves: 3, order: null, trail: [], food: 20 });
+    attackVillage(world, state, 701, n.siteHex);
+    const ev = state.events.find((e) => e.kind === 'battle');
+    expect(ev?.battle?.rounds.length).toBe(3);
+    if (ev?.battle?.attackerWon) expect(state.units.filter((u) => u.party === 701 || u.colony).some((u) => (u.vet ?? 0) > 0)).toBe(true);
+  });
+
+  it('an army without food starves; one beside its colony restocks', () => {
+    const { world, state } = newGame(1492);
+    const hex = [...Array(OLD.N).keys()].find((h) => world.old.terrain[h] === T.Desert)!;
+    for (let k = 0; k < 8; k++) state.units.push({ id: 890 + k, type: 'infantry', fleet: null, city: null, party: 702 });
+    state.parties.push({ id: 702, name: 'Column', map: 'old', hex, leader: null, moves: 3, order: null, trail: [], food: 0 });
+    seasonTick(world, state);
+    expect(state.units.filter((u) => u.party === 702).length).toBeLessThan(8);
+  });
+
+  it('walls are raised with materials from the warehouse', () => {
+    const { world, state } = newGame(1492);
+    state.colonies.push({ id: 'col-w', name: 'Murada', map: 'new', hex: 5, founded: 0, pop: 4, level: 'outpost', stock: { timber: 40 }, growth: 0, loyalty: 80,
+      charter: false, unrest: false, newcomers: 0, walls: 0, last: emptyAccount() });
+    void world;
+    expect(buildWalls(state, 'col-w').ok).toBe(true);
+    expect(state.colonies[0].walls).toBe(1);
+    expect(state.colonies[0].stock.timber).toBe(10);
+    expect(buildWalls(state, 'col-w').ok).toBe(false); // no stone
   });
 });

@@ -12,7 +12,9 @@ import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { planRoute, stepCost } from './sailing';
 import { LEVELS } from './colony';
 import { personById, skill } from './court';
-import { Fog, seasonOf, emptyAccount, type Colony, type Fleet, type GameEvent, type GameState, type MapId, type Party, type RivalColony, type RivalShip, type RivalState, type World } from './types';
+import { fight, casualties, recordLosses, blood, partyForce, assaultColony, rivalGarrison, type Force } from './battle';
+import { isMilitary } from '../data/army';
+import { Fog, seasonOf, yearOf, emptyAccount, type Stance, type Colony, type Fleet, type GameEvent, type GameState, type MapId, type Party, type RivalColony, type RivalShip, type RivalState, type World } from './types';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -176,9 +178,9 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
       // raids on colonies near theirs
       for (const c of s.colonies) {
         if (!s.rivalColonies.some((x) => x.crown === spec.id && x.map === c.map && GRIDS[c.map].distance(x.hex, c.hex) <= 12) || rng() > 0.2) continue;
-        const garrison = s.units.filter((u) => u.colony === c.id && u.type === 'infantry').length;
-        const win = rng() < 7 / (7 + garrison * 4 + c.pop * 0.6 + 1);
-        if (win) {
+        const raiders = Math.min(6, 2 + Math.floor((s.turn - (r.warSince ?? s.turn)) / 8));
+        const out = assaultColony(s, c, { name: spec.name, units: rivalGarrison(raiders, 0, yearOf(s.turn)), crown: spec.id }, w[c.map].terrain[c.hex], rng);
+        if (out.win) {
           if (c.pop > 1) c.pop--;
           for (const k of Object.keys(c.stock) as (keyof Colony['stock'])[]) c.stock[k] = Math.floor((c.stock[k] ?? 0) / 2);
           log('peril', `${spec.people[0].toUpperCase()}${spec.people.slice(1)} raid ${c.name}: a colonist is killed and the warehouse plundered.`);
@@ -289,30 +291,46 @@ export function makePeace(s: GameState, crown: CrownId): Result {
   return { ok: true, message: `Peace with ${rivalSpec(crown).name}, for ${cost} ducats.` };
 }
 
-export const rivalColonyDefence = (c: RivalColony) => c.garrison * 4 + c.pop + (c.level === 'town' ? 4 : c.level === 'city' ? 8 : 0);
+/** A rival colony's defenders: its garrison companies, its settlers, and walls for a town or city. */
+export function rivalForce(s: GameState, c: RivalColony): Force {
+  return { name: c.name, units: rivalGarrison(c.garrison, c.pop, yearOf(s.turn)), walls: c.level === 'town' ? 1 : c.level === 'city' ? 2 : 0, crown: c.crown };
+}
 
 /** Storm a rival colony beside the party. If it falls, it becomes yours. */
-export function stormColony(_w: World, s: GameState, p: Party, colonyId: string, strength: number, rng: Rng, log: Log, ev: Ev): Result {
+export function stormColony(w: World, s: GameState, p: Party, colonyId: string, rng: Rng, log: Log, ev: Ev, stance: Stance = 'assault'): Result {
   const c = s.rivalColonies.find((x) => x.id === colonyId);
   if (!c) return fail('No such colony.');
   const g = GRIDS[p.map];
   if (c.map !== p.map || (c.hex !== p.hex && !g.neighbors(p.hex).includes(c.hex))) return fail('The party must stand beside the colony.');
+  const mine = partyForce(s, p);
+  if (!mine.units.length) return fail('The party has no one who can fight.');
   const r = s.rivals[c.crown];
   const spec = rivalSpec(c.crown);
   if (r.relation !== 'war') { r.relation = 'war'; r.warSince = s.turn; r.attitude = Math.min(r.attitude, -70); log('peril', `The attack on ${c.name} means war with ${spec.name}.`); }
-  const d = rivalColonyDefence(c);
+  const theirs = rivalForce(s, c);
+  const out = fight(rng, mine, theirs, w[c.map].terrain[c.hex], stance);
   const units = s.units.filter((u) => u.party === p.id);
-  if (rng() < strength / (strength + d)) {
+  const dead = casualties(rng, units, out.atkLoss);
+  s.units = s.units.filter((u) => !dead.includes(u));
+  recordLosses(out.report.attacker, dead);
+  const theirDead = casualties(rng, theirs.units, out.defLoss);
+  recordLosses(out.report.defender, theirDead);
+  const who = personById(s, p.leader)?.name ?? p.name;
+  if (out.attackerWon) {
     s.rivalColonies = s.rivalColonies.filter((x) => x !== c);
+    const settlers = Math.max(1, c.pop - theirDead.filter((u) => u.type === 'colonist').length);
     const col: Colony = {
-      id: `col-${s.nextId++}`, name: c.name, map: c.map, hex: c.hex, founded: s.turn, pop: Math.max(1, Math.round(c.pop * 0.7)), level: c.level,
-      stock: { food: 10 }, growth: 0, loyalty: 50, charter: false, unrest: false, newcomers: 0, last: emptyAccount(),
+      id: `col-${s.nextId++}`, name: c.name, map: c.map, hex: c.hex, founded: s.turn, pop: Math.max(1, Math.round(settlers * 0.8)), level: c.level,
+      stock: { food: 10 }, growth: 0, loyalty: 50, charter: false, unrest: false, newcomers: 0, walls: theirs.walls ?? 0, last: emptyAccount(),
     };
     s.colonies.push(col);
-    for (const u of units) if (u.type === 'infantry') { u.party = null; u.colony = col.id; }
+    const survivors = s.units.filter((u) => u.party === p.id);
+    blood(survivors);
+    for (const u of survivors) if (isMilitary(u.type)) { u.party = null; u.colony = col.id; }
     s.prestige += 15;
-    log('peril', `${c.name} falls to ${me(s)}. Its settlers stay on under a new flag.`);
-    ev({ kind: 'people', title: `${c.name} taken`, map: c.map, hex: c.hex, text: `The colony of ${spec.name} at ${c.name} has fallen. It is yours now, with ${col.pop} of its settlers. ${spec.name} will want it back.` });
+    const text = `${who} storms ${c.name}. The colony of ${spec.name} is yours now, with ${col.pop} of its settlers, and the soldiers stay on as its garrison. ${spec.name} will want it back.`;
+    log('peril', text);
+    ev({ kind: 'battle', title: `${c.name} taken`, map: c.map, hex: c.hex, text, battle: out.report });
     if (!s.units.some((u) => u.party === p.id)) {
       const l = personById(s, p.leader);
       s.parties = s.parties.filter((x) => x !== p);
@@ -320,10 +338,10 @@ export function stormColony(_w: World, s: GameState, p: Party, colonyId: string,
     }
     return { ok: true };
   }
-  const dead = units.slice(0, Math.max(1, Math.round(units.length * 0.5)));
-  s.units = s.units.filter((u) => !dead.includes(u));
-  c.garrison = Math.max(1, c.garrison - (rng() < 0.5 ? 1 : 0));
-  log('peril', `The assault on ${c.name} fails. ${dead.length} unit${dead.length > 1 ? 's are' : ' is'} lost.`);
+  c.garrison = Math.max(1, c.garrison - theirDead.filter((u) => u.type !== 'colonist').length);
+  const text = `The assault on ${c.name} fails.${dead.length ? ` ${dead.length} compan${dead.length > 1 ? 'ies are' : 'y is'} lost.` : ''}`;
+  log('peril', text);
+  ev({ kind: 'battle', title: `Beaten back at ${c.name}`, map: c.map, hex: c.hex, text, battle: out.report });
   return { ok: true };
 }
 

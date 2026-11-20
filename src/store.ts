@@ -7,7 +7,7 @@ import { SAVE_KEY, LEGACY_KEY, STALE_KEYS, wrap, fromLegacy, readSave, type Load
 import type { SimApi, Command } from './sim/worker';
 import type { CrownId } from './data/rivals';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
-import { prevTurnStart } from './sim/types';
+import { prevTurnStart, type Stance } from './sim/types';
 import type { MovePreview } from './sim/game';
 
 const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' }));
@@ -31,6 +31,8 @@ interface Store {
   selectedParty: number | null;
   /** choosing where the selected fleet puts its people ashore */
   landing: { leader: boolean } | null;
+  /** how your armies attack: hard, or holding back */
+  stance: Stance;
   selectedPort: string | null;
   selectedColony: string | null;
   preview: Preview | null;
@@ -121,7 +123,7 @@ export const useStore = create<Store>((set, get) => {
     set({ phase: 'menu', world: null, game: null, saveProblem: 'The voyage could not be started. Try again, or try another world seed.' });
   };
   return {
-    phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, selectedPort: null, selectedColony: null, preview: null,
+    phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, stance: 'assault', selectedPort: null, selectedColony: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false, showSettings: false,
     drawer: null, courtTab: 'people', dismissed: [], toast: null, busy: false,
 

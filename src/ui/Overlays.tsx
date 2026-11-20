@@ -8,6 +8,7 @@ import { getView } from './MapCanvas';
 import { standings } from '../sim/empire';
 import { portById } from '../sim/game';
 import { crownSpec } from '../data/rivals';
+import { BattleReportView } from './Battle';
 
 function FinalStandings() {
   const game = useStore((s) => s.game)!;
@@ -38,8 +39,9 @@ export function EventCard() {
   return (
     <div className="modal-back">
       <div className={`modal event ${ev.kind}`} role="dialog" aria-label={ev.title}>
-        <img className="event-art" src={spriteUrl(art)} alt="" />
+        {!ev.battle && <img className="event-art" src={spriteUrl(art)} alt="" />}
         <h2>{ev.title}</h2>
+        {ev.battle && <BattleReportView r={ev.battle} />}
         <p className="event-text">{ev.text}</p>
         {ev.kind === 'end' && <FinalStandings />}
         {ev.choices ? (

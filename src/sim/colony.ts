@@ -252,7 +252,7 @@ export function foundColony(world: World, s: GameState, p: Party): Result & { co
   const c: Colony = {
     id: `col-${s.nextId++}`, name: free.length ? pick(rng, free) : `Colonia ${s.colonies.length + 1}`, map: p.map, hex: p.hex,
     founded: s.turn, pop: colonists.length, level: 'outpost', stock: { food: 4 }, growth: 0, loyalty: 85, charter: false, unrest: false,
-    newcomers: 0, last: emptyAccount(),
+    newcomers: 0, walls: 0, last: emptyAccount(),
   };
   s.units = s.units.filter((u) => !colonists.includes(u));
   for (const u of s.units) if (u.party === p.id) { u.party = null; u.colony = c.id; }

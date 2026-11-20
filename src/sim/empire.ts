@@ -5,7 +5,9 @@ import { mulberry32, hashSeed, int } from './rng';
 import { LEVELS, score } from './colony';
 import { rivalScore } from './rivals';
 import { rivalsOf, rivalSpec } from '../data/rivals';
-import { yearOf, emptyAccount, type Colony, type GameEvent, type GameState, type World, type Party } from './types';
+import { fight, casualties, recordLosses, blood, partyForce, type Force } from './battle';
+import { isMilitary } from '../data/army';
+import { yearOf, emptyAccount, type Stance, type Colony, type GameEvent, type GameState, type World, type Party } from './types';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -20,7 +22,7 @@ export const colonyTaxes = (s: GameState, c: Colony) => Math.round(c.pop * TAX[s
 /** What a colony's loyalty drifts toward, and why. */
 export function loyaltyFactors(s: GameState, c: Colony): { label: string; value: number }[] {
   const years = (s.turn - c.founded) / 4;
-  const garrison = s.units.filter((u) => u.colony === c.id && u.type === 'infantry').length;
+  const garrison = s.units.filter((u) => u.colony === c.id && isMilitary(u.type)).length;
   const f: { label: string; value: number }[] = [
     { label: 'Settlers loyal to you', value: 75 },
     { label: 'Generations born overseas', value: -Math.min(30, Math.floor(years / 25) * 8) },
@@ -82,7 +84,7 @@ export function empireSeason(w: World, s: GameState, log: Log, ev: Ev) {
     c.unrest = c.loyalty < 30;
     if (c.unrest && !wasUnrest) log('peril', `Unrest in ${c.name}: the settlers grumble against your officers, and work slows.`);
     if (c.loyalty < 15 && c.pop >= 6 && rng() < 0.12) {
-      const garrison = s.units.filter((u) => u.colony === c.id && u.type === 'infantry').length;
+      const garrison = s.units.filter((u) => u.colony === c.id && isMilitary(u.type)).length;
       const rebels = c.pop * 0.8;
       if (rng() < (garrison * 4) / (garrison * 4 + rebels)) {
         c.pop = Math.max(1, c.pop - 1);
@@ -125,28 +127,49 @@ export function standings(w: World, s: GameState) {
   ].sort((a, b) => b.total - a.total);
 }
 
-/** Retake a colony that broke away. */
-export function retake(s: GameState, p: Party, freeId: string, strength: number, log: Log): Result {
+/** Retake a colony that broke away: its settlers fight for their freedom behind whatever walls they have. */
+export function retake(w: World, s: GameState, p: Party, freeId: string, log: Log, ev: (e: GameEvent) => void, stance: Stance = 'assault'): Result {
   const f = s.freeStates.find((x) => x.id === freeId);
   if (!f) return fail('No such place.');
   const g = GRIDS[p.map];
   if (f.map !== p.map || (f.hex !== p.hex && !g.neighbors(p.hex).includes(f.hex))) return fail('The party must stand beside it.');
+  const mine = partyForce(s, p);
+  if (!mine.units.length) return fail('The party has no one who can fight.');
   const rng = mulberry32(hashSeed(s.seed, s.turn, f.hex, 92));
-  const d = f.pop * 1.5 + (f.level === 'town' ? 4 : f.level === 'city' ? 8 : 0);
+  const theirs = freeForce(f);
+  const out = fight(rng, mine, theirs, w[f.map].terrain[f.hex], stance);
   const units = s.units.filter((u) => u.party === p.id);
-  if (rng() < strength / (strength + d)) {
+  const dead = casualties(rng, units, out.atkLoss);
+  s.units = s.units.filter((u) => !dead.includes(u));
+  recordLosses(out.report.attacker, dead);
+  recordLosses(out.report.defender, casualties(rng, theirs.units, out.defLoss));
+  if (out.attackerWon) {
     s.freeStates = s.freeStates.filter((x) => x !== f);
     s.colonies.push({
       id: `col-${s.nextId++}`, name: f.name, map: f.map, hex: f.hex, founded: s.turn, pop: Math.max(1, Math.round(f.pop * 0.8)), level: f.level,
-      stock: { food: 10 }, growth: 0, loyalty: 35, charter: false, unrest: true, newcomers: 0, last: emptyAccount(),
+      stock: { food: 10 }, growth: 0, loyalty: 35, charter: false, unrest: true, newcomers: 0, walls: 0, last: emptyAccount(),
     });
-    for (const u of units) if (u.type === 'infantry') { u.party = null; u.colony = s.colonies[s.colonies.length - 1].id; }
+    const survivors = s.units.filter((u) => u.party === p.id);
+    blood(survivors);
+    for (const u of survivors) if (isMilitary(u.type)) { u.party = null; u.colony = s.colonies[s.colonies.length - 1].id; }
     if (!s.units.some((u) => u.party === p.id)) s.parties = s.parties.filter((x) => x !== p);
-    log('peril', `Royal soldiers retake ${f.name}. Its settlers submit, sullenly.`);
+    const text = `Royal soldiers retake ${f.name}. Its settlers submit, sullenly.`;
+    log('peril', text);
+    ev({ kind: 'battle', title: `${f.name} retaken`, map: f.map, hex: f.hex, text, battle: out.report });
     return { ok: true };
   }
-  const dead = units.slice(0, Math.max(1, Math.round(units.length * 0.5)));
-  s.units = s.units.filter((u) => !dead.includes(u));
-  log('peril', `The free settlers of ${f.name} beat back the royal soldiers.`);
+  const text = `The free settlers of ${f.name} beat back the royal soldiers.`;
+  log('peril', text);
+  ev({ kind: 'battle', title: `Beaten back at ${f.name}`, map: f.map, hex: f.hex, text, battle: out.report });
   return { ok: true };
+}
+
+/** A free state's defenders: armed settlers, a militia of pikes, and walls if it was a town. */
+export function freeForce(f: GameState['freeStates'][number]): Force {
+  const militia = Math.floor(f.pop / 3);
+  const units = [
+    ...Array.from({ length: militia }, () => ({ type: 'infantry' as const, vet: 0 })),
+    ...Array.from({ length: f.pop }, () => ({ type: 'colonist' as const, vet: 0 })),
+  ];
+  return { name: f.name, units, walls: f.level === 'town' ? 1 : f.level === 'city' ? 2 : 0 };
 }

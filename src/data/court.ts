@@ -29,6 +29,11 @@ export const RANK_INFO: Record<Rank, { name: string; cost: number; ready: number
 
 export const UNIT_INFO: Record<UnitType, { name: string; sprite: string; blurb: string }> = {
   colonist: { name: 'Colonist', sprite: 'units/colonist', blurb: 'Settlers: they found colonies (with timber and tools) and work the land there.' },
-  infantry: { name: 'Infantry', sprite: 'units/pikeman', blurb: 'Soldiers to protect an expedition ashore, or to conquer.' },
   missionary: { name: 'Missionary', sprite: 'units/friar', blurb: 'Friars who will found missions among native peoples.' },
+  infantry: { name: 'Pikemen', sprite: 'units/pikeman', blurb: 'The backbone of an army: they hold the line in melee, and horse cannot ride them down.' },
+  swordsman: { name: 'Swordsmen', sprite: 'units/conquistador', blurb: 'Sword and buckler men: the hardest hitters hand to hand, at home in forest and jungle.' },
+  archer: { name: 'Crossbowmen', sprite: 'units/scout', blurb: 'They shoot first: strong in the fire round, weak if the enemy closes.' },
+  musketeer: { name: 'Arquebusiers', sprite: 'units/musketeer', blurb: 'Firearms: the strongest fire of any foot, and terrifying to those who have never heard a shot.' },
+  cavalry: { name: 'Lancers', sprite: 'units/cavalry', blurb: 'Horse: a crushing charge and a deadly pursuit on open ground; poor in forest and hills. Eats double.' },
+  cannon: { name: 'Field guns', sprite: 'units/cannon', blurb: 'Breach walls and break a line from afar. Slow, and helpless if caught.' },
 };

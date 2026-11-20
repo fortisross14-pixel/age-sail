@@ -20,10 +20,11 @@ import { mulberry32, hashSeed, int, type Rng } from './rng';
 import { maxMoves as baseMoves, crewNeeded, windwardOf as baseWindward, planRoute, stepCost, stormRisk, type RoutePlan } from './sailing';
 import { initialCourt, newPetitioners, leaderOf, personById, skill, salary, deathChance, ageOf } from './court';
 import { RANK_INFO, UNIT_INFO } from '../data/court';
+import { WALLS } from '../data/army';
 import {
   Fog, dateLabel, seasonOf, yearOf, nextTurnStart,
   type Fleet, type GameState, type World, type PortDef, type ChronicleEntry, type MapData, type ProjectKind, type GameEvent,
-  type Person, type UnitType, type TradeRoute, type Rank, type City,
+  type Person, type UnitType, type TradeRoute, type Rank, type City, type Stance,
 } from './types';
 export { leaderOf };
 
@@ -389,7 +390,8 @@ export function projectCost(p: ProjectKind, city: City, governor?: Person, edge?
     const spec = UNIT_SPECS[p.unit];
     const cost = Math.round(spec.cost * (edge?.unitCost?.[p.unit] ?? 1));
     if (spec.needs && city.buildings[spec.needs] < 1) return { cost, build: spec.build, allowed: false, why: `Needs ${BUILDINGS[spec.needs].name.toLowerCase()}.` };
-    const drilled = p.unit === 'infantry' && city.buildings.barracks >= 2;
+    if (spec.needs && spec.level && city.buildings[spec.needs] < spec.level) return { cost, build: spec.build, allowed: false, why: `Needs ${BUILDINGS[spec.needs].name.toLowerCase()} level ${spec.level}.` };
+    const drilled = spec.needs === 'barracks' && city.buildings.barracks >= 2;
     return { cost: Math.round(cost * (drilled ? 0.7 : 1)), build: Math.max(1, spec.build - (drilled ? 1 : 0)), allowed: true };
   }
   if (p.building === 'docks' && city.inland) return { cost: 0, build: 0, allowed: false, why: 'An inland city has no quay for docks.' };
@@ -606,20 +608,20 @@ export function mission(world: World, s: GameState, from: { fleet?: number; part
   return Nat.foundMission(world, s, { fleet: from.fleet != null ? fleetById(s, from.fleet) : undefined, party: from.party != null ? Land.partyById(s, from.party) : undefined });
 }
 
-export function attackVillage(world: World, s: GameState, partyId: number, hex: number): CommandResult {
+export function attackVillage(world: World, s: GameState, partyId: number, hex: number, stance: Stance = 'assault'): CommandResult {
   const p = Land.partyById(s, partyId);
   if (!p) return fail('No such party.');
-  return Nat.attack(world, s, p, hex, natRng(s, 3), (k, t) => log(s, k, t), (e) => event(s, e));
+  return Nat.attack(world, s, p, hex, natRng(s, 3), (k, t) => log(s, k, t), (e) => event(s, e), stance);
 }
 
 // ---------- rival crowns ----------
 
 export function declareWar(s: GameState, crown: CrownId): CommandResult { return Riv.declareWar(s, crown, (k, t) => log(s, k, t)); }
 export function rivalPeace(s: GameState, crown: CrownId): CommandResult { return Riv.makePeace(s, crown); }
-export function stormColony(world: World, s: GameState, partyId: number, colonyId: string): CommandResult {
+export function stormColony(world: World, s: GameState, partyId: number, colonyId: string, stance: Stance = 'assault'): CommandResult {
   const p = Land.partyById(s, partyId);
   if (!p) return fail('No such party.');
-  return Riv.stormColony(world, s, p, colonyId, Nat.partyStrength(s, p), natRng(s, 4), (k, t) => log(s, k, t), (e) => event(s, e));
+  return Riv.stormColony(world, s, p, colonyId, natRng(s, 4), (k, t) => log(s, k, t), (e) => event(s, e), stance);
 }
 
 // ---------- the empire ----------
@@ -628,10 +630,24 @@ export function grantCharter(s: GameState, colonyId: string): CommandResult { re
 export function holdFestival(s: GameState, colonyId: string): CommandResult { return Emp.festival(s, colonyId); }
 export function setTaxRate(s: GameState, rate: GameState['taxRate']): CommandResult { return Emp.setTaxRate(s, rate); }
 export function chooseStory(world: World, s: GameState, index: number): CommandResult { return Story.resolveStory(world, s, index, (k, t) => log(s, k, t)); }
-export function retakeFree(s: GameState, partyId: number, freeId: string): CommandResult {
+export function retakeFree(world: World, s: GameState, partyId: number, freeId: string, stance: Stance = 'assault'): CommandResult {
   const p = Land.partyById(s, partyId);
   if (!p) return fail('No such party.');
-  return Emp.retake(s, p, freeId, Nat.partyStrength(s, p), (k, t) => log(s, k, t));
+  return Emp.retake(world, s, p, freeId, (k, t) => log(s, k, t), (e) => event(s, e), stance);
+}
+
+/** Raise a colony's walls a level, with materials from its own warehouse. */
+export function buildWalls(s: GameState, colonyId: string): CommandResult {
+  const c = Col.colonyById(s, colonyId);
+  if (!c) return fail('No such colony.');
+  const next = (c.walls ?? 0) + 1;
+  const W = WALLS[next];
+  if (!W) return fail(`${c.name} already has a star fort.`);
+  if (next === 3 && c.level === 'outpost') return fail('A star fort needs a town at least.');
+  for (const [g, n] of Object.entries(W.needs)) if ((c.stock[g as GoodId] ?? 0) < (n as number)) return fail(`${W.name} need ${Object.entries(W.needs).map(([gg, nn]) => `${nn} ${GOOD_INFO[gg as GoodId].name.toLowerCase()}`).join(' and ')} in the warehouse.`);
+  for (const [g, n] of Object.entries(W.needs)) c.stock[g as GoodId] = (c.stock[g as GoodId] ?? 0) - (n as number);
+  c.walls = next;
+  return { ok: true, message: `${c.name} raises ${W.name.toLowerCase()}.` };
 }
 
 // ---------- colonies ----------
@@ -1217,7 +1233,8 @@ export function seasonTick(world: World, s: GameState): void {
       crossOcean(world, s, f.id);
     } else advance(world, s, f);
   }
-  // parties ashore march on
+  // parties ashore eat, forage or starve, then march on
+  for (const p of [...s.parties]) Land.supplyParty(world, s, p, landLog(s));
   for (const p of s.parties) {
     p.moves = Land.partyMaxMoves(s, p);
     p.trail = [p.hex];
