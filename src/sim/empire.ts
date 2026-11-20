@@ -5,7 +5,7 @@ import { mulberry32, hashSeed, int } from './rng';
 import { LEVELS, score } from './colony';
 import { rivalScore } from './rivals';
 import { rivalsOf, rivalSpec } from '../data/rivals';
-import { yearOf, type Colony, type GameEvent, type GameState, type World, type Party } from './types';
+import { yearOf, emptyAccount, type Colony, type GameEvent, type GameState, type World, type Party } from './types';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -138,7 +138,7 @@ export function retake(s: GameState, p: Party, freeId: string, strength: number,
     s.freeStates = s.freeStates.filter((x) => x !== f);
     s.colonies.push({
       id: `col-${s.nextId++}`, name: f.name, map: f.map, hex: f.hex, founded: s.turn, pop: Math.max(1, Math.round(f.pop * 0.8)), level: f.level,
-      stock: { food: 10 }, growth: 0, loyalty: 35, charter: false, unrest: true, last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false },
+      stock: { food: 10 }, growth: 0, loyalty: 35, charter: false, unrest: true, newcomers: 0, last: emptyAccount(),
     });
     for (const u of units) if (u.type === 'infantry') { u.party = null; u.colony = s.colonies[s.colonies.length - 1].id; }
     if (!s.units.some((u) => u.party === p.id)) s.parties = s.parties.filter((x) => x !== p);

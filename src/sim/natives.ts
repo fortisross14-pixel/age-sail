@@ -9,7 +9,8 @@ import { GOOD_INFO, type GoodId } from '../data/goods';
 import { GRIDS } from './hex';
 import { mulberry32, hashSeed, int, type Rng } from './rng';
 import { personById, skill } from './court';
-import type { Fleet, GameEvent, GameState, NationDef, NativeState, Party, World, MapId, Person } from './types';
+import type { Colony, Fleet, GameEvent, GameState, NationDef, NativeState, Party, World, MapId, Person } from './types';
+import { NATIVE, DEFENCE } from '../data/colony';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -39,6 +40,7 @@ export function nationAt(w: World, map: MapId, hex: number): NationDef | undefin
 export function initNatives(w: World): Record<string, NativeState> {
   return Object.fromEntries(allNations(w).map((n) => [n.id, {
     met: false, attitude: 10, relation: 'peace' as const, warriors: n.warriors, converted: 0, post: false, mission: false, lost: [], contact: null, epidemic: false,
+    memory: [], siege: null,
   }]));
 }
 
@@ -62,6 +64,38 @@ export function envoy(s: GameState): Person | undefined {
 }
 
 const clampAtt = (st: NativeState) => { st.attitude = Math.max(-100, Math.min(100, st.attitude)); };
+
+/**
+ * Change how a people feels about you, and remember why. Deeds of the same kind add up in one memory,
+ * so the player can read the reasons behind their mood: "settlers on our land", "the trading post".
+ */
+export function remember(s: GameState, st: NativeState, why: string, delta: number) {
+  const before = st.attitude;
+  st.attitude += delta;
+  clampAtt(st);
+  const d = st.attitude - before;
+  if (!d) return;
+  const m = st.memory.find((x) => x.why === why);
+  if (m) { m.amount += d; m.turn = s.turn; } else st.memory.push({ why, amount: d, turn: s.turn });
+  st.memory.sort((a, b) => b.turn - a.turn);
+  if (st.memory.length > 8) st.memory.length = 8;
+}
+
+/** The peoples whose land lies within two hexes of a colony. */
+export function neighbours(w: World, s: GameState, c: Colony): { n: NationDef; st: NativeState }[] {
+  const near = new Set(GRIDS[c.map].within(c.hex, 2));
+  return w[c.map].nations.filter((n) => s.natives[n.id] && territory(n).some((h) => near.has(h))).map((n) => ({ n, st: s.natives[n.id] }));
+}
+
+/** The people laying siege to a colony, if any. */
+export function besieging(w: World, s: GameState, c: Colony): NationDef | undefined {
+  return allNations(w).find((n) => s.natives[n.id]?.siege?.colony === c.id);
+}
+
+const soldiersIn = (s: GameState, c: Colony) => s.units.filter((u) => u.colony === c.id && u.type === 'infantry').length;
+/** A colony's strength behind its palisade: soldiers, settlers and walls. */
+export const palisade = (s: GameState, c: Colony) => soldiersIn(s, c) * DEFENCE.soldier + c.pop * DEFENCE.settler + DEFENCE.base
+  + (c.level === 'town' ? DEFENCE.town : c.level === 'city' ? DEFENCE.city : 0);
 const nameOf = (n: NationDef) => `the ${n.people}`;
 
 // ---------- strength and battle ----------
@@ -124,8 +158,7 @@ export function gift(w: World, s: GameState, id: string, ducats: number): Result
   const e = envoy(s);
   s.treasury -= ducats;
   const gain = (ducats / 25) * (1 + 0.15 * skill(e, 'diplomacy')) * (crownSpec(s.crown).edge.gifts ?? 1);
-  x.st.attitude += gain;
-  clampAtt(x.st);
+  remember(s, x.st, 'Your gifts', gain);
   return { ok: true, message: `${e?.name ?? 'Your envoy'} brings gifts to ${nameOf(x.n)}. They are ${moodOf(x.st)} now.` };
 }
 
@@ -139,7 +172,7 @@ export function proposeAlliance(w: World, s: GameState, id: string, rng: Rng): R
     x.st.relation = 'allied';
     return { ok: true, message: `${nameOf(x.n)} agree to an alliance, negotiated by ${e?.name ?? 'your envoy'}.` };
   }
-  x.st.attitude -= 5;
+  remember(s, x.st, 'An alliance pressed on them too soon', -5);
   return fail(`${nameOf(x.n)} turn the alliance down, for now.`);
 }
 
@@ -161,7 +194,7 @@ export function incite(w: World, s: GameState, id: string, targetId: string, rng
     win.warriors = Math.max(1, Math.round(win.warriors * (1 - r.winnerLoss * 0.5)));
     lose.warriors = Math.max(1, Math.round(lose.warriors * (1 - r.loserLoss * 0.5)));
     log('court', `${nameOf(x.n)} raid their old rivals ${nameOf(t)} with the arms you gave them, and ${r.win ? 'win' : 'are beaten back'}. Both peoples are weaker for it.`);
-    if (rng() < 0.25) { ts.attitude -= 30; clampAtt(ts); log('peril', `${nameOf(t)} learn who armed their enemies. They will not forget.`); }
+    if (rng() < 0.25) { remember(s, ts, `You armed ${nameOf(x.n)} against them`, -30); log('peril', `${nameOf(t)} learn who armed their enemies. They will not forget.`); }
     return { ok: true };
   }
   return fail(`${nameOf(x.n)} take the gifts, but do not go to war.`);
@@ -201,8 +234,7 @@ export function tradingPost(w: World, s: GameState, f: Fleet): Result {
   for (const [g, q] of needs) if ((f.cargo[g] ?? 0) < q) return fail(`A trading post needs ${needs.map(([gg, qq]) => `${qq} ${GOOD_INFO[gg].name.toLowerCase()}`).join(' and ')} in the hold.`);
   for (const [g, q] of needs) { f.cargo[g] = (f.cargo[g] ?? 0) - q; if (!f.cargo[g]) delete f.cargo[g]; }
   st.post = true;
-  st.attitude += 10;
-  clampAtt(st);
+  remember(s, st, 'The trading post', 10);
   s.prestige += 5;
   return { ok: true, message: `A trading post rises beside the ground of ${nameOf(n)}. Trade will grow.` };
 }
@@ -244,7 +276,7 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
   const firstWar = st.relation !== 'war';
   st.relation = 'war';
   st.met = true;
-  for (const [id, o] of Object.entries(s.natives)) if (id !== n.id && o.met && o.relation !== 'subject') { o.attitude -= 10; clampAtt(o); }
+  for (const [id, o] of Object.entries(s.natives)) if (id !== n.id && o.met && o.relation !== 'subject') remember(s, o, `You made war on ${nameOf(n)}`, -10);
   const r = battle(rng, a, d);
   const leader = personById(s, p.leader);
   const who = leader?.name ?? p.name;
@@ -252,7 +284,7 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
     const dead = killUnits(s, p, r.winnerLoss * 0.6, rng);
     st.warriors = Math.max(0, Math.round(st.warriors * (1 - r.loserLoss)));
     st.lost.push(hex);
-    st.attitude = Math.max(-100, st.attitude - 40);
+    remember(s, st, 'You burned their villages', -40);
     const all = [n.siteHex, ...n.villages].every((h) => st.lost.includes(h));
     const loss = dead.length ? ` The party loses ${dead.join(', ')}.` : '';
     if (hex === n.siteHex || all || st.warriors < 3) {
@@ -270,7 +302,7 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
   }
   const dead = killUnits(s, p, r.loserLoss, rng);
   st.warriors = Math.max(1, Math.round(st.warriors * (1 - r.winnerLoss * 0.5)));
-  st.attitude = Math.max(-100, st.attitude - 30);
+  remember(s, st, 'You attacked them', -30);
   let msg = `${nameOf(n)} beat back ${who}’s attack.${dead.length ? ` The party loses ${dead.join(', ')}.` : ''}`;
   if (leader && !s.units.some((u) => u.party === p.id) && rng() < 0.5) {
     leader.alive = false;
@@ -281,6 +313,47 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
   log('peril', msg);
   if (firstWar) ev({ kind: 'lost', title: 'Repulsed', map: n.map, hex, text: msg });
   return { ok: true };
+}
+
+// ---------- sieges ----------
+
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** A season of siege: one assault on the palisade. The colony can fall, and burn. */
+function siegeSeason(s: GameState, n: NationDef, st: NativeState, rng: Rng, log: Log, ev: Ev) {
+  const c = s.colonies.find((x) => x.id === st.siege!.colony);
+  if (!c) { st.siege = null; return; }
+  const who = cap(nameOf(n));
+  const r = battle(rng, st.warriors * NATIVE.assault, palisade(s, c));
+  if (r.win) {
+    const dead = Math.min(c.pop, c.pop >= 6 ? 2 : 1);
+    c.pop -= dead;
+    for (const k of Object.keys(c.stock) as GoodId[]) c.stock[k] = Math.floor((c.stock[k] ?? 0) / 2);
+    const soldier = s.units.find((u) => u.colony === c.id && u.type === 'infantry');
+    if (soldier && rng() < 0.5) s.units = s.units.filter((u) => u !== soldier);
+    st.warriors = Math.max(1, Math.round(st.warriors * (1 - r.winnerLoss * 0.5)));
+    if (c.pop <= 0) {
+      s.colonies = s.colonies.filter((x) => x !== c);
+      s.units = s.units.filter((u) => u.colony !== c.id);
+      for (const f of s.fleets) if (f.at === c.id) f.at = null;
+      st.siege = null;
+      remember(s, st, `Vengeance taken at ${c.name}`, 25);
+      log('peril', `${who} storm the palisade of ${c.name} and burn it to the ground. No one is left.`);
+      ev({ kind: 'lost', title: `${c.name} is burned`, map: c.map, hex: c.hex,
+        text: `${who} broke into ${c.name} at dawn. The houses and the warehouse are ashes, the settlers dead or carried off. The coast is theirs again.` });
+      return;
+    }
+    log('peril', `${who} break into ${c.name}: ${dead} settler${dead > 1 ? 's' : ''} killed and the warehouse plundered before they are driven out. ${c.pop} left.`);
+  } else {
+    st.warriors = Math.max(1, Math.round(st.warriors * (1 - r.loserLoss * 0.4)));
+    log('peril', `${who} throw themselves at the palisade of ${c.name} and are beaten back.`);
+  }
+  // they go home when the siege has cost too much, when tempers cool, or for their own harvest
+  const tooLong = s.turn - st.siege!.since >= NATIVE.siegeSeasons;
+  if (st.warriors < NATIVE.siegeWarriors / 2 || (st.relation !== 'war' && st.attitude > NATIVE.hostile) || tooLong) {
+    st.siege = null;
+    log('peril', `${who} lift the siege of ${c.name} and melt back into the forest.${tooLong ? ' Their own fields need them.' : ''}`);
+  }
 }
 
 // ---------- the season ----------
@@ -300,45 +373,63 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
     if (st.contact == null) st.contact = s.turn;
     // attitude drifts back toward wary neutrality
     st.attitude += st.attitude > 5 ? -0.5 : st.attitude < -5 ? 1 : 0;
-    if (st.post) st.attitude += 1;
+    for (const m of st.memory) m.amount *= NATIVE.memoryFade;
+    st.memory = st.memory.filter((m) => Math.abs(m.amount) >= 1);
+    if (st.post) remember(s, st, 'The trading post', 1);
     if (st.mission) {
-      st.attitude += 1;
+      remember(s, st, 'The friars of the mission', 1);
       if (st.converted < 1) {
         st.converted = Math.min(1, st.converted + 0.035);
         if (st.converted >= 1) log('court', `The mission among ${nameOf(n)} has won most of them over. They might join your realm, if asked.`);
       }
     }
-    // colonies on their land
-    for (const c of s.colonies) {
-      if (c.map !== n.map || !g.within(c.hex, 2).some((h) => land.has(h))) continue;
+    // colonies on their land wear them down; friends trade them food
+    const near = s.colonies.filter((c) => c.map === n.map && g.within(c.hex, 2).some((h) => land.has(h)));
+    for (const c of near) {
       const k = st.relation === 'allied' ? 0.5 : st.post || st.mission ? 1 : 2.5;
-      st.attitude -= k;
+      if (st.relation !== 'subject') remember(s, st, `Settlers at ${c.name} on their land`, -k);
+      const friendly = st.relation === 'allied' || st.relation === 'subject' || (st.relation === 'peace' && st.attitude >= NATIVE.friendly);
+      if (friendly && !st.siege) c.stock.food = (c.stock.food ?? 0) + (st.relation === 'peace' ? NATIVE.friendFood : NATIVE.allyFood);
     }
-    clampAtt(st);
     // sickness: some seasons after first contact, an epidemic
     if (!st.epidemic && s.turn - st.contact >= 4 + (hashSeed(s.seed, n.siteHex) % 5)) {
       st.epidemic = true;
       const before = st.warriors;
       st.warriors = Math.max(1, Math.round(st.warriors * 0.6));
+      remember(s, st, 'The sickness that came with your ships', -8);
       log('peril', `Sickness brought by the strangers’ ships spreads among ${nameOf(n)}. Many die, old and young; ${before - st.warriors} of their warriors among them.`);
     }
     // slow recovery
     if (st.relation !== 'subject' && s.turn % 4 === 0 && st.warriors < n.warriors) st.warriors = Math.min(n.warriors, st.warriors + 1);
     // tribute from subjects
     if (st.relation === 'subject') s.treasury += Math.round(st.warriors * 4 + 20);
+    // a siege under way: an assault each season, until the colony falls or they give up
+    if (st.siege) {
+      siegeSeason(s, n, st, rng, log, _ev);
+      continue;
+    }
     if (!isHostile(st) || st.warriors < 2) continue;
-    // raids on colonies near their land
-    for (const c of s.colonies) {
-      if (c.map !== n.map || !g.within(c.hex, 4).some((h) => land.has(h)) || rng() > 0.3) continue;
-      const garrison = s.units.filter((u) => u.colony === c.id && u.type === 'infantry').length;
-      const r = battle(rng, st.warriors * 0.5, garrison * 4 + c.pop * 0.6 + 1);
+    // furious and strong: lay siege to the weakest colony near their land
+    const reach = s.colonies.filter((c) => c.map === n.map && g.within(c.hex, 4).some((h) => land.has(h)));
+    if ((st.attitude <= NATIVE.furious || st.relation === 'war') && st.warriors >= NATIVE.siegeWarriors && reach.length && rng() < NATIVE.siegeChance) {
+      const c = [...reach].sort((x, y) => palisade(s, x) - palisade(s, y))[0];
+      st.siege = { colony: c.id, since: s.turn };
+      log('peril', `${cap(nameOf(n))} surround ${c.name} with ${st.warriors} warriors. Nobody can leave the palisade to work the fields.`);
+      _ev({ kind: 'lost', title: `${c.name} besieged`, map: c.map, hex: c.hex,
+        text: `${cap(nameOf(n))} have had enough of the strangers. Their warriors surround ${c.name}: the fields go untended and every season they will try the palisade. Send soldiers and food by sea, make peace, or the colony may be burned.` });
+      continue;
+    }
+    // otherwise they raid colonies near their land
+    for (const c of reach) {
+      if (rng() > 0.3) continue;
+      const r = battle(rng, st.warriors * 0.5, palisade(s, c));
       if (r.win) {
         if (c.pop > 1) c.pop--;
         for (const k of Object.keys(c.stock) as GoodId[]) c.stock[k] = Math.floor((c.stock[k] ?? 0) / 2);
-        log('peril', `${nameOf(n)} raid ${c.name}: a colonist is killed and the warehouse plundered.`);
+        log('peril', `${cap(nameOf(n))} raid ${c.name}: a colonist is killed and the warehouse plundered.`);
       } else {
         st.warriors = Math.max(1, st.warriors - 2);
-        log('peril', `${nameOf(n)} raid ${c.name}, but the settlers drive them off.`);
+        log('peril', `${cap(nameOf(n))} raid ${c.name}, but the settlers drive them off.`);
       }
     }
     // ambushes on parties in their land

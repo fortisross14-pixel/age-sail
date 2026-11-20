@@ -82,3 +82,6 @@ export const rivalSpec = (id: CrownId) => CROWNS.find((r) => r.id === id)!;
 export const crownSpec = rivalSpec;
 /** The four crowns you are not playing. */
 export const rivalsOf = (me: CrownId) => CROWNS.filter((c) => c.id !== me);
+
+/** A rival colony gains a settler from home every this many seasons (yours grow by the ships you send). */
+export const RIVAL_SETTLERS_EVERY = 8;

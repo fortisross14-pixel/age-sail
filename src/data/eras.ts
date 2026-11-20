@@ -12,10 +12,16 @@ export const eraAt = (year: number) => [...ERAS].reverse().find((e) => year >= e
 export const eraIndex = (year: number) => ERAS.indexOf(eraAt(year));
 
 export const GAME_LENGTHS = [
-  { id: 'short', name: 'Short', until: 1550, blurb: 'The age of discovery and conquest. About 230 seasons.' },
-  { id: 'standard', name: 'Standard', until: 1650, blurb: 'Through the plantations to the golden age of trade. About 630 seasons.' },
-  { id: 'full', name: 'Full', until: 1750, blurb: 'The whole age of sail. About 1,030 seasons.' },
+  { id: 'short', name: 'Short', until: 1550, blurb: 'The age of discovery and conquest. About 115 turns.' },
+  { id: 'standard', name: 'Standard', until: 1650, blurb: 'Through the plantations to the golden age of trade. About 215 turns.' },
+  { id: 'full', name: 'Full', until: 1750, blurb: 'The whole age of sail. About 315 turns.' },
 ] as const;
 
 /** The standard game, used wherever no length is chosen. */
 export const DEFAULT_UNTIL = 1650;
+
+/**
+ * The calendar of turns. The rules run season by season underneath; a player's turn covers half a
+ * year (spring and summer, then autumn and winter) until this year, then a whole year.
+ */
+export const HALF_YEAR_TURNS_UNTIL = 1550;

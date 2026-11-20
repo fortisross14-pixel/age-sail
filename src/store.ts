@@ -7,6 +7,7 @@ import { SAVE_KEY, LEGACY_KEY, STALE_KEYS, wrap, fromLegacy, readSave, type Load
 import type { SimApi, Command } from './sim/worker';
 import type { CrownId } from './data/rivals';
 import type { GameState, World, ChronicleEntry, MapId } from './sim/types';
+import { prevTurnStart } from './sim/types';
 import type { MovePreview } from './sim/game';
 
 const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' }));
@@ -149,7 +150,7 @@ export const useStore = create<Store>((set, get) => {
       let loaded;
       try { loaded = await sim.load(r.state); } catch (e) { startFailed(e); return; }
       const { world, state } = loaded;
-      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: state.chronicle.filter((c) => c.turn < state.turn - 1).map(newsKey) });
+      set({ world, game: state, phase: 'playing', map: 'old', selectedFleet: null, selectedPort: null, preview: null, drawer: null, dismissed: state.chronicle.filter((c) => c.turn < prevTurnStart(state.turn)).map(newsKey) });
     },
 
     quitToMenu() {
@@ -175,11 +176,11 @@ export const useStore = create<Store>((set, get) => {
       set({ busy: true, preview: null });
       sfx('season');
       let state: GameState;
-      try { state = await sim.endTurn(); } catch (e) { await recover('while ending the season', e); return; }
+      try { state = await sim.endTurn(); } catch (e) { await recover('while ending the turn', e); return; }
       const sel = get().selectedFleet;
       const keep = sel != null && state.fleets.some((f) => f.id === sel);
-      // news older than last season fades from the feed by itself
-      const old = state.chronicle.filter((c) => c.turn < state.turn - 1).map(newsKey);
+      // news from before this turn's seasons fades from the feed by itself
+      const old = state.chronicle.filter((c) => c.turn < g.turn).map(newsKey);
       const psel = get().selectedParty;
       set({ game: state, busy: false, selectedFleet: keep ? sel : null, selectedParty: psel != null && state.parties.some((p) => p.id === psel) ? psel : null, landing: null, dismissed: [...new Set([...get().dismissed.slice(-200), ...old])] });
       follow(state);

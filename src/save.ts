@@ -7,8 +7,10 @@ import type { GameState } from './sim/types';
  * Version 10 is the M8 state (stored bare under `age-sail:save:v9`), now wrapped in an envelope.
  * Version 11 (M9) adds the crown you play and city sizes; M9 also redrew the maps (genVersion 2), so
  * older saves are refused rather than migrated.
+ * Version 12 (M11) adds colony newcomers and births and deaths, and what native peoples remember and
+ * whether they besiege a colony. Turns now cover half a year, then a year; the season clock is unchanged.
  */
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 export const SAVE_KEY = 'age-sail:save';
 /** Keys used before the envelope. v9 is migrated; older ones can't be read and are removed. */
 export const LEGACY_KEY = 'age-sail:save:v9';
@@ -25,7 +27,17 @@ export type LoadResult =
   | { ok: false; reason: string };
 
 /** saveVersion n → n + 1. Each is a pure function of the previous shape. */
-const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {};
+const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {
+  11: (s) => {
+    const colonies = (s.colonies as Record<string, unknown>[]).map((c) => ({
+      ...c, growth: 0, newcomers: 0,
+      last: { ...(c.last as object), births: 0, deaths: 0, garrison: 0, seasoned: 0, besieged: false },
+    }));
+    const natives = Object.fromEntries(Object.entries(s.natives as Record<string, Record<string, unknown>>)
+      .map(([id, st]) => [id, { ...st, memory: [], siege: null }]));
+    return { ...s, colonies, natives };
+  },
+};
 
 export function wrap(state: GameState): SaveEnvelope {
   return { saveVersion: SAVE_VERSION, genVersion: GEN_VERSION, state };

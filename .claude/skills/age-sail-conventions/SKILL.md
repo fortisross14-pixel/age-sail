@@ -37,6 +37,12 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   ruler ("your realm"), never about "the Crown" as someone else.
 - **Cities** come from `CITIES` in `src/data/europe.ts` (largest first; placement keeps an empty hex
   between any two). Inland cities have no market or docks; their units march to the nearest port.
+- **Time.** `state.turn` is a season clock. A player's turn (`endTurn`) runs `seasonTick` for each
+  season it covers: two until 1550, four after (`turnStride`, `turnLabel` in `types.ts`). Write rules
+  per season; never assume one `endTurn` is one season (tests of a single season call `seasonTick`).
+- **Colonies and natives** tune in `src/data/colony.ts` (births and deaths, seasoning, garrison food,
+  siege thresholds). Change a people's attitude with `remember(s, st, why, delta)` so the player can
+  see the reason, never by writing `attitude` directly.
 - **The world is regenerated from the seed on load**, not saved. Any change to `mapgen.ts`
   output changes every existing save's map: bump the generator version (see Saves).
 

@@ -336,9 +336,18 @@ function Peoples() {
                     {rivals.map((r) => <button key={r.id} disabled={game.treasury < 400} title="400 ducats in gifts and arms. It may get out." onClick={() => void run({ kind: 'incite', nation: n.id, target: r.id })}>the {r.people}</button>)}
                   </div>
                 )}
+                {st.memory.length > 0 && (
+                  <ul className="memory" aria-label="What they remember">
+                    {st.memory.map((m) => (
+                      <li key={m.why} className={m.amount > 0 ? 'good' : 'bad'}><b>{m.amount > 0 ? '+' : '−'}{Math.round(Math.abs(m.amount))}</b> {m.why}</li>
+                    ))}
+                  </ul>
+                )}
+                {st.siege && <div className="notice bad small">Their warriors are besieging {game.colonies.find((c) => c.id === st.siege!.colony)?.name}.</div>}
                 <div className="muted small">
                   {rivals.length ? `Rivals: ${rivals.map((r) => `the ${r.people}`).join(', ')}. ` : ''}
-                  {st.relation === 'peace' && st.attitude <= -40 ? 'They raid colonies and ambush parties near their land. ' : ''}
+                  {st.relation === 'peace' && st.attitude <= -40 ? (st.attitude <= -60 ? 'Furious: they raid, ambush, and may besiege a colony. ' : 'They raid colonies and ambush parties near their land. ') : ''}
+                  {st.relation === 'peace' && st.attitude >= 40 ? 'Friendly: they trade food to your colonies nearby, and the settlers prosper. ' : ''}
                   {st.relation === 'subject' ? 'They pay tribute every season; their land counts as yours.' : 'Trade, a trading post or a mission builds goodwill; colonies on their land and attacks on anyone wear it down.'}
                 </div>
               </div>

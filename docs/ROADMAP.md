@@ -92,6 +92,11 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | Pass 1 | Best practices: game-dev skills in `.claude/skills/`, audit (`docs/AUDIT.md`), versioned saves, crash recovery, render on demand, lazy New World art, determinism tests | done |
 | M9 | Your realm: play any of the five Atlantic crowns, each with a national edge; 53 named Old World cities in 15 realms (the five crowns plus the Ottomans, Morocco, Venice, Genoa, the Papal States, Naples, the Hanse, Denmark, Scotland and the Empire), at least one empty hex apart; realm borders and names on the chart; every city of your realm is yours to build in (inland ones train units that march to the nearest port); you are the Crown, with no charge or deadline; a plain start with two ships, a colonist and a soldier | done |
 | M10 | GUI pass in the Admiralty look (navy lacquer, gold leaf, parchment): HUD with crest, map-tool rail, six-tile dock, minimap; every screen opens over the map and HUD with motion and synthesized sound; city screen (Overview, Buildings with slot tiles, detail card and a short picker with an info button, Economy, Recruitment); Court as portrait cards with a detail pane and commissions; Fleets and Markets as list and detail with visual goods rows; Research as three branch columns; Chronicle as a timeline. Waiting for the art sheets in `art/PROMPTS.md`; then a shorter, visual help and title screen | base done |
+| M11 | Colonies and natives: turns of half a year until 1550, then a year (seasons still pass one by one underneath); colonies grow by births over deaths (slow; the tropics are deadly), so settlers come from home and spend a season "seasoning" before they work; soldiers and friars eat from the warehouse or desert; peoples remember why they feel as they do (gifts, trade, posts, missions, settlers on their land, attacks, sickness); friendly peoples trade food to nearby colonies and raise births; furious ones besiege a colony (no fields worked, an assault each season) and can burn it | done |
+| M12 | Armies: unit types (pikemen, musketeers, archers, cavalry, cannon), armies under generals with supply, three-round automatic battles with a high-level report and stances, sieges with walls and forts, veterans | next |
+| M13 | A living market: rival merchants, regional demand, shocks, colonial demand; your trading posts (factories) in any European city to buy and sell where it pays most; saturation and price drops | |
+| M14 | The Mediterranean front (corsairs, the Ottomans, Venice and Genoa) and European treaties | |
+| M15 | Knowledge: research from research buildings and funded scientific expeditions (a scientific explorer completes one in the New World); a tree of about 30 subjects that unlock ships, units, buildings and laws | |
 | Pass 3 | Balance: tuning numbers in one place, autoplay harness, retune for five crowns | |
 | later | Scenarios with goals (the old Crown's charge belongs here), Mediterranean powers as playable nations | |
 | later | Rival AI depth (real fleets and economies, rival-native alliances), Old World depth (buildings, full research), events and characters' stories, eras, score and victory, Chronicle, iPad performance, an illustrator's cohesive art set | |
@@ -119,6 +124,20 @@ Decided with the player after M8:
   territory. Scenarios with goals come later.
 - **A plain start**, as in other strategy games: a couple of ships in your main port, a colonist and
   a soldier ready, and your court.
+
+## Systems decisions (from the systems review)
+
+- **Exploration** stays slow and dangerous: many voyages fail before they reach a coast. First you
+  discover, then send another expedition with materials, found a colony with no troops, send troops
+  and the food to feed them, and the natives may ravage it before it stands.
+- **Trade** is about the edge: open posts in Sevilla, Venice, Paris or anywhere, buy and sell within
+  Europe, and bring goods from the Indies to wherever pays most. Flood a market and the price falls.
+- **Colonies** grow slowly on their own (births and deaths); most settlers are trained at home,
+  shipped, and season for a turn. Size is capped by level; raising it takes materials from home.
+- **Research** comes from research buildings and from scientific expeditions you fund.
+- **Turns** are half a year, then a year from 1550.
+- **Battles** are automatic with a high-level report: this is Civilization, not Europa Universalis.
+- **Slavery** is left out for now.
 
 ## M10: GUI pass (plan)
 

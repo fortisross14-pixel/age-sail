@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateWorld, generateOldWorld } from './mapgen';
 import {
-  newGame, endTurn, buy, sell, moveFleet, previewMove, crossOcean, startProject, portById, cargoUsed, maxMoves,
+  newGame, endTurn, seasonTick, buy, sell, moveFleet, previewMove, crossOcean, startProject, portById, cargoUsed, maxMoves,
   provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
   slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost, landParty, moveParty, boardParty, citySlots, slotsUsedIn,
   foundColony, upgradeColony, colonyTransfer, allyNation, incorporateNation, attackVillage, tradingPost, declareWar, rivalPeace, stormColony,
@@ -15,7 +15,7 @@ import { canFound, score } from './colony';
 import { gift, odds } from './natives';
 import { rivalScore } from './rivals';
 import { colonyTaxes, loyaltyTarget } from './empire';
-import { Fog } from './types';
+import { Fog, emptyAccount, turnLabel, turnStride } from './types';
 
 const SEEDS = [1492, 7, 42, 2024, 31337];
 
@@ -174,9 +174,9 @@ describe('a voyage, turn by turn', () => {
     expect(startProject(state, 'seville', { kind: 'ship', ship: 'carrack' }).ok).toBe(false); // busy
     expect(startProject(state, 'cadiz', { kind: 'ship', ship: 'carrack' }).ok).toBe(false); // port too small
     const n = state.fleets.length;
-    endTurn(world, state);
+    seasonTick(world, state);
     expect(state.fleets.length).toBe(n);
-    endTurn(world, state);
+    seasonTick(world, state);
     expect(state.fleets.length).toBe(n + 1);
     const builder = [...state.people].sort((x, y) => y.skills.construction - x.skills.construction)[0];
     const cadiz = state.cities.cadiz;
@@ -196,9 +196,11 @@ describe('a voyage, turn by turn', () => {
     sailTo(world, state, f.id, sea, 4);
     f.supplies = 0;
     f.order = null;
+    f.movedThisTurn = true; // under way, not foraging at anchor
     const crew = f.crew;
-    endTurn(world, state);
-    expect(f.crew).toBeLessThan(crew);
+    seasonTick(world, state);
+    // in the open ocean, empty stores can also mean the fleet is never seen again
+    expect(!state.fleets.includes(f) || f.crew < crew).toBe(true);
   });
 });
 
@@ -271,10 +273,10 @@ describe('M2: near shore, deep ocean, research', () => {
     for (const p of state.people) p.skills.navigation = 0;
     const deep = [...Array(OLD.N).keys()].find((i) => world.old.deep[i] && OLD.lat(i) > 35 && OLD.lat(i) < 40)!;
     f.hex = deep; f.at = null; f.order = null; f.supplies = 8;
-    endTurn(world, state);
+    seasonTick(world, state);
     expect(f.supplies).toBe(6);
     state.research.known.push('volta');
-    endTurn(world, state);
+    seasonTick(world, state);
     expect(f.supplies).toBe(5);
   });
 
@@ -470,19 +472,39 @@ describe('M5: colonies', () => {
     expect(state.units.some((u) => u.colony === c.id)).toBe(true); // the infantry stays as a garrison
   });
 
-  it('a colony fed, clothed and given wine grows; one without cloth and wine stalls', () => {
+  it('a colony fed, clothed and given wine grows slowly by births; one without cloth and wine loses ground', () => {
     const { world, state, p } = beachhead();
     foundColony(world, state, p.id);
     const c = state.colonies[0];
     c.pop = 3;
     c.stock = { food: 10, cloth: 20, wine: 20, sugar: 10 };
-    for (let k = 0; k < 6; k++) endTurn(world, state);
-    expect(c.pop).toBeGreaterThan(3);
-    const before = c.pop;
+    seasonTick(world, state);
+    expect(c.last.births).toBeGreaterThan(c.last.deaths);
+    const g = c.growth;
+    seasonTick(world, state);
+    expect(c.growth).toBeGreaterThan(g);
+    // a year of births adds well under one colonist: settlers have to come from home
+    expect(c.pop * (c.last.births - c.last.deaths)).toBeLessThan(1);
+    const content = c.last.births;
     c.stock = { food: 10 };
-    for (let k = 0; k < 6; k++) endTurn(world, state);
+    seasonTick(world, state);
     expect(c.last.discontent).toBe(true);
-    expect(c.pop).toBeLessThanOrEqual(before);
+    expect(c.last.births).toBeLessThan(content);
+  });
+
+  it('newcomers season for a turn before they count, and the garrison eats', () => {
+    const { world, state, p } = beachhead();
+    foundColony(world, state, p.id);
+    const c = state.colonies[0];
+    const pop = c.pop;
+    const soldiers = state.units.filter((u) => u.colony === c.id).length;
+    c.newcomers = 2;
+    state.units.push({ id: 9001, type: 'infantry', fleet: null, city: null, party: null, colony: c.id });
+    c.stock = { food: 1 };
+    seasonTick(world, state);
+    expect(c.pop + c.last.seasoned).toBe(pop + 2);
+    expect(c.newcomers).toBe(0);
+    expect(c.last.garrison).toBe(soldiers + 1);
   });
 
   it('colonists work the land around the colony and fill its warehouse', () => {
@@ -567,6 +589,34 @@ describe('M6: native peoples', () => {
     expect(score(state, world).territory).toBeGreaterThan(0);
   });
 
+  it('a people remembers why it feels as it does', () => {
+    const { world, state } = newGame(1492);
+    const n = world.old.nations[0];
+    state.natives[n.id].met = true;
+    expect(gift(world, state, n.id, 200).ok).toBe(true);
+    const m = state.natives[n.id].memory.find((x) => x.why === 'Your gifts');
+    expect(m && m.amount).toBeGreaterThan(0);
+  });
+
+  it('a furious people lays siege to an unguarded colony, and can burn it', () => {
+    const { world, state } = newGame(1492);
+    const n = world.old.nations.find((x) => !x.empire)!;
+    const st = state.natives[n.id];
+    st.met = true; st.contact = 0; st.epidemic = true; st.attitude = -90; st.warriors = 30;
+    const hex = OLD.neighbors(n.siteHex).find((h) => world.old.terrain[h] > 1)!;
+    state.colonies.push({ id: 'col-s', name: 'Testa', map: 'old', hex, founded: 0, pop: 2, level: 'outpost', stock: { food: 40 }, growth: 0, loyalty: 80,
+      charter: false, unrest: false, newcomers: 0, last: emptyAccount() });
+    let besieged = false;
+    for (let k = 0; k < 40 && state.colonies.length; k++) {
+      seasonTick(world, state);
+      st.attitude = -90; // keep them furious
+      if (st.siege) besieged = true;
+    }
+    expect(besieged).toBe(true);
+    expect(state.colonies.length).toBe(0);
+    expect(st.siege).toBeNull();
+  });
+
   it('battles are about numbers: a lone soldier rarely beats a whole people', () => {
     expect(odds(4, 15)).toBeLessThan(0.25);
     expect(odds(40, 15)).toBeGreaterThan(0.7);
@@ -594,7 +644,7 @@ describe('M6: native peoples', () => {
     const st = state.natives[n.id];
     st.met = true; st.contact = 0; st.epidemic = true; st.attitude = -80; st.warriors = 30;
     state.colonies.push({ id: 'col-x', name: 'Test', map: 'old', hex: n.villages[0], founded: 0, pop: 4, level: 'outpost', stock: { food: 40, cloth: 40, wine: 40 }, growth: 0, loyalty: 80, charter: false, unrest: false,
-      last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false } });
+      newcomers: 0, last: emptyAccount() });
     for (let k = 0; k < 8; k++) endTurn(world, state);
     expect(state.chronicle.some((c) => c.text.includes('raid Test'))).toBe(true);
   });
@@ -681,7 +731,7 @@ describe('M8: the long game', () => {
   const testColony = (state: ReturnType<typeof newGame>['state'], world: ReturnType<typeof newGame>['world'], pop = 8) => {
     const hex = [...Array(NEW.N).keys()].find((h) => world.new.terrain[h] > 1)!;
     const c = { id: 'col-t', name: 'Testa', map: 'new' as const, hex, founded: 0, pop, level: 'town' as const, stock: { food: 100, cloth: 100, wine: 100 }, growth: 0,
-      loyalty: 80, charter: false, unrest: false, last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false } };
+      loyalty: 80, charter: false, unrest: false, newcomers: 0, last: emptyAccount() };
     state.colonies.push(c);
     return c;
   };
@@ -741,5 +791,21 @@ describe('M8: the long game', () => {
     expect(state.events.some((e) => e.kind === 'end')).toBe(true);
     endTurn(world, state);
     expect(state.events.filter((e) => e.kind === 'end').length).toBe(1);
+  });
+});
+
+describe('M11 calendar', () => {
+  it('a turn is half a year until 1550, then a year; the seasons still pass one by one', () => {
+    const { world, state } = newGame(1492);
+    expect(turnLabel(state.turn)).toBe('Spring 1492');
+    endTurn(world, state);
+    expect(state.turn).toBe(2);
+    expect(turnLabel(state.turn)).toBe('Autumn 1492');
+    expect(turnStride((1549 - 1492) * 4 + 2)).toBe(2);
+    expect(turnStride((1550 - 1492) * 4)).toBe(4);
+    expect(turnLabel((1551 - 1492) * 4)).toBe('1551');
+    state.turn = (1550 - 1492) * 4;
+    endTurn(world, state);
+    expect(state.turn).toBe((1551 - 1492) * 4);
   });
 });

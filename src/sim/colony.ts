@@ -6,8 +6,9 @@ import { T, isWater } from '../data/terrain';
 import { GRIDS } from './hex';
 import { mulberry32, hashSeed, pick } from './rng';
 import { personById, skill } from './court';
-import type { Colony, ColonyLevel, Fleet, GameState, MapId, Party, PortDef, World } from './types';
+import { emptyAccount, type Colony, type ColonyLevel, type Fleet, type GameState, type MapId, type Party, type PortDef, type World } from './types';
 import * as Nat from './natives';
+import { DEMOGRAPHY, SEASONING, GARRISON_FOOD, NATIVE } from '../data/colony';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -19,7 +20,6 @@ export const LEVELS: Record<ColonyLevel, { name: string; radius: number; cap: nu
 };
 /** Materials to found an outpost (the founder's construction skill trims them). */
 export const FOUNDING: Partial<Record<GoodId, number>> = { timber: 30, tools: 20 };
-export const GROWTH_STEP = 8;
 
 const NAMES = ['San Miguel', 'Santa Cruz', 'Nueva Sevilla', 'Villa Rica', 'San Juan', 'Santa Fe', 'Puerto Real', 'Nueva Cádiz', 'San Mateo',
   'Santiago', 'La Navidad', 'Villa Hermosa', 'San Lorenzo', 'Santa Elena', 'Nombre de Dios', 'San Felipe', 'La Concepción', 'Santa Marta'];
@@ -88,8 +88,9 @@ export function workPlan(world: World, s: GameState, c: Colony) {
   const worked: { hex: number; good: GoodId; amount: number }[] = [];
   let food = 2; // the colony's own fields
   const used = new Set<number>();
-  // feed everyone first
-  while (worked.length < c.pop && food < c.pop * NEEDS.food) {
+  // feed everyone first: settlers, newcomers, and the soldiers and friars of the garrison
+  const mouths = (c.pop + c.newcomers) * NEEDS.food + s.units.filter((u) => u.colony === c.id).length * GARRISON_FOOD;
+  while (worked.length < c.pop && food < mouths) {
     let best: { h: number; amount: number } | null = null;
     for (const t of tiles) {
       if (used.has(t.h)) continue;
@@ -121,49 +122,92 @@ export function workPlan(world: World, s: GameState, c: Colony) {
   return worked;
 }
 
-/** One season in a colony: work, eat, dress, drink, grow (or not). */
+/** Soldiers and friars who live in a colony and eat from its warehouse. */
+export const garrisonOf = (s: GameState, c: Colony) => s.units.filter((u) => u.colony === c.id);
+
+/**
+ * One season in a colony: newcomers season, everyone works, eats, dresses and drinks, and the colony
+ * grows by births over deaths. Natural growth is slow; most settlers have to come from home.
+ */
 export function colonySeason(world: World, s: GameState, c: Colony, log: (text: string, kind?: 'trade' | 'peril' | 'court') => void) {
-  const worked = workPlan(world, s, c);
+  const g = GRIDS[c.map];
+  const rng = mulberry32(hashSeed(s.seed, s.turn, c.hex, 43));
+  const tropics = Math.abs(g.lat(c.hex)) < 23;
+  const besieged = Nat.besieging(world, s, c) != null;
+  const friends = Nat.neighbours(world, s, c).filter((x) => x.st.relation === 'allied' || x.st.relation === 'subject' || (x.st.relation === 'peace' && x.st.attitude >= NATIVE.friendly));
+  // newcomers who landed last turn: some die of the climate, the rest join the work
+  let seasoned = 0;
+  if (c.newcomers > 0) {
+    const risk = tropics ? SEASONING.tropics : SEASONING.temperate;
+    for (let k = 0; k < c.newcomers; k++) if (rng() < risk) seasoned++;
+    if (seasoned) log(`${seasoned} of the newcomers to ${c.name} die of fever before they are used to the land.`, 'peril');
+    c.pop = Math.min(LEVELS[c.level].cap, c.pop + c.newcomers - seasoned);
+    c.newcomers = 0;
+  }
+  // under siege nobody leaves the palisade: only the colony's own fields are worked
+  const worked = besieged ? [] : workPlan(world, s, c);
   const discontentBefore = c.last.discontent;
-  // the colony's own fields, plus whatever idle hands can forage
-  const produced: Partial<Record<GoodId, number>> = { food: 2 + Math.max(0, c.pop - worked.length) * 0.5 };
+  const produced: Partial<Record<GoodId, number>> = { food: 2 + (besieged ? 0 : Math.max(0, c.pop - worked.length) * 0.5) };
   for (const w of worked) produced[w.good] = (produced[w.good] ?? 0) + w.amount * (discontentBefore ? 0.7 : 1) * (c.unrest ? 0.75 : 1);
-  for (const g of GOODS) if (produced[g]) c.stock[g] = Math.round(((c.stock[g] ?? 0) + produced[g]!) * 10) / 10;
-  const take = (g: GoodId, n: number) => {
-    const have = c.stock[g] ?? 0;
+  for (const gd of GOODS) if (produced[gd]) c.stock[gd] = Math.round(((c.stock[gd] ?? 0) + produced[gd]!) * 10) / 10;
+  const take = (gd: GoodId, n: number) => {
+    const have = c.stock[gd] ?? 0;
     const got = Math.min(have, n);
-    c.stock[g] = Math.round((have - got) * 10) / 10;
-    if (!c.stock[g]) delete c.stock[g];
+    c.stock[gd] = Math.round((have - got) * 10) / 10;
+    if (!c.stock[gd]) delete c.stock[gd];
     return got >= n - 1e-6;
   };
+  // the garrison and the friars eat first: a hungry soldier deserts
+  const garrison = garrisonOf(s, c);
+  const fedGarrison = take('food', garrison.length * GARRISON_FOOD);
+  if (!fedGarrison && garrison.length) {
+    const gone = garrison[garrison.length - 1];
+    s.units = s.units.filter((u) => u !== gone);
+    log(`There is no bread for the garrison of ${c.name}. A ${gone.type === 'infantry' ? 'company of soldiers' : 'friar'} gives up and leaves.`, 'peril');
+  }
   const fed = take('food', c.pop * NEEDS.food);
   const clothed = take('cloth', c.pop * NEEDS.cloth);
   const drink = take('wine', c.pop * NEEDS.wine);
   let lux = false;
   const luxNeed = c.pop * LUXURY_NEED;
-  const luxHave = LUXURIES.reduce((t, g) => t + (c.stock[g] ?? 0), 0);
+  const luxHave = LUXURIES.reduce((t, gd) => t + (c.stock[gd] ?? 0), 0);
   if (luxHave >= luxNeed) {
     let left = luxNeed;
-    for (const g of LUXURIES) { const k = Math.min(left, c.stock[g] ?? 0); take(g, k); left -= k; }
+    for (const gd of LUXURIES) { const k = Math.min(left, c.stock[gd] ?? 0); take(gd, k); left -= k; }
     lux = true;
   }
   const discontent = !clothed || !drink;
+  // births and deaths, as yearly shares of the colony
+  const D = DEMOGRAPHY;
+  const plenty = (produced.food ?? 0) - c.pop * NEEDS.food >= c.pop * 0.5;
+  const births = !fed ? 0 : D.births + (plenty ? D.plentyBirths : 0) + (lux ? D.luxuryBirths : 0) + (friends.length ? D.friendBirths : 0) - (discontent ? D.births / 2 : 0);
+  const deaths = D.deaths + (tropics ? D.tropicDeaths : 0) + (besieged ? D.siegeDeaths : 0);
   if (!fed) {
     if (c.pop > 1) { c.pop--; log(`Hunger in ${c.name}: a colonist dies, and others leave for the woods.`, 'peril'); }
     else log(`${c.name} is starving. Send food, or the outpost will not last.`, 'peril');
-    c.growth = 0;
-  } else if (!discontent) {
-    const surplus = Math.max(0, (produced.food ?? 0) - c.pop * NEEDS.food);
-    c.growth += Math.max(1, surplus) * (lux ? 1.5 : 1);
-    if (c.growth >= GROWTH_STEP && c.pop < LEVELS[c.level].cap) {
-      c.growth = 0;
+    c.growth = Math.min(0, c.growth);
+  }
+  c.growth += c.pop * (births - deaths) / 4;
+  const cap = LEVELS[c.level].cap;
+  if (c.growth >= 1) {
+    if (c.pop < cap) {
+      c.growth -= 1;
       c.pop++;
-      log(`${c.name} grows: ${c.pop} colonists now.`, 'court');
-    } else if (c.pop >= LEVELS[c.level].cap) c.growth = Math.min(c.growth, GROWTH_STEP);
+      log(`A child is born in ${c.name}, and lives: ${c.pop} colonists now.`, 'court');
+    } else c.growth = Math.min(c.growth, 1);
+  } else if (c.growth <= -1) {
+    c.growth += 1;
+    if (c.pop > 1) {
+      c.pop--;
+      log(`Fever and hard work take their toll: ${c.name} buries one more than it baptises. ${c.pop} colonists left.`, 'peril');
+    }
   }
   if (discontent && !discontentBefore) log(`The settlers of ${c.name} grumble: they need ${[!clothed && 'cloth', !drink && 'wine'].filter(Boolean).join(' and ')}. Work slows.`, 'peril');
-  c.last = { produced, worked, hungry: !fed, discontent, luxuries: lux };
+  c.last = { produced, worked, hungry: !fed, discontent, luxuries: lux, births, deaths, garrison: garrison.length, seasoned, besieged };
 }
+
+/** A colony's strength behind its palisade. */
+export const colonyDefence = Nat.palisade;
 
 // ---------- commands ----------
 
@@ -208,7 +252,7 @@ export function foundColony(world: World, s: GameState, p: Party): Result & { co
   const c: Colony = {
     id: `col-${s.nextId++}`, name: free.length ? pick(rng, free) : `Colonia ${s.colonies.length + 1}`, map: p.map, hex: p.hex,
     founded: s.turn, pop: colonists.length, level: 'outpost', stock: { food: 4 }, growth: 0, loyalty: 85, charter: false, unrest: false,
-    last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false },
+    newcomers: 0, last: emptyAccount(),
   };
   s.units = s.units.filter((u) => !colonists.includes(u));
   for (const u of s.units) if (u.party === p.id) { u.party = null; u.colony = c.id; }
@@ -263,12 +307,12 @@ export function settle(s: GameState, f: Fleet, c: Colony): Result {
   if (f.at !== c.id) return fail('The fleet must be docked at the colony.');
   const colonists = s.units.filter((u) => u.fleet === f.id && u.type === 'colonist');
   if (!colonists.length) return fail('No colonists aboard.');
-  const room = LEVELS[c.level].cap - c.pop;
+  const room = LEVELS[c.level].cap - c.pop - c.newcomers;
   if (room <= 0) return fail(`${c.name} has no room. Raise it to the next level first.`);
   const n = Math.min(room, colonists.length);
   s.units = s.units.filter((u) => !colonists.slice(0, n).includes(u));
-  c.pop += n;
-  return { ok: true, message: `${n} colonist${n > 1 ? 's' : ''} settle in ${c.name}.` };
+  c.newcomers += n;
+  return { ok: true, message: `${n} colonist${n > 1 ? 's' : ''} come ashore at ${c.name}. They need a season to get used to the land before they can work.` };
 }
 
 export function score(s: GameState, w?: World) {

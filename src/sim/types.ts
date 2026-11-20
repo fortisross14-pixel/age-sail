@@ -6,6 +6,7 @@ import type { CrownId } from '../data/rivals';
 import type { RealmId } from '../data/realms';
 import type { CitySize } from '../data/europe';
 import type { MapId } from './hex';
+import { HALF_YEAR_TURNS_UNTIL } from '../data/eras';
 
 export type { MapId };
 export const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'] as const;
@@ -153,8 +154,10 @@ export interface Colony {
   level: ColonyLevel;
   /** goods in the colony's warehouse */
   stock: Partial<Record<GoodId, number>>;
-  /** progress toward the next colonist */
+  /** births minus deaths so far, in colonists: a whole one joins (or leaves) the colony */
   growth: number;
+  /** settlers who arrived this turn and are still seasoning: they eat but do not work yet */
+  newcomers: number;
   /** 0..100: how loyal the settlers are to the Crown */
   loyalty: number;
   /** a royal charter: self-government and half taxes, in return for loyalty */
@@ -167,6 +170,13 @@ export interface Colony {
     hungry: boolean;
     discontent: boolean;
     luxuries: boolean;
+    /** yearly births and deaths, as shares of the colony, for the player */
+    births: number;
+    deaths: number;
+    /** soldiers and friars fed, and newcomers who died seasoning */
+    garrison: number;
+    seasoned: number;
+    besieged: boolean;
   };
 }
 
@@ -203,7 +213,14 @@ export interface NativeState {
   lost: number[];
   contact: number | null;
   epidemic: boolean;
+  /** what they remember of you: the reasons behind their attitude */
+  memory: Memory[];
+  /** a siege they are laying to one of your colonies */
+  siege: { colony: string; since: number } | null;
 }
+
+/** One remembered deed, good or bad, and how much it still weighs. */
+export interface Memory { why: string; amount: number; turn: number }
 
 export type { CrownId };
 
@@ -395,3 +412,16 @@ export interface GameState {
 export const seasonOf = (turn: number) => turn % 4;
 export const yearOf = (turn: number) => START_YEAR + Math.floor(turn / 4);
 export const dateLabel = (turn: number) => `${SEASONS[seasonOf(turn)]} ${yearOf(turn)}`;
+/** Seasons in the player's turn that starts at this season: two (half a year) early on, then four. */
+export const turnStride = (turn: number) => (yearOf(turn) < HALF_YEAR_TURNS_UNTIL ? 2 : 4);
+/** The season the next player turn starts at. */
+export const nextTurnStart = (turn: number) => { const k = turnStride(turn); return turn + k - (turn % k); };
+/** The season the player's current turn started at, the one before this. */
+export const prevTurnStart = (turn: number) => Math.max(0, turn - turnStride(Math.max(0, turn - 1)));
+/** How a player's turn is named: "Spring 1492" and "Autumn 1492" in the half-year era, then "1551". */
+export const turnLabel = (turn: number) => (turnStride(turn) === 2 ? `${seasonOf(turn) < 2 ? 'Spring' : 'Autumn'} ${yearOf(turn)}` : `${yearOf(turn)}`);
+/** Player turns from the start of the game to a season. */
+export const turnsBetween = (from: number, to: number) => { let n = 0; for (let t = from; t < to; t = nextTurnStart(t)) n++; return n; };
+
+/** A colony's account before its first season. */
+export const emptyAccount = (): Colony['last'] => ({ produced: {}, worked: [], hungry: false, discontent: false, luxuries: false, births: 0, deaths: 0, garrison: 0, seasoned: 0, besieged: false });

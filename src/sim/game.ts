@@ -21,7 +21,7 @@ import { maxMoves as baseMoves, crewNeeded, windwardOf as baseWindward, planRout
 import { initialCourt, newPetitioners, leaderOf, personById, skill, salary, deathChance, ageOf } from './court';
 import { RANK_INFO, UNIT_INFO } from '../data/court';
 import {
-  Fog, dateLabel, seasonOf, yearOf,
+  Fog, dateLabel, seasonOf, yearOf, nextTurnStart,
   type Fleet, type GameState, type World, type PortDef, type ChronicleEntry, type MapData, type ProjectKind, type GameEvent,
   type Person, type UnitType, type TradeRoute, type Rank, type City,
 } from './types';
@@ -321,7 +321,7 @@ export function buy(world: World, s: GameState, fleetId: number, g: GoodId, qty:
 function goodwill(world: World, s: GameState, f: Fleet) {
   const n = f.at ? Nat.nationOfSite(world, f.at) : undefined;
   const st = n ? s.natives[n.id] : undefined;
-  if (st && st.attitude < 60) st.attitude += 1;
+  if (st && st.attitude < 60) Nat.remember(s, st, 'Fair trade at their ground', 1);
 }
 
 export function sell(world: World, s: GameState, fleetId: number, g: GoodId, qty: number): CommandResult {
@@ -1022,7 +1022,17 @@ function advance(world: World, s: GameState, f: Fleet) {
 
 // ---------- end of turn ----------
 
+/**
+ * End the player's turn: the seasons it covers pass one by one (two in the half-year era, four
+ * later), so every rule keeps its per-season pace and only the player's turns get longer.
+ */
 export function endTurn(world: World, s: GameState): void {
+  const until = nextTurnStart(s.turn);
+  while (s.turn < until) seasonTick(world, s);
+}
+
+/** One season of the world: voyages, projects, rivals, natives, colonies, markets, research, the court. */
+export function seasonTick(world: World, s: GameState): void {
   const rng = mulberry32(hashSeed(s.seed, s.turn, 7));
 
   // life at sea: food and water, foraging along a shore, scurvy

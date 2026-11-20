@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.10
+## Now playing: v0.11
 
-M10, the Admiralty interface: navy lacquer and gold, screens that open over the map with motion and sound, a city screen with building places, a portrait court.
+M11, colonies and natives: turns of half a year (a year from 1550); colonies that grow slowly by births and need settlers from home, who season a turn before they work; garrisons that must be fed; native peoples who remember what you did, feed their friends and besiege their enemies.
+
+From v0.10, the Admiralty interface: navy lacquer and gold, screens that open over the map with motion and sound, a city screen with building places, a portrait court.
 
 From v0.9, your realm: play Castile, Portugal, England, France or the Netherlands, in an Old World of 53 cities and 15 realms.
 

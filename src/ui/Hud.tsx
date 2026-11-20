@@ -1,5 +1,5 @@
 import { useStore } from '../store';
-import { seasonOf, SEASONS, yearOf } from '../sim/types';
+import { turnLabel, turnStride, yearOf } from '../sim/types';
 import { score } from '../sim/colony';
 import { rivalScore } from '../sim/rivals';
 import { rivalsOf, crownSpec } from '../data/rivals';
@@ -36,7 +36,7 @@ export function Hud() {
         <CrestArt realm={game.crown} size={56} fallback={<Crest primary={colours.css2} secondary={colours.css} size={46} />} />
       </div>
       <div className="hud-date" title={`${era.blurb} The age ends in ${1492 + Math.floor(game.endTurn / 4)}${game.ended ? ' (passed: playing on)' : ''}.`}>
-        <div className="season">{SEASONS[seasonOf(game.turn)]} {yearOf(game.turn)}</div>
+        <div className="season">{turnLabel(game.turn)}</div>
         <div className="era">{era.name}</div>
       </div>
       <span className="hud-sep" />
@@ -62,8 +62,8 @@ export function Hud() {
         <button className={`adm-square ${drawer === 'court' ? 'on' : ''}`} onClick={() => toggle('court')} title="Court (4)" aria-label="Court"><Medal name="people" size={50} fallback={<Icon name="units" size={26} />} /></button>
         <button className={`adm-square ${showSettings ? 'on' : ''}`} onClick={() => { sfx(showSettings ? 'close' : 'open'); set({ showSettings: !showSettings }); }} title="Settings" aria-label="Settings"><Medal name="settings" size={50} fallback={<Icon name="settings" size={26} />} /></button>
       </div>
-      <button className="end-turn" onClick={() => void endTurn()} disabled={busy} title={idle ? `${idle} fleet${idle > 1 ? 's' : ''} without orders (Enter)` : 'End the season (Enter)'}>
-        {busy ? 'The season passes…' : 'End Season'}
+      <button className="end-turn" onClick={() => void endTurn()} disabled={busy} title={idle ? `${idle} fleet${idle > 1 ? 's' : ''} without orders (Enter)` : `End the turn: ${turnStride(game.turn) === 2 ? 'half a year' : 'a year'} passes (Enter)`}>
+        {busy ? 'Time passes…' : 'End Turn'}
         <Icon name="arrow" size={22} tone="light" />
       </button>
     </header>

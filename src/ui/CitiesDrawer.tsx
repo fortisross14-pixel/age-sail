@@ -4,13 +4,17 @@ import { UNIT_INFO } from '../data/court';
 import { fmt } from './format';
 import { GoodIcon } from './Icon';
 import { GOODS, GOOD_INFO, NEEDS, LUXURIES, LUXURY_NEED, type GoodId } from '../data/goods';
-import { LEVELS, GROWTH_STEP, territoryOf } from '../sim/colony';
+import { LEVELS, territoryOf } from '../sim/colony';
+import { GARRISON_FOOD } from '../data/colony';
+import { moodOf, nationById, neighbours } from '../sim/natives';
 import { loyaltyFactors, loyaltyTarget, colonyTaxes, TAX } from '../sim/empire';
 import { cargoUsed, cargoCapacity } from '../sim/game';
 import { getView } from './MapCanvas';
+import { turnLabel } from '../sim/types';
 
 export function ColonyCard({ colonyId }: { colonyId: string }) {
   const game = useStore((s) => s.game)!;
+  const world = useStore((s) => s.world)!;
   const selected = useStore((s) => s.selectedColony);
   const run = useStore((s) => s.run);
   const set = useStore((s) => s.set);
@@ -23,12 +27,16 @@ export function ColonyCard({ colonyId }: { colonyId: string }) {
   const lux = LUXURIES.reduce((t, g) => t + (c.stock[g] ?? 0), 0);
   const need = (g: GoodId, per: number) => ({ have: Math.floor(c.stock[g] ?? 0), want: Math.ceil(c.pop * per * 10) / 10 });
   const needs: [string, { have: number; want: number }, string][] = [
-    ['Food', need('food', NEEDS.food), 'Without it, colonists starve.'],
+    ['Food', { have: Math.floor(c.stock.food ?? 0), want: Math.ceil((c.pop + c.newcomers) * NEEDS.food + garrison.length * GARRISON_FOOD) }, 'Settlers, newcomers and the garrison all eat. Without it, colonists starve and soldiers desert.'],
     ['Cloth', need('cloth', NEEDS.cloth), 'Without it, work slows and the colony stops growing.'],
     ['Wine', need('wine', NEEDS.wine), 'Without it, work slows and the colony stops growing.'],
   ];
   const stock = GOODS.filter((g) => (c.stock[g] ?? 0) >= 1);
   const produced = GOODS.filter((g) => (c.last.produced[g] ?? 0) > 0);
+  const net = c.last.births - c.last.deaths;
+  const perYear = Math.round(c.pop * net * 100) / 100;
+  const siege = Object.entries(game.natives).find(([, st]) => st.siege?.colony === c.id);
+  const besiegers = siege ? nationById(world, siege[0]) : undefined;
   return (
     <section className={`city-card colony ${open ? 'open' : ''}`}>
       <button className="city-head" onClick={() => { set({ selectedColony: open ? null : c.id }); if (!open) setTimeout(() => getView()?.focusHex(c.map, c.hex), 0); }} aria-expanded={open}>
@@ -48,8 +56,19 @@ export function ColonyCard({ colonyId }: { colonyId: string }) {
               <span className="muted small">pays {colonyTaxes(game, c)} a season</span>
             </div>
           </div>
-          <div className="small">Growth {Math.floor(c.growth)}/{GROWTH_STEP}{c.last.luxuries ? ' · luxuries: growing faster' : ''}{c.pop >= L.cap ? ' · full: raise it to grow further' : ''}</div>
-          <div className="bar"><div style={{ width: `${Math.min(100, (c.growth / GROWTH_STEP) * 100)}%` }} /></div>
+          {besiegers && <div className="notice bad"><b>Besieged by the {besiegers.people}</b> since {turnLabel(siege![1].siege!.since)}. No one works the fields; every season they try the palisade. Bring soldiers and food by sea, or make peace.</div>}
+          <div className="small" title={`Births ${(c.last.births * 100).toFixed(1)}% a year, deaths ${(c.last.deaths * 100).toFixed(1)}% a year. Plenty of food, luxuries and friendly peoples nearby raise births; the tropics and sieges raise deaths.`}>
+            Births {(c.last.births * 100).toFixed(1)}% · deaths {(c.last.deaths * 100).toFixed(1)}% a year:{' '}
+            <b className={perYear < 0 ? 'bad' : ''}>{perYear >= 0 ? '+' : ''}{perYear} colonists a year</b>
+            {c.newcomers > 0 ? ` · ${c.newcomers} newcomer${c.newcomers > 1 ? 's' : ''} seasoning` : ''}
+            {c.pop + c.newcomers >= L.cap ? ' · full: raise it to grow further' : ''}
+          </div>
+          <div className="bar"><div className={c.growth < 0 ? 'bad' : ''} style={{ width: `${Math.min(100, Math.abs(c.growth) * 100)}%` }} /></div>
+          <div className="small muted">Natural growth is slow. Settlers from home grow a colony faster: ship them over, and they work after a season ashore.</div>
+          {(() => {
+            const near = neighbours(world, game, c).filter((x) => x.st.met);
+            return near.length > 0 && <div className="small">Neighbours: {near.map((x) => `the ${x.n.people} (${moodOf(x.st)})`).join(', ')}. Friendly peoples trade food and help the colony grow; hostile ones raid it, and furious ones besiege it.</div>;
+          })()}
 
           <h4>Needs each season</h4>
           <div className="needs">

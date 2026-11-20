@@ -18,10 +18,11 @@ for (const seed of [1492, 7, 42]) {
   console.log(seed, foundColony(world, state, state.parties[0].id).ok);
   const c = state.colonies[0];
   const rows: string[] = [];
-  for (let t = 0; t < 12; t++) {
+  for (let t = 0; t < 20; t++) {
     endTurn(world, state);
     rows.push(`${c.pop}${c.last.hungry ? 'H' : c.last.discontent ? 'D' : ''}`);
   }
   const stock = Object.entries(c.stock).filter(([, v]) => v! >= 1).map(([g, v]) => `${g}:${Math.floor(v!)}`).join(' ');
-  console.log('  pop by season:', rows.join(' '), '| stock after 3 years:', stock);
+  console.log('  pop by turn (half-years):', rows.join(' '), '| stock after 10 years:', stock, `| births ${(c.last.births * 100).toFixed(1)}% deaths ${(c.last.deaths * 100).toFixed(1)}%`);
+  for (const e of state.chronicle.filter((x) => x.kind === 'peril' && x.text.includes(c.name))) console.log('   ', e.turn, e.text);
 }

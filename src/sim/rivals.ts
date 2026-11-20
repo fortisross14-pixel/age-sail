@@ -3,7 +3,7 @@
  * colonies at good sites and to trade with native peoples, grow their colonies, and go to war with you when
  * relations sour. Everything they do happens on the map, where the player can see it.
  */
-import { CROWNS, rivalSpec, rivalsOf, type CrownId } from '../data/rivals';
+import { CROWNS, RIVAL_SETTLERS_EVERY, rivalSpec, rivalsOf, type CrownId } from '../data/rivals';
 import { SHIPS } from '../data/ships';
 import { isWater } from '../data/terrain';
 import { RESOURCE_IDS } from '../data/city';
@@ -12,7 +12,7 @@ import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { planRoute, stepCost } from './sailing';
 import { LEVELS } from './colony';
 import { personById, skill } from './court';
-import { Fog, seasonOf, type Colony, type Fleet, type GameEvent, type GameState, type MapId, type Party, type RivalColony, type RivalShip, type RivalState, type World } from './types';
+import { Fog, seasonOf, emptyAccount, type Colony, type Fleet, type GameEvent, type GameState, type MapId, type Party, type RivalColony, type RivalShip, type RivalState, type World } from './types';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -227,7 +227,7 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
 
   // their colonies grow, and the ones you can see are noted
   for (const c of s.rivalColonies) {
-    if ((s.turn - c.founded) % 5 === 4 && c.pop < LEVELS[c.level].cap) c.pop++;
+    if ((s.turn - c.founded) % RIVAL_SETTLERS_EVERY === RIVAL_SETTLERS_EVERY - 1 && c.pop < LEVELS[c.level].cap) c.pop++;
     if (c.pop >= LEVELS[c.level].cap && LEVELS[c.level].next && rng() < 0.25) { c.level = LEVELS[c.level].next!; c.garrison++; }
     if (!c.seen && s.fog[c.map][c.hex] >= Fog.Charted) {
       c.seen = true;
@@ -306,7 +306,7 @@ export function stormColony(_w: World, s: GameState, p: Party, colonyId: string,
     s.rivalColonies = s.rivalColonies.filter((x) => x !== c);
     const col: Colony = {
       id: `col-${s.nextId++}`, name: c.name, map: c.map, hex: c.hex, founded: s.turn, pop: Math.max(1, Math.round(c.pop * 0.7)), level: c.level,
-      stock: { food: 10 }, growth: 0, loyalty: 50, charter: false, unrest: false, last: { produced: {}, worked: [], hungry: false, discontent: false, luxuries: false },
+      stock: { food: 10 }, growth: 0, loyalty: 50, charter: false, unrest: false, newcomers: 0, last: emptyAccount(),
     };
     s.colonies.push(col);
     for (const u of units) if (u.type === 'infantry') { u.party = null; u.colony = col.id; }

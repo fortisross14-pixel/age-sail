@@ -12,7 +12,7 @@ import { CITIES } from '../data/europe';
 const CITY_NAME: Record<string, string> = Object.fromEntries(CITIES.map((c) => [c.id, c.name]));
 import { GRIDS } from './hex';
 import { Fog } from './types';
-import { allNations } from './natives';
+import { allNations, remember } from './natives';
 
 type Log = (kind: 'discovery' | 'peril' | 'court' | 'trade', text: string) => void;
 type Ctx = Record<string, string | number>;
@@ -155,9 +155,9 @@ const STORIES: Story[] = [
     title: () => 'Envoys from across the sea',
     text: (_s, c, w) => { const n = allNations(w).find((x) => x.id === c.nation)!; return `Envoys of the ${n.people} have come aboard one of your ships, with gifts of feathers and gold, asking what the strangers want in their land.`; },
     choices: () => [
-      { label: 'Exchange gifts and swear friendship', hint: '−200 ducats; they think better of you', apply: (_w, s, c) => { s.treasury -= 200; s.natives[String(c.nation)].attitude += 20; return 'The envoys leave with mirrors, cloth and a sword for their chief.'; } },
+      { label: 'Exchange gifts and swear friendship', hint: '−200 ducats; they think better of you', apply: (_w, s, c) => { s.treasury -= 200; remember(s, s.natives[String(c.nation)], 'Friendship sworn with their envoys', 20); return 'The envoys leave with mirrors, cloth and a sword for their chief.'; } },
       { label: 'Ask them to guide your explorers', hint: 'Their lands are charted', apply: (w, s, c) => { const n = allNations(w).find((x) => x.id === c.nation)!; for (const h of [n.siteHex, ...n.villages].flatMap((v) => GRIDS[n.map].within(v, 3))) if (s.fog[n.map][h] < Fog.Explored) s.fog[n.map][h] = Fog.Explored; return 'They draw their country in the sand: rivers, villages, mountains.'; } },
-      { label: 'Send them away', hint: 'They are offended', apply: (_w, s, c) => { s.natives[String(c.nation)].attitude -= 15; return 'The envoys leave in silence.'; } },
+      { label: 'Send them away', hint: 'They are offended', apply: (_w, s, c) => { remember(s, s.natives[String(c.nation)], 'Their envoys sent away', -15); return 'The envoys leave in silence.'; } },
     ],
   },
   {

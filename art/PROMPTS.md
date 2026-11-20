@@ -1,8 +1,8 @@
 # Art requests: the Admiralty interface
 
-**How to use these.** One prompt makes one image: paste one at a time, each in a new message.
-Attach the Admiralty concept image (the Sevilla city screen) as the style reference every time,
-and only that. Save each result in `art/source/ui/` under its file name and I'll cut it in.
+**How to use these.** One prompt makes one image: paste one at a time, each in a new message. No
+attachments are needed: the style paragraph describes the look. Save each result in
+`art/source/ui/` under its file name and I'll cut it in.
 
 **Why they look like this.** The icon sheet came out best when every item sat in its own framed
 cell on a plain background. So every prompt asks for a strict grid of framed tiles on flat navy:
@@ -11,7 +11,7 @@ easy for ChatGPT to draw, easy for me to cut, no transparency needed.
 Every prompt starts with the same style paragraph, describing the concept art's painted look
 (not the gold medallion look of the icons), so the sheets match each other and the concept:
 
-> **Style:** match the attached concept art: full-colour, hand-painted illustrations for a premium
+> **Style:** full-colour, hand-painted illustrations for a premium
 > historical strategy game, like detailed painted miniatures. Warm natural colours (terracotta
 > roofs, pale stone, weathered timber, green grass, blue water, red pennants), soft daylight from
 > the top left, a fine dark outline, rich but readable detail. No text, letters, numbers or
@@ -34,9 +34,43 @@ Every prompt starts with the same style paragraph, describing the concept art's 
 
 Still wanted, if you like: a colonist and a missionary in the units style.
 
+## Wanted for M11 (natives and sieges)
+
+### 9. `native-leaders.png`
+
+> Style: full-colour, hand-painted illustrations for a premium historical strategy game, like
+> detailed painted miniatures. Warm natural colours, soft daylight from the top left, a fine dark
+> outline, rich but readable detail. No text, letters, numbers or labels anywhere.
+>
+> A landscape image with a strict grid of 4 columns and 3 rows on flat plain navy. Each cell
+> holds one oval portrait in a thin gold frame, all the same size: head and shoulders,
+> three-quarter view, painted in full colour like a small oil portrait, dignified and respectful.
+> Leaders of the peoples of the Atlantic world around 1500: a Taíno chief with a gold disc
+> pendant · a Tupi elder with a feather headdress · a woodland chief of the northeast with a
+> roach headdress · a Mexica lord with a jade lip plug and a feathered cloak ·
+> an Andean lord with large gold ear spools · a Maya noblewoman with a jade necklace · a
+> Wolof king of the West African coast in a white robe · a Benin queen mother with a coral bead
+> crown ·
+> a Kongo noble with a raffia cap · a Mapuche warrior chief · a young Arawak woman of
+> rank · an old Carib war leader.
+
+### 10. `native-units.png`
+
+> Style: (the same paragraph)
+>
+> A landscape image with a strict grid of 5 columns and 2 rows of square tiles, all the same
+> size, separated by even gaps of flat plain navy. Each tile has a light parchment background and
+> a thin gold border, and shows one painted miniature, centred, the same scale in every tile:
+> a woodland warrior with a bow · a jungle warrior with a blowgun · an imperial jaguar warrior
+> with a wooden sword edged in obsidian · an Andean soldier with a sling and a quilted tunic ·
+> a West African warrior with a spear and a hide shield ·
+> a war canoe with five paddlers · a war camp of tents and fires (seen from above, for a
+> siege) · a burned palisade with smoke (a destroyed colony) · a native village of round
+> houses · a palisaded colony with a cross and a flag.
+
 ## 2. `buildings.png`
 
-> Style: match the attached concept art: full-colour, hand-painted illustrations for a premium
+> Style: full-colour, hand-painted illustrations for a premium
 > historical strategy game, like detailed painted miniatures. Warm natural colours (terracotta
 > roofs, pale stone, weathered timber, green grass, blue water, red pennants), soft daylight from
 > the top left, a fine dark outline, rich but readable detail. No text, letters, numbers or
@@ -58,8 +92,7 @@ Still wanted, if you like: a colonist and a missionary in the units style.
 > Style: (the same paragraph)
 >
 > A landscape image with a strict grid of 5 columns and 3 rows on flat plain navy, evenly
-> spaced. Each cell holds one painted heraldic shield like the red-and-gold crest in the
-> concept, all the same shape and size (a rounded heater shield with a thin gold rim), simple and
+> spaced. Each cell holds one painted heraldic shield like a red-and-gold royal crest, all the same shape and size (a rounded heater shield with a thin gold rim), simple and
 > bold so each reads when small:
 > Castile (red and gold, a castle) · Portugal (white with small blue shields, red border) ·
 > England (red, gold lions) · France (blue, gold fleurs-de-lis) · the Netherlands (orange, a
@@ -114,7 +147,7 @@ Still wanted, if you like: a colonist and a missionary in the units style.
 > A landscape image with a strict grid of 2 columns and 4 rows of wide panels, each panel three
 > times as wide as it is tall, all the same size, separated by even gaps of flat plain navy, no
 > frames. Each panel is a sunny painted city skyline across water under a pale blue sky
-> with soft clouds, like the Sevilla view in the concept's header:
+> with soft clouds, like a painted city banner:
 > Sevilla with its cathedral tower and ships at the quay · Lisboa on the river with a fortified
 > tower · London with a long bridge and a white castle · La Rochelle with two harbour towers ·
 > Antwerpen with a tall cathedral spire · a sunny southern port · a walled inland city on a hill ·
@@ -126,7 +159,7 @@ Still wanted, if you like: a colonist and a missionary in the units style.
 >
 > A wide 16:9 painting for a game's title screen: caravels and a galleon leaving a sunlit
 > Iberian harbour at dawn for the open ocean; in the foreground, the edge of a navy-lacquered desk
-> with gold inlay like the concept's frames, an old sea chart, a brass astrolabe and a compass. Keep the middle third calm
+> with gold inlay, an old sea chart, a brass astrolabe and a compass. Keep the middle third calm
 > and empty for the title and buttons.
 
 ---
