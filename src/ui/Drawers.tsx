@@ -18,6 +18,7 @@ import { Sparkline } from './Sparkline';
 import { Fleets } from './FleetsDrawer';
 import { Cities } from './CityScreen';
 import { Court, Research, Chronicle } from './CourtDrawer';
+import { StepHint } from './Guidance';
 
 const HEADS: Record<Exclude<DrawerId, 'cities'>, { title: string; icon: IconName; sub: (g: GameState) => string }> = {
   markets: { title: 'Markets', icon: 'markets', sub: () => 'Prices in every port you know' },
@@ -64,6 +65,7 @@ export function Drawer() {
           <div><h2>{head.title}</h2><div className="sub">{head.sub(game)}</div></div>
         </header>
       )}
+      <StepHint screen={shown} />
       <div className="drawer-body" key={shown}>
         {shown === 'fleets' && <Fleets />}
         {shown === 'markets' && <Markets />}

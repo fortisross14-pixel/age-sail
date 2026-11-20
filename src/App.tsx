@@ -11,7 +11,7 @@ import { SelectionCard } from './ui/SelectionCard';
 import { NewsFeed } from './ui/NewsFeed';
 import { HoverInfo } from './ui/HoverInfo';
 import { EventCard, Help, Toast, Settings } from './ui/Overlays';
-import { ObjectivesPanel, EndTurnGuard, Welcome } from './ui/Guidance';
+import { ObjectivesPanel, EndTurnGuard, Welcome, MapPointer } from './ui/Guidance';
 
 const DRAWER_KEYS: Record<string, DrawerId> = { '1': 'cities', '2': 'markets', '3': 'fleets', '4': 'court', '5': 'research', '6': 'chronicle' };
 const PAN_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
@@ -53,6 +53,7 @@ function useKeys() {
         case 'v': s.set({ showWind: !s.showWind }); break;
         case 'g': s.set({ showGrid: !s.showGrid }); break;
         case 'm': s.setMap(s.map === 'old' ? 'new' : 'old'); break;
+        case 'n': s.nextAttention(); break;
         case 'h': case '?': s.set({ showHelp: true }); break;
         case '+': case '=': getView()?.zoomBy(1.2); break;
         case '-': getView()?.zoomBy(1 / 1.2); break;
@@ -88,6 +89,7 @@ export function App() {
       <MapCanvas />
       <Hud />
       <Rail />
+      <MapPointer />
       <NewsFeed />
       <ObjectivesPanel />
       <Dock />

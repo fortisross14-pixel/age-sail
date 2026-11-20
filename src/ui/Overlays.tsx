@@ -115,7 +115,7 @@ export function Help() {
               <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows, drag, or rest the pointer at the screen edge to pan · <kbd>Wheel</kbd>/<kbd>Pinch</kbd> zoom</li>
               <li><kbd>Space</kbd> sail · <kbd>Enter</kbd> end the turn · <kbd>Tab</kbd> next fleet · <kbd>Esc</kbd> cancel or close · <kbd>M</kbd> switch map</li>
               <li><kbd>1</kbd> Cities · <kbd>2</kbd> Markets · <kbd>3</kbd> Fleets · <kbd>4</kbd> Court · <kbd>5</kbd> Research · <kbd>6</kbd> Chronicle</li>
-              <li><kbd>V</kbd> winds · <kbd>G</kbd> hex grid · <kbd>H</kbd> this guide · hold <kbd>Alt</kbd> to highlight everything you can click</li>
+              <li><kbd>V</kbd> winds · <kbd>G</kbd> hex grid · <kbd>N</kbd> next thing that needs you · <kbd>H</kbd> this guide · hold <kbd>Alt</kbd> to highlight everything you can click</li>
             </ul>
           )}
         </div>

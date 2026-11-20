@@ -7,7 +7,7 @@ fresh every game.
 
 ## Now playing: v0.14
 
-Phase 1, the first hour: a first voyage in eight steps and advisers' ambitions with rewards, an objectives panel with "Show me", a short welcome and a tabbed guide in place of the help wall, End Turn reminders, and three difficulty levels (Squire, Captain, Admiral). The plan from here, item by item: [docs/ROADMAP.md](docs/ROADMAP.md#production-plan); the audit behind it: [docs/PRODUCTION-AUDIT.md](docs/PRODUCTION-AUDIT.md).
+Phase 1, the first hour: a first voyage in eight steps and advisers' ambitions with rewards, an objectives panel with "Show me", a short welcome and a tabbed guide in place of the help wall, End Turn reminders with `N` for the next thing that needs you, a ring on the map for the step in hand, openings written for each crown, news of the first rival sail, and three difficulty levels (Squire, Captain, Admiral). The plan from here, item by item: [docs/ROADMAP.md](docs/ROADMAP.md#production-plan); the audit behind it: [docs/PRODUCTION-AUDIT.md](docs/PRODUCTION-AUDIT.md).
 
 From v0.13, a living market: factories in any European port that sell slowly at fair prices and buy cheap; regional tastes; shocks; rival merchants; tools that wear out in the colonies.
 

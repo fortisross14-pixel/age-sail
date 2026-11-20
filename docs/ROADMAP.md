@@ -96,7 +96,7 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | M11 | Colonies and natives: turns of half a year until 1550, then a year (seasons still pass one by one underneath); colonies grow by births over deaths (slow; the tropics are deadly), so settlers come from home and spend a season "seasoning" before they work; soldiers and friars eat from the warehouse or desert; peoples remember why they feel as they do (gifts, trade, posts, missions, settlers on their land, attacks, sickness); friendly peoples trade food to nearby colonies and raise births; furious ones besiege a colony (no fields worked, an assault each season) and can burn it | done |
 | M12 | Armies: pikemen, swordsmen, crossbowmen, arquebusiers, lancers and field guns (barracks II for the last three), each with fire, melee, toughness and pursuit; parties ashore are armies under a general, carrying food (a small band forages, an army starves without supply, and restocks beside a colony); automatic battles in three rounds (fire, melee, pursuit) decided by morale, with terrain (horse and guns poor in rough country, defenders stronger there), firearms frightening peoples who have never met them, assault or steady stance, and a battle report; colony walls (palisade, stone walls, star fort) that field guns breach; veterans; native raids, sieges and ambushes, rival raids and storms, and retaking free states all fought the same way | done |
 | M13 | A living market: factories in any European port (yours or foreign, with dues abroad) that hold your goods, sell them slowly at fair prices and buy what you need while it is cheap; regional tastes (wine and spices in the North, silver and sugar in Italy, no wine in the Maghreb); shocks that move a region's demand for a few years (bad harvests, plague, war, a royal wedding, a fashion, a good peace); rival merchants who ship their colonies' sugar, tobacco and furs into their home ports and buy tools and cloth there; colonies wear out tools and work slower without them; glut and scarce markers. Paris trades through Rouen | done |
-| Phase 1 | **The first hour** (v0.14): objectives (a first voyage of eight steps, then advisers' ambitions with rewards), an objectives panel with "Show me", a short welcome in place of the help wall, a tabbed guide, End Turn reminders with a count on the button, three difficulty levels, and small interface fixes. Items P1-01 to P1-23 below | in progress: 16 of 23 done |
+| Phase 1 | **The first hour** (v0.14): objectives (a first voyage of eight steps, then advisers' ambitions with rewards), an objectives panel with "Show me", a short welcome in place of the help wall, a tabbed guide, End Turn reminders with a count on the button, three difficulty levels, and small interface fixes. Items P1-01 to P1-23 below | 22 of 23 done; P1-20 (watching new players) needs people |
 | Phase 2 | A world that pushes back: rivals with treasuries, needs, fleets and intentions; rivals and peoples who deal with each other | next |
 | Phase 3 | Stories and dynasty: a hundred stories in data, chains, a monarch and heirs, crown-specific text | |
 | Phase 4 | Depth: the research tree (was M15), European diplomacy and the Mediterranean (was M14), victory paths, scenarios | |
@@ -144,7 +144,10 @@ Decided with the player after M8:
 - **Research** comes from research buildings and from scientific expeditions you fund.
 - **Turns** are half a year, then a year from 1550.
 - **Battles** are automatic with a high-level report: this is Civilization, not Europa Universalis.
-- **Slavery** is left out for now.
+- **Slavery is in the game** (owner's decision after the production audit; it replaces "left out
+  for now"). Enslaved people are a hybrid of a good and a unit: they are bought and sold in
+  markets, taken in wars and battles, carried in a fleet's hold, and put to work in your colonies.
+  Built in Phase 4 (P4-14 to P4-17).
 
 ## M10: GUI pass (plan)
 
@@ -177,10 +180,10 @@ phase; nothing is renumbered.
 
 | Phase | Theme | Items | Done |
 |---|---|---|---|
-| 1 | The first hour | 23 | 16 |
+| 1 | The first hour | 23 | 22 |
 | 2 | A world that pushes back | 12 | 0 |
 | 3 | Stories and dynasty | 14 | 0 |
-| 4 | Depth | 13 | 0 |
+| 4 | Depth | 17 | 1 |
 | 5 | Interface depth | 13 | 0 |
 | 6 | Balance (deferred) | 10 | 0 |
 | 7 | Technical and visual polish (deferred) | 14 | 0 |
@@ -208,13 +211,13 @@ the guide.
 | P1-13 | Minimap: uncharted hexes drawn as chart paper so the unknown does not read as an empty box | U8 | done |
 | P1-14 | "Survivors at sea" picks only among the crowns you are not playing | N6 | done |
 | P1-15 | Save version 15: older voyages become Captain and tick what they have already achieved without paying for it; tests for objectives, difficulty, reminders and the migration | - | done |
-| P1-16 | Point at the map for the current step: a pulsing ring on the port, coast or fleet a first-voyage step is about | G1 | open |
-| P1-17 | First-time hints inside screens: one line the first time Court, Markets, Fleets and a city open, pointing at the control the current step needs | G3 | open |
-| P1-18 | A key and a button for "the next thing that needs me", cycling the attention list without ending the turn | U2 | open |
-| P1-19 | Openings per crown: the first voyage's wording and targets for Portugal (already knows the lateen), England, France and the Netherlands (far from Cape Bojador) | G1 | open |
+| P1-16 | Point at the map for the current step: a pulsing ring on your main port or on the edge of the known coast, resting at the screen's edge when that place is out of view | G1 | done |
+| P1-17 | First-time hints inside screens: when Court, Markets or Fleets open for the step in hand, one line says which control to use; closing it is remembered | G3 | done |
+| P1-18 | `N` and a button beside End Turn jump to the next thing that needs you, round the attention list, without ending the turn | U2 | done |
+| P1-19 | Openings per crown (`OPENINGS` in `src/data/objectives.ts`): a line on the welcome card about what the crown is good at, and the voyage south reworded for Portugal, England, France and the Netherlands | G1 | done |
 | P1-20 | Watch three people who have never played reach their first colony; write down where each stalls and add an item for each stall | G1 | open (needs people) |
-| P1-21 | News feed at the start of a turn: no more than two cards over the map, the rest behind "and 3 more" | U5 | open |
-| P1-22 | A first rival sighting inside the first ten turns, so the race is felt early (an event and a ship on the map) | G1, D2 | open |
+| P1-21 | News feed at the start of a turn: no more than two cards over the map, the rest behind "and 3 more" | U5 | done |
+| P1-22 | The first rival sail is an event ("Rival sails", with "Go there" to the ship), inside the first ten turns for every crown | G1, D2 | done |
 | P1-23 | A chosen option on the menu or in Settings keeps its dark look under the pointer | U9 | done |
 
 ### Phase 2: A world that pushes back
@@ -276,8 +279,12 @@ Goal: enough to decide for a 200-turn game, and more than one way to win it.
 | P4-09 | Give prestige a use: it opens better petitioners, royal marriages and treaties, and is spent on favours | G6 | open |
 | P4-10 | Sea battles on the three-round model of land battles (gunnery, boarding, pursuit), with a report | M3 | open |
 | P4-11 | More to build at home: five more Old World buildings, and buildings that depend on each other | M4 | open |
-| P4-12 | Decide how the game treats slavery and the plantation economy, write the decision under "Systems decisions", and build what follows from it | M5 | open (owner's decision) |
+| P4-12 | Decide how the game treats slavery and the plantation economy. **Decided: it is in**, as a hybrid of a good and a unit (see "Systems decisions") | M5 | done (decision) |
 | P4-13 | A late game worth reaching: independence wars as a campaign, and objectives for the last two eras | G2 | open |
+| P4-14 | Enslaved people in the game state: counted in a fleet's hold and in a colony (not a named unit, not a plain cargo), with a price in the markets that deal in them and food to be found for them aboard and ashore | M5 | open |
+| P4-15 | How they are acquired: bought at trading grounds on the African coast and from other crowns' ports, and taken as captives in battles and when a village or colony falls | M5 | open |
+| P4-16 | How they are used: put to work on a colony's hexes beside colonists (plantation goods first), without the settlers' needs for cloth, wine and luxuries, and sold on in colonial and European markets | M5 | open |
+| P4-17 | What it costs: deaths at sea and in the fields, flight and risings in colonies where they outnumber the settlers, what it does to the peoples they were taken from and to your standing with them, and, in the later eras, laws that restrict or end the trade (P4-03). No objective or ambition rewards it; the game states what happens and leaves the judgment to the player | M5 | open |
 
 ### Phase 5: Interface depth
 

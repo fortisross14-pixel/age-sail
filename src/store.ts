@@ -69,6 +69,8 @@ interface Store {
   endTurn: (force?: boolean) => Promise<void>;
   /** Open the screen or select the thing an objective or a reminder points at. */
   goTo: (t: Target) => void;
+  /** Jump to the next thing that needs the player, round and round. */
+  nextAttention: () => void;
   selectFleet: (id: number | null) => void;
   selectParty: (id: number | null) => void;
   selectPort: (id: string | null) => void;
@@ -80,6 +82,8 @@ interface Store {
 }
 
 let toastId = 0;
+/** the reminder last jumped to, so the next press moves on */
+let lastAttention: string | null = null;
 
 /** The sound each kind of order makes when it succeeds. */
 function soundFor(c: Command): Sfx {
@@ -208,6 +212,19 @@ export const useStore = create<Store>((set, get) => {
       void save(state);
       const fresh = (Object.keys(state.objectives.done) as ObjectiveId[]).filter((id) => g.objectives.done[id] == null);
       if (fresh.length) announce(state, fresh);
+    },
+
+    nextAttention() {
+      const g = get().game, w = get().world;
+      if (!g || !w) return;
+      const all = attention(g, w);
+      const items = [...all.filter((a) => a.urgent), ...all.filter((a) => !a.urgent)];
+      if (!items.length) { get().say('Nothing needs you: end the turn when you are ready.'); return; }
+      const at = items.findIndex((a) => a.id === lastAttention);
+      const next = items[(at + 1) % items.length];
+      lastAttention = next.id;
+      get().goTo(next.go);
+      get().say(next.text);
     },
 
     goTo(t) {

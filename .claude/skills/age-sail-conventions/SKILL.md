@@ -51,6 +51,8 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   (`demandFactor`), rival merchants, and factories (`factorySeason`); numbers in `src/data/trade.ts`.
 - **Objectives** (the first voyage, advisers' ambitions): words, order and rewards in
   `src/data/objectives.ts`, conditions in `src/sim/objectives.ts` (`MET`, one function per id).
+  A first-voyage step can carry `inScreen` (the hint shown inside the screen it opens) and `point`
+  (where the map ring sits); what differs by crown goes in `OPENINGS`.
   `checkObjectives` runs after every order (in the worker) and every season; it pays once and
   logs to the chronicle. A new objective is a data entry plus a condition; never pay a reward
   anywhere else.

@@ -25,6 +25,10 @@ export interface ObjectiveDef {
   from?: string;
   /** how to do it, in one or two sentences */
   how: string;
+  /** said inside the screen "Show me" opens, the first time: which control to use */
+  inScreen?: string;
+  /** where the map points while this is the next step */
+  point?: 'home' | 'south';
   goto?: ObjectiveGoto;
   reward: { ducats?: number; prestige?: number };
   /** ambitions wait until these are done */
@@ -35,21 +39,25 @@ export const OBJECTIVES: ObjectiveDef[] = [
   // ---- the first voyage ----
   { id: 'explorer', chain: 'voyage', title: 'Commission an explorer',
     how: 'Open Court, pick the courtier with the best navigation, and make them an explorer. They need a turn to make ready. Only an explorer may sail into uncharted water.',
-    goto: { screen: 'court', courtTab: 'people' }, reward: { ducats: 100 } },
+    inScreen: 'Pick a courtier on the left and read their Navigation on the right: the higher, the further and safer they sail. Under Commission, choose Explorer and who sails with them.',
+    point: 'home', goto: { screen: 'court', courtTab: 'people' }, reward: { ducats: 100 } },
   { id: 'cargo', chain: 'voyage', title: 'Load goods to trade',
     how: 'Open Markets, choose your main port and buy tools for a ship in harbour. The peoples of the African coast prize iron.',
-    goto: { screen: 'markets' }, reward: { ducats: 100 } },
+    inScreen: 'Choose your main port on the left, then Buy on the Tools row. The lot buttons at the top right set how much each press buys.',
+    point: 'home', goto: { screen: 'markets' }, reward: { ducats: 100 } },
   { id: 'command', chain: 'voyage', title: 'Give your explorer a fleet',
     how: 'When the explorer is ready, open Fleets, pick a ship and choose them to command it. Join your two ships first if you want them to sail together.',
-    goto: { screen: 'fleets' }, reward: { ducats: 100 } },
+    inScreen: 'Pick a ship under Idle ships, then "Choose someone at court" and your explorer. Join puts both ships in one fleet; Embark takes the colonist and the soldier aboard.',
+    point: 'home', goto: { screen: 'fleets' }, reward: { ducats: 100 } },
   { id: 'south', chain: 'voyage', title: 'Sail beyond the known coast',
     how: 'Select the fleet and click the sea to the south, past Cape Bojador: numbered markers show where each season ends. Click again or press Space to sail. Watch the stores: about eight seasons of food.',
-    goto: { fleet: 'led' }, reward: { ducats: 150, prestige: 2 } },
+    point: 'south', goto: { fleet: 'led' }, reward: { ducats: 150, prestige: 2 } },
   { id: 'meet', chain: 'voyage', title: 'Meet a people',
     how: 'Follow the coast until a trading ground appears, and dock there. Every coast belongs to someone.',
     goto: { fleet: 'led' }, reward: { ducats: 150, prestige: 3 } },
   { id: 'sale', chain: 'voyage', title: 'Sell a cargo',
     how: 'Trade your tools for gold, pepper or dyes, carry them back to Europe and sell where the price is best (Markets, Compare prices).',
+    inScreen: 'Compare prices shows every port you know side by side. Sell where the bar is short: that market is hungry for the good.',
     goto: { screen: 'markets' }, reward: { ducats: 300 } },
   { id: 'ashore', chain: 'voyage', title: 'Send a party ashore',
     how: 'Ships only chart coasts. With units aboard and the fleet beside a shore, choose Land party. On foot they survey for gold, timber and good soil.',
@@ -96,6 +104,30 @@ export const OBJECTIVES: ObjectiveDef[] = [
     how: 'Lead the standings in Court, Crowns: colonists, territory and commerce all count.',
     goto: { screen: 'court', courtTab: 'crowns' }, reward: { prestige: 20 } },
 ];
+
+/**
+ * The opening differs by crown: how far the unknown coast is, and what the crown is good at.
+ * `welcome` is added to the greeting; `south` replaces the how-to of "Sail beyond the known coast".
+ */
+export const OPENINGS: Record<string, { welcome: string; south?: string }> = {
+  spain: { welcome: 'Sevilla is a short sail from the African coast, and your colonists come cheap: you can plant a colony early.' },
+  portugal: {
+    welcome: 'Your pilots already know the portolan and the lateen sail, and Lisboa is the nearest great port to Africa: you can be first down the coast.',
+    south: 'Select the fleet and click the sea south of Cape Bojador. Your lateen sails make the beat home easier than for anyone else. Numbered markers show where each season ends; click again or press Space to sail.',
+  },
+  england: {
+    welcome: 'London is far from the unknown coasts: a voyage south takes most of your stores before it begins. Your ships fight well, and there is trade to be had in the North first.',
+    south: 'Cape Bojador is three or four seasons from London. Sail with full stores and call at a port on the way (Lisboa, Sevilla): foreign ports refill your stores to half. Click the sea to plan; numbered markers show where each season ends.',
+  },
+  france: {
+    welcome: 'La Rochelle looks out on the open Atlantic, a season or two from the African coast. Your court is larger than any other, and your gifts go further with the peoples you meet.',
+    south: 'Cape Bojador is about two seasons from La Rochelle. Follow the Iberian coast south and call at a port if the stores run low: foreign ports refill them to half. Click the sea to plan, then click again or press Space.',
+  },
+  netherlands: {
+    welcome: 'Antwerpen is the furthest of the five from the unknown coasts, but your prices are the best in every market and your ships are cheap: trade within Europe can pay for the long voyages.',
+    south: 'Cape Bojador is four seasons or more from Antwerpen. Consider a trading run to Lisboa or Sevilla on the way: you sell there at better prices than anyone, and the port refills your stores to half. Click the sea to plan; numbered markers show where each season ends.',
+  },
+};
 
 export const objectiveById = (id: ObjectiveId) => OBJECTIVES.find((o) => o.id === id)!;
 export const VOYAGE = OBJECTIVES.filter((o) => o.chain === 'voyage');

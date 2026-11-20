@@ -6,9 +6,11 @@ interface Prefs {
   guard: boolean;
   /** the objectives panel folded away */
   objectivesFolded: boolean;
+  /** first-voyage steps whose in-screen hint the player has closed */
+  hintsSeen: string[];
 }
 
-const DEFAULTS: Prefs = { guard: true, objectivesFolded: false };
+const DEFAULTS: Prefs = { guard: true, objectivesFolded: false, hintsSeen: [] };
 
 let prefs: Prefs = { ...DEFAULTS };
 try {

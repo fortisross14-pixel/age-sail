@@ -145,6 +145,14 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
           const site = pickSite(w, s, spec.id, map, rng);
           if (site != null) spawn(w, s, spec.id, map, 'settlers', site);
         }
+        // the first sail of any rival is news: the race has begun
+        const first = s.rivalShips.find((x) => x.crown === spec.id);
+        if (first && s.told.first_rival == null) {
+          s.told.first_rival = s.turn;
+          const home = w.old.ports.find((p) => p.id === spec.home);
+          ev({ kind: 'people', title: 'Rival sails', map: first.map, hex: first.hex,
+            text: `Word from ${home?.name ?? 'abroad'}: ${spec.people} have sent ${first.kind === 'trader' ? 'a ship to trade with the peoples of the coast' : 'a ship with settlers to plant a colony'}. You are not the only crown looking beyond the known world; the best coasts will go to whoever reaches them first.` });
+        }
       }
       r.next = s.turn + Math.round(Math.max(8, spec.pace - Math.floor(s.turn / 40)) * difficultySpec(s.difficulty).rivalPace);
     }

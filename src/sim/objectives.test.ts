@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { newGame, endTurn, promote, buy, mainPort, checkObjectives, setResearch } from './game';
 import { activeAmbitions, objectiveDone, voyageDone, rewardOf } from './objectives';
-import { OBJECTIVES, VOYAGE, AMBITIONS, AMBITIONS_AT_ONCE, objectiveById } from '../data/objectives';
+import { OBJECTIVES, VOYAGE, AMBITIONS, AMBITIONS_AT_ONCE, OPENINGS, objectiveById } from '../data/objectives';
 import { DIFFICULTIES } from '../data/difficulty';
 import { CROWNS, type CrownId } from '../data/rivals';
 import { attention } from '../ui/attention';
@@ -95,6 +95,26 @@ describe('Phase 1: what needs you before the turn ends', () => {
     expect(attention(state, world).filter((a) => a.urgent).map((a) => a.id)).toContain('research');
     setResearch(state, 'portolan');
     expect(attention(state, world).map((a) => a.id)).not.toContain('research');
+  });
+});
+
+describe('Phase 1: the race is felt early', () => {
+  it('announces the first rival sail inside the first ten turns, once, for every crown', () => {
+    for (const c of CROWNS) {
+      const { world, state } = newGame(1492, 1650, c.id as CrownId);
+      let seen = 0, when = -1;
+      for (let i = 0; i < 20; i++) {
+        endTurn(world, state);
+        for (const e of state.events) if (e.title === 'Rival sails') { seen++; if (when < 0) when = i + 1; }
+        state.events = [];
+      }
+      expect(seen, c.id).toBe(1);
+      expect(when, c.id).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('has an opening for every crown', () => {
+    for (const c of CROWNS) expect(OPENINGS[c.id]?.welcome, c.id).toBeTruthy();
   });
 });
 

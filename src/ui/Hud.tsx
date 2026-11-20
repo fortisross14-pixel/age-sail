@@ -23,6 +23,7 @@ export function Hud() {
   const showSettings = useStore((s) => s.showSettings);
   const set = useStore((s) => s.set);
   const endTurn = useStore((s) => s.endTurn);
+  const nextAttention = useStore((s) => s.nextAttention);
   const sc = score(game, world);
   const rank = 1 + rivalsOf(game.crown).filter((r) => rivalScore(game, r.id).total > sc.total).length;
   const waiting = attention(game, world).filter((a) => a.urgent);
@@ -63,6 +64,7 @@ export function Hud() {
         <button className={`adm-square ${drawer === 'court' ? 'on' : ''}`} onClick={() => toggle('court')} title="Court (4)" aria-label="Court"><Medal name="people" size={50} fallback={<Icon name="units" size={26} />} /></button>
         <button className={`adm-square ${showSettings ? 'on' : ''}`} onClick={() => { sfx(showSettings ? 'close' : 'open'); set({ showSettings: !showSettings }); }} title="Settings" aria-label="Settings"><Medal name="settings" size={50} fallback={<Icon name="settings" size={26} />} /></button>
       </div>
+      {waiting.length > 0 && <button className="adm-square next-need" onClick={nextAttention} title={`Next thing that needs you (N): ${waiting.length} waiting`} aria-label="Next thing that needs you"><Icon name="next" size={26} /></button>}
       <button className="end-turn" onClick={() => void endTurn()} disabled={busy} title={waiting.length ? `${waiting.map((a) => a.text).join('\n')}\n(Enter)` : `End the turn: ${turnStride(game.turn) === 2 ? 'half a year' : 'a year'} passes (Enter)`}>
         {busy ? 'Time passes…' : 'End Turn'}
         {!busy && waiting.length > 0 && <span className="end-count" aria-label={`${waiting.length} things need you`}>{waiting.length}</span>}
