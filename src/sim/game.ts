@@ -8,6 +8,7 @@ import * as Nat from './natives';
 import * as Riv from './rivals';
 import * as Emp from './empire';
 import * as Story from './stories';
+import * as Trade from './trade';
 import type { CrownId } from '../data/rivals';
 import { CITIES, cityById, cityMarket, KNOWN_SOUTH, ATLANTIC_ISLANDS } from '../data/europe';
 import { crownSpec, type CrownEdge } from '../data/rivals';
@@ -265,7 +266,7 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
     rumoursDone: { old: [], new: [] }, finds: [], colonies: [], revenue: 0, natives: Nat.initNatives(world), rivals: Riv.initRivals(crown), rivalColonies: [], rivalShips: [],
     freeStates: [], endTurn: (until - 1492) * 4, ended: false, taxRate: 'normal', loans: [], told: {},
     adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
-    chronicle: [], events: [], nextId: 1, newWorldFound: false,
+    chronicle: [], events: [], factories: [], shocks: [], nextId: 1, newWorldFound: false,
     research: { known: [...(spec.edge.startTechs ?? [])], current: null, progress: 0, pending: 0 },
   };
   state.research.current = TECHS.find((t) => !state.research.known.includes(t.id) && t.requires.every((r) => state.research.known.includes(r)))?.id ?? null;
@@ -318,6 +319,23 @@ export function buy(world: World, s: GameState, fleetId: number, g: GoodId, qty:
   return { ok: true, message: `Bought ${qty} ${GOOD_INFO[g].name.toLowerCase()} for ${cost} ducats.` };
 }
 
+/** Every new good sold in Europe teaches more people to want it. */
+function adopt(s: GameState, g: GoodId, qty: number) {
+  const before = s.adoption[g] ?? 1;
+  s.adoption[g] = Math.min(1, before + qty / 400);
+  if (before < 0.5 && s.adoption[g]! >= 0.5) log(s, 'trade', `${GOOD_INFO[g].name} is becoming fashionable in Europe. Demand will keep growing.`);
+}
+
+// ---------- factories ----------
+
+export function openFactory(world: World, s: GameState, portId: string): CommandResult { return Trade.openFactory(world, s, portById(world, portId, s)); }
+export function factoryOrder(s: GameState, city: string, g: GoodId, mode: 'sell' | 'buy' | 'hold'): CommandResult { return Trade.setOrder(s, city, g, mode); }
+export function factoryTransfer(s: GameState, fleetId: number, g: GoodId, qty: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  if (!f) return fail('No such fleet.');
+  return Trade.factoryTransfer(s, f, g, qty, cargoCapacity(f) - cargoUsed(f));
+}
+
 /** Fair trade at a people's ground builds goodwill. */
 function goodwill(world: World, s: GameState, f: Fleet) {
   const n = f.at ? Nat.nationOfSite(world, f.at) : undefined;
@@ -340,11 +358,7 @@ export function sell(world: World, s: GameState, fleetId: number, g: GoodId, qty
   m.stock += qty;
   f.cargo[g] = (f.cargo[g] ?? 0) - qty;
   if (!f.cargo[g]) delete f.cargo[g];
-  if (f.map === 'old') {
-    const before = s.adoption[g] ?? 1;
-    s.adoption[g] = Math.min(1, before + qty / 400);
-    if (before < 0.5 && s.adoption[g]! >= 0.5) log(s, 'trade', `${GOOD_INFO[g].name} is becoming fashionable in Europe. Demand will keep growing.`);
-  }
+  if (f.map === 'old') adopt(s, g, qty);
   return { ok: true, message: `Sold ${qty} ${GOOD_INFO[g].name.toLowerCase()} for ${value} ducats.` };
 }
 
@@ -1149,7 +1163,9 @@ export function seasonTick(world: World, s: GameState): void {
   const wages = Math.round(s.people.filter((p) => p.alive).reduce((t, p) => t + salary(p), 0));
   for (const p of s.people) if (p.alive && p.trait === 'learned' && p.fleet == null) addResearch(s, 1);
 
-  // markets
+  // markets: shocks come and go, rival merchants bring their goods home, every market moves
+  Trade.shockSeason(s, (k, t) => log(s, k, t));
+  Trade.rivalMerchants(world, s);
   for (const [id, book] of Object.entries(s.markets)) {
     const port = portById(world, id, s);
     const european = port?.kind !== 'native';
@@ -1162,10 +1178,13 @@ export function seasonTick(world: World, s: GameState): void {
       if (!m) continue;
       const prod = m.production;
       m.production = prod * boost;
+      m.demand = european ? Trade.demandFactor(s, port?.realm, g) : 1;
       tickMarket(m, european ? s.adoption[g] ?? 1 : 1);
       m.production = prod;
     }
   }
+  // your factors trade slowly at fair prices
+  Trade.factorySeason(world, s, (city) => spreadFor(s, undefined) - (s.cities[city]?.buildings.market ?? 0) * 0.02, (g, n) => adopt(s, g, n), (k, t) => log(s, k, t));
 
   // research: the court's scholars, plus what explorers brought back
   const r = s.research;

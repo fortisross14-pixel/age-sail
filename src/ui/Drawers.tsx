@@ -1,5 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useStore, type DrawerId } from '../store';
+import { factoryAt, factoryCost, factoryPace, demandFactor, shocksIn, shockTitle } from '../sim/trade';
+import { FACTORY, REGION_NAME, type Region } from '../data/trade';
+import { turnLabel } from '../sim/types';
 import type { GameState } from '../sim/types';
 import { realmSpec } from '../data/realms';
 import { Frame } from './theme/Frame';
@@ -121,7 +124,7 @@ function Markets() {
                         <button className={`fleet-row ${p.id === current?.id ? 'sel' : ''}`} onClick={() => { sfx('select'); set({ selectedPort: p.id }); }}>
                           {p.realm ? <CrestArt realm={p.realm} size={34} fallback={<span className="crown-flag" style={{ background: hexColor(realmSpec(p.realm).color), borderColor: '#2a1806' }} aria-hidden />} /> : <span className="crown-flag native" aria-hidden />}
                           <span className="fleet-name">{p.name}<span className="muted small">{p.kind === 'native' ? ` · the ${p.people}` : p.kind === 'foreign' ? ` · ${p.nation}` : ''}</span></span>
-                          <span className="fleet-where">{docked ? `${docked} fleet${docked > 1 ? 's' : ''} in port` : ''}</span>
+                          <span className="fleet-where">{factoryAt(game, p.id) ? <span className="chip">factory</span> : null}{docked ? `${docked} fleet${docked > 1 ? 's' : ''} in port` : ''}</span>
                         </button>
                       </li>
                     );
@@ -151,6 +154,8 @@ function PortMarket({ portId }: { portId: string }) {
   const fleet = game.fleets.find((f) => f.id === selected && f.at === port.id) ?? game.fleets.find((f) => f.at === port.id);
   const free = fleet ? cargoCapacity(fleet) - cargoUsed(fleet) : 0;
   const sp = spreadFor(game, fleet, port.kind === 'native');
+  const factory = factoryAt(game, port.id);
+  const pacePreview = book.sugar ? factoryPace(book.sugar) : FACTORY.minPace;
   const sub = port.kind === 'native' ? `Trading ground of the ${port.people}` : port.kind === 'home' ? 'Your city' : `Foreign market · ${port.nation}`;
   return (
     <div className="port-market">
@@ -163,6 +168,21 @@ function PortMarket({ portId }: { portId: string }) {
           <label className="qty">Lot {[1, 10, 50].map((q) => <button key={q} className={qty === q ? 'on' : ''} onClick={() => setQty(q)}>{q}</button>)}</label>
         </div>
       ) : <div className="muted small notice">Prices this season. Bring a fleet into port to trade.</div>}
+      {shocksIn(game, port.realm).map((x) => (
+        <div key={x.kind} className="notice shock"><b>{shockTitle(x.kind, x.region)}</b> · {x.spec.text.replace('{region}', REGION_NAME[x.region as Region])} <span className="muted">Until {turnLabel(x.until)}.</span></div>
+      ))}
+      {port.map === 'old' && port.kind !== 'native' && (factory ? (
+        <div className="factory-head">
+          <b>Your factory</b>
+          <span className="muted small">Leave goods with the factor, then choose <b>Sell</b>: they sell about {pacePreview} a season, only at fair prices. <b>Buy</b>: they buy up to {FACTORY.buyTarget} while it is cheap. Wages {FACTORY.upkeep} a season{port.kind === 'foreign' ? `, and ${Math.round(FACTORY.foreignDues * 100)}% dues to ${port.nation}` : ''}.</span>
+          {(factory.last.sold > 0 || factory.last.bought > 0) && <span className="small">Last season: {factory.last.sold ? `sold for ${fmt(factory.last.sold)}` : ''} {factory.last.bought ? `bought for ${fmt(factory.last.bought)}` : ''}</span>}
+        </div>
+      ) : (
+        <div className="factory-head">
+          <button className="adm-gold-btn" disabled={game.treasury < factoryCost(game, port.id)} onClick={() => void run({ kind: 'openFactory', city: port.id })}>Open a factory · {fmt(factoryCost(game, port.id))}</button>
+          <span className="muted small">A factor and a warehouse here: they sell what you leave a little at a time, so the price holds, and buy what you need when it is cheap.</span>
+        </div>
+      ))}
       <div className="goods-list">
         {GOODS.filter((g) => book[g]).map((good) => {
           const m = book[good]!;
@@ -171,10 +191,15 @@ function PortMarket({ portId }: { portId: string }) {
           const sellQ = Math.max(1, Math.min(qty, have));
           const hist = m.history;
           const falling = hist.length > 1 && hist[hist.length - 1] < hist[hist.length - 2];
+          const fill = m.stock / Math.max(1, m.ref);
+          const taste = port.kind !== 'native' ? demandFactor(game, port.realm, good) : 1;
+          const tag = fill > 1.6 ? ['glut', 'Glut: too much in stock, prices are low'] : fill < 0.4 ? ['scarce', 'Scarce: they will pay well'] : taste >= 1.25 ? ['wanted', 'In demand in this region'] : null;
+          const fstock = Math.floor(factory?.stock[good] ?? 0);
+          const mode = factory?.orders[good] ?? 'hold';
           return (
             <div key={good} className="good-row" title={GOOD_INFO[good].blurb}>
               <GoodIcon good={good} size={40} />
-              <span className="g-name"><b>{GOOD_INFO[good].name}</b><span className="stock" title={`${fmt(m.stock)} in stock`}><i style={{ width: `${Math.min(100, (m.stock / Math.max(1, m.ref)) * 100)}%` }} /></span></span>
+              <span className="g-name"><b>{GOOD_INFO[good].name}{tag && <em className={`tag ${tag[0]}`} title={tag[1]}>{tag[0]}</em>}</b><span className="stock" title={`${fmt(m.stock)} in stock`}><i style={{ width: `${Math.min(100, fill * 100)}%` }} /></span></span>
               <span className="g-price"><b>{fmt(unitPrice(m) * (1 - sp))}</b><span>sell</span></span>
               <span className="g-price buy"><b>{fmt(unitPrice(m) * (1 + sp))}</b><span>buy</span></span>
               <span className={`g-trend ${falling ? 'down' : 'up'}`}><Sparkline values={hist} /></span>
@@ -186,11 +211,21 @@ function PortMarket({ portId }: { portId: string }) {
                   <button disabled={!have} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty: have })}>All</button>
                 </span>
               )}
+              {factory && (
+                <span className="g-factor">
+                  <span className="hold" title="With your factor">{fstock} stored</span>
+                  <span className="stance mini" role="radiogroup" aria-label={`Factor orders for ${GOOD_INFO[good].name}`}>
+                    {(['hold', 'sell', 'buy'] as const).map((k) => <button key={k} role="radio" aria-checked={mode === k} className={mode === k ? 'on' : ''} onClick={() => void run({ kind: 'factoryOrder', city: port.id, good, mode: k })}>{k === 'hold' ? 'Hold' : k === 'sell' ? 'Sell' : 'Buy'}</button>)}
+                  </span>
+                  {fleet && have > 0 && <button title="Leave it all with the factor" onClick={() => void run({ kind: 'factoryTransfer', fleet: fleet.id, good, qty: have })}>Leave {have}</button>}
+                  {fleet && fstock > 0 && <button disabled={free <= 0} onClick={() => void run({ kind: 'factoryTransfer', fleet: fleet.id, good, qty: -fstock })}>Take</button>}
+                </span>
+              )}
             </div>
           );
         })}
       </div>
-      <div className="muted small">Every lot moves the price: spread big cargoes across ports.</div>
+      <div className="muted small">Every lot moves the price. Flood a market and the price collapses: spread big cargoes across ports, or leave them with a factor.</div>
     </div>
   );
 }

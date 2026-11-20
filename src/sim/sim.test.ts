@@ -5,8 +5,9 @@ import {
   provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
   slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost, landParty, moveParty, boardParty, citySlots, slotsUsedIn,
   foundColony, upgradeColony, colonyTransfer, allyNation, incorporateNation, attackVillage, tradingPost, declareWar, rivalPeace, stormColony,
-  grantCharter, setTaxRate, chooseStory, buildWalls,
+  grantCharter, setTaxRate, chooseStory, buildWalls, openFactory, factoryOrder,
 } from './game';
+import { demandFactor, rivalMerchants } from './trade';
 import { battleOdds, type Force } from './battle';
 import { T } from '../data/terrain';
 import type { UnitType } from './types';
@@ -480,7 +481,7 @@ describe('M5: colonies', () => {
     foundColony(world, state, p.id);
     const c = state.colonies[0];
     c.pop = 3;
-    c.stock = { food: 10, cloth: 20, wine: 20, sugar: 10 };
+    c.stock = { food: 10, cloth: 20, wine: 20, sugar: 10, tools: 10 };
     seasonTick(world, state);
     expect(c.last.births).toBeGreaterThan(c.last.deaths);
     const g = c.growth;
@@ -865,5 +866,41 @@ describe('M12 armies', () => {
     expect(state.colonies[0].walls).toBe(1);
     expect(state.colonies[0].stock.timber).toBe(10);
     expect(buildWalls(state, 'col-w').ok).toBe(false); // no stone
+  });
+});
+
+describe('M13 a living market', () => {
+  it('a factor sells slowly at fair prices, and earns more than dumping the whole cargo at once', () => {
+    const { world, state } = newGame(1492);
+    state.treasury = 10000;
+    expect(openFactory(world, state, 'antwerp').ok).toBe(true);
+    const f = state.factories[0];
+    const m = state.markets.antwerp.sugar!;
+    const dump = sellValue({ ...m }, 120, 0.1);
+    f.stock.sugar = 120;
+    expect(factoryOrder(state, 'antwerp', 'sugar', 'sell').ok).toBe(true);
+    let earned = 0;
+    for (let k = 0; k < 40 && (f.stock.sugar ?? 0) > 0; k++) { seasonTick(world, state); earned += f.last.sold; }
+    expect(earned).toBeGreaterThan(dump);
+    expect(unitPrice(m)).toBeGreaterThan(m.base * 0.6);
+  });
+
+  it('regions have tastes, and shocks move demand', () => {
+    const { state } = newGame(1492);
+    expect(demandFactor(state, 'england', 'spices')).toBeGreaterThan(demandFactor(state, 'spain', 'spices'));
+    expect(demandFactor(state, 'morocco', 'wine')).toBeLessThan(demandFactor(state, 'spain', 'wine'));
+    const before = demandFactor(state, 'france', 'food');
+    state.shocks.push({ kind: 'famine', region: 'france', since: 0, until: 10 });
+    expect(demandFactor(state, 'france', 'food')).toBeGreaterThan(before * 1.5);
+  });
+
+  it("rival merchants bring their colonies' goods into their home port", () => {
+    const { world, state } = newGame(1492);
+    const home = state.markets.lisbon;
+    const hex = [...Array(NEW.N).keys()].find((h) => Math.abs(NEW.lat(h)) < 20 && world.new.terrain[h] > 1)!;
+    state.rivalColonies.push({ id: 'rcol-x', crown: 'portugal', name: 'X', map: 'new', hex, pop: 10, level: 'town', founded: 0, garrison: 1, seen: false });
+    const sugar = home.sugar!.stock;
+    rivalMerchants(world, state);
+    expect(home.sugar!.stock).toBeGreaterThan(sugar);
   });
 });

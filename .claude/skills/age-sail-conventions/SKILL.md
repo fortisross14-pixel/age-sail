@@ -47,6 +47,8 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   `nativeForce`, `rivalForce`, `freeForce`); unit numbers live in `src/data/army.ts`. Player-ordered
   battles push a `kind: 'battle'` event with the report. Check odds with `tools/battles.ts`.
   Count soldiers with `isMilitary(type)`, never `type === 'infantry'`.
+- **Markets** move in `seasonTick`: `src/sim/trade.ts` adds regional taste and shocks to consumption
+  (`demandFactor`), rival merchants, and factories (`factorySeason`); numbers in `src/data/trade.ts`.
 - **The world is regenerated from the seed on load**, not saved. Any change to `mapgen.ts`
   output changes every existing save's map: bump the generator version (see Saves).
 

@@ -47,6 +47,9 @@ export type Command =
   | { kind: 'mission'; fleet?: number; party?: number }
   | { kind: 'attack'; party: number; hex: number; stance?: Stance }
   | { kind: 'walls'; colony: string }
+  | { kind: 'openFactory'; city: string }
+  | { kind: 'factoryOrder'; city: string; good: GoodId; mode: 'sell' | 'buy' | 'hold' }
+  | { kind: 'factoryTransfer'; fleet: number; good: GoodId; qty: number }
   | { kind: 'declareWar'; crown: CrownId }
   | { kind: 'charter'; colony: string }
   | { kind: 'festival'; colony: string }
@@ -127,6 +130,9 @@ const api = {
       case 'mission': result = G.mission(world, state, { fleet: c.fleet, party: c.party }); break;
       case 'attack': result = G.attackVillage(world, state, c.party, c.hex, c.stance); break;
       case 'walls': result = G.buildWalls(state, c.colony); break;
+      case 'openFactory': result = G.openFactory(world, state, c.city); break;
+      case 'factoryOrder': result = G.factoryOrder(state, c.city, c.good, c.mode); break;
+      case 'factoryTransfer': result = G.factoryTransfer(state, c.fleet, c.good, c.qty); break;
       case 'declareWar': result = G.declareWar(state, c.crown); break;
       case 'charter': result = G.grantCharter(state, c.colony); break;
       case 'festival': result = G.holdFestival(state, c.colony); break;

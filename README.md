@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.12
+## Now playing: v0.13
 
-M12, armies: six kinds of soldiers, armies that need food, battles in three rounds with a report, walls and guns, veterans.
+M13, a living market: factories in any European port that sell slowly at fair prices and buy cheap; regional tastes; shocks; rival merchants; tools that wear out in the colonies.
+
+From v0.12, armies: six kinds of soldiers, armies that need food, battles in three rounds with a report, walls and guns, veterans.
 
 From v0.11, colonies and natives: turns of half a year (a year from 1550); colonies that grow slowly by births and need settlers from home, who season a turn before they work; garrisons that must be fed; native peoples who remember what you did, feed their friends and besiege their enemies.
 

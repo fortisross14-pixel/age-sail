@@ -80,6 +80,8 @@ export interface MarketGood {
   production: number;
   /** price at the end of each recent turn, newest last */
   history: number[];
+  /** what this region will pay over (or under) the usual, with any shock under way: multiplies the price */
+  demand?: number;
 }
 
 export interface Ship {
@@ -183,6 +185,8 @@ export interface Colony {
     garrison: number;
     seasoned: number;
     besieged: boolean;
+    /** whether there were tools enough for the work */
+    tooled?: boolean;
   };
 }
 
@@ -390,6 +394,20 @@ export interface BattleReport {
 
 export type Stance = 'assault' | 'steady';
 
+/** Your factor and warehouse in a European port. */
+export interface Factory {
+  city: string;
+  stock: Partial<Record<GoodId, number>>;
+  /** what the factor does with each good: sell it slowly at fair prices, or buy it while cheap */
+  orders: Partial<Record<GoodId, 'sell' | 'buy'>>;
+  opened: number;
+  /** ducats in and out last season, for the player */
+  last: { sold: number; bought: number };
+}
+
+/** A few years of unusual demand in one region of Europe. */
+export interface MarketShock { kind: string; region: string; since: number; until: number }
+
 export interface GameState {
   seed: number;
   /** the crown you lead */
@@ -434,6 +452,10 @@ export interface GameState {
   adoption: Partial<Record<GoodId, number>>;
   chronicle: ChronicleEntry[];
   events: GameEvent[];
+  /** your factories in European ports */
+  factories: Factory[];
+  /** shocks to demand under way */
+  shocks: MarketShock[];
   nextId: number;
   /** true once anyone has sighted New World land */
   newWorldFound: boolean;

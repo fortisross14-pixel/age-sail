@@ -12,7 +12,7 @@ const MAX_F = 3.2;
  */
 export function unitPrice(m: MarketGood, stock = m.stock): number {
   const f = Math.pow(m.ref / (Math.max(0, stock) + 1), K);
-  return m.base * Math.min(MAX_F, Math.max(MIN_F, f));
+  return m.base * (m.demand ?? 1) * Math.min(MAX_F, Math.max(MIN_F, f));
 }
 
 /** Total cost to buy qty units, unit by unit (each purchase lowers the stock). */

@@ -9,6 +9,7 @@ import { personById, skill } from './court';
 import { emptyAccount, type Colony, type ColonyLevel, type Fleet, type GameState, type MapId, type Party, type PortDef, type World } from './types';
 import * as Nat from './natives';
 import { DEMOGRAPHY, SEASONING, GARRISON_FOOD, NATIVE } from '../data/colony';
+import { TOOL_WEAR } from '../data/trade';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -148,7 +149,12 @@ export function colonySeason(world: World, s: GameState, c: Colony, log: (text: 
   const worked = besieged ? [] : workPlan(world, s, c);
   const discontentBefore = c.last.discontent;
   const produced: Partial<Record<GoodId, number>> = { food: 2 + (besieged ? 0 : Math.max(0, c.pop - worked.length) * 0.5) };
-  for (const w of worked) produced[w.good] = (produced[w.good] ?? 0) + w.amount * (discontentBefore ? 0.7 : 1) * (c.unrest ? 0.75 : 1);
+  // tools wear out: settlers without them work slower (colonies need tools from Europe)
+  const toolNeed = worked.length * TOOL_WEAR.perWorker;
+  const tooled = (c.stock.tools ?? 0) >= toolNeed;
+  c.stock.tools = Math.max(0, Math.round(((c.stock.tools ?? 0) - toolNeed) * 100) / 100);
+  if (!c.stock.tools) delete c.stock.tools;
+  for (const w of worked) produced[w.good] = (produced[w.good] ?? 0) + w.amount * (discontentBefore ? 0.7 : 1) * (c.unrest ? 0.75 : 1) * (tooled ? 1 : TOOL_WEAR.without);
   for (const gd of GOODS) if (produced[gd]) c.stock[gd] = Math.round(((c.stock[gd] ?? 0) + produced[gd]!) * 10) / 10;
   const take = (gd: GoodId, n: number) => {
     const have = c.stock[gd] ?? 0;
@@ -203,7 +209,7 @@ export function colonySeason(world: World, s: GameState, c: Colony, log: (text: 
     }
   }
   if (discontent && !discontentBefore) log(`The settlers of ${c.name} grumble: they need ${[!clothed && 'cloth', !drink && 'wine'].filter(Boolean).join(' and ')}. Work slows.`, 'peril');
-  c.last = { produced, worked, hungry: !fed, discontent, luxuries: lux, births, deaths, garrison: garrison.length, seasoned, besieged };
+  c.last = { produced, worked, hungry: !fed, discontent, luxuries: lux, births, deaths, garrison: garrison.length, seasoned, besieged, tooled };
 }
 
 /** A colony's strength behind its palisade. */
