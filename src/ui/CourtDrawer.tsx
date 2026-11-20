@@ -9,7 +9,7 @@ import { fmt } from './format';
 import { KIND_MARK } from './NewsFeed';
 import { Tabs } from './Drawers';
 import { Icon } from './theme/icons';
-import { Art } from './theme/Art';
+import { Art, CrestArt } from './theme/Art';
 import { Portrait } from './theme/Portrait';
 import { sfx } from './sound';
 import { getView } from './MapCanvas';
@@ -367,7 +367,7 @@ function Crowns() {
         <tbody>
           {rows.map((r, i) => (
             <tr key={r.id} className={r.mine ? 'me' : ''}>
-              <td><span className="crown-flag" style={{ background: CROWN[r.id].css, borderColor: CROWN[r.id].css2 }} aria-hidden /> {i + 1}. {r.name}</td><td className="num"><b>{fmt(r.total)}</b></td><td className="num">{r.colonies}</td><td className="num">{r.pop}</td><td className="num">{r.territory}</td><td className="num">{r.posts}</td>
+              <td><CrestArt realm={r.id} size={24} fallback={<span className="crown-flag" style={{ background: CROWN[r.id].css, borderColor: CROWN[r.id].css2 }} aria-hidden />} /> {i + 1}. {r.name}</td><td className="num"><b>{fmt(r.total)}</b></td><td className="num">{r.colonies}</td><td className="num">{r.pop}</td><td className="num">{r.territory}</td><td className="num">{r.posts}</td>
             </tr>
           ))}
         </tbody>
@@ -382,7 +382,7 @@ function Crowns() {
             <li key={r.id} className="person nation">
               <div className="person-head static">
                 <span className={`rank-badge mood-${mood.split(' ')[0]}`}>{mood}</span>
-                <span className="person-name"><span className="crown-flag" style={{ background: CROWN[r.id].css, borderColor: CROWN[r.id].css2 }} aria-hidden /> {r.name}</span>
+                <span className="person-name"><CrestArt realm={r.id} size={30} fallback={<span className="crown-flag" style={{ background: CROWN[r.id].css, borderColor: CROWN[r.id].css2 }} aria-hidden />} /> {r.name}</span>
                 <span className="muted small">{r.blurb}</span>
                 <div className="attitude" title={`Attitude ${Math.round(st.attitude)}`}><div className="att-mid" /><div className="att-dot" style={{ left: `${(st.attitude + 100) / 2}%` }} /></div>
               </div>

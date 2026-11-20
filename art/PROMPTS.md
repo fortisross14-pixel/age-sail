@@ -19,10 +19,20 @@ Every prompt starts with the same style paragraph, describing the concept art's 
 
 ---
 
-## Done
+## Done (cut and in the game)
 
-- **1. `icons.png`**: the 24 gold-on-navy medallions. Cut and in the game (dock, rail, HUD,
-  stats, screen headers, city roles).
+- `icons.png`: 24 gold-on-navy medallions (dock, rail, HUD, stats, screen headers, city roles)
+- `buildings.png`: 12 buildings by level (city places, building card, build list)
+- `crests.png`: 15 coats of arms (HUD, city headers, menu, markets, crowns)
+- `portraits-men.png`, `portraits-women.png`: 24 court portraits by age
+- `units.png`: soldiers and ships (recruitment, fleets, explorer commissions); a colonist and a
+  missionary are still the ink figures
+- `cities.png`: 8 city views (city headers and the city list)
+- `settlements.png`: 18 colonies (6 kinds × outpost, town, city) on the map; they also draw
+  Europe's cities and native trading grounds
+- `title.png`: the title screen
+
+Still wanted, if you like: a colonist and a missionary in the units style.
 
 ## 2. `buildings.png`
 

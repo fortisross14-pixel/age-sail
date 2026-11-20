@@ -3,7 +3,7 @@ import { useStore, type DrawerId } from '../store';
 import type { GameState } from '../sim/types';
 import { realmSpec } from '../data/realms';
 import { Frame } from './theme/Frame';
-import { Medal } from './theme/Art';
+import { Medal, CrestArt } from './theme/Art';
 import { Icon, type IconName } from './theme/icons';
 import { sfx } from './sound';
 import { GOOD_INFO, GOODS, type GoodId } from '../data/goods';
@@ -119,7 +119,7 @@ function Markets() {
                     return (
                       <li key={p.id}>
                         <button className={`fleet-row ${p.id === current?.id ? 'sel' : ''}`} onClick={() => { sfx('select'); set({ selectedPort: p.id }); }}>
-                          {p.realm ? <span className="crown-flag" style={{ background: hexColor(realmSpec(p.realm).color), borderColor: '#2a1806' }} aria-hidden /> : <span className="crown-flag native" aria-hidden />}
+                          {p.realm ? <CrestArt realm={p.realm} size={34} fallback={<span className="crown-flag" style={{ background: hexColor(realmSpec(p.realm).color), borderColor: '#2a1806' }} aria-hidden />} /> : <span className="crown-flag native" aria-hidden />}
                           <span className="fleet-name">{p.name}<span className="muted small">{p.kind === 'native' ? ` · the ${p.people}` : p.kind === 'foreign' ? ` · ${p.nation}` : ''}</span></span>
                           <span className="fleet-where">{docked ? `${docked} fleet${docked > 1 ? 's' : ''} in port` : ''}</span>
                         </button>

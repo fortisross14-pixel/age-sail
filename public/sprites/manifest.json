@@ -2,93 +2,93 @@
  "colonies": [
   {
    "name": "fort-outpost",
-   "w": 96,
-   "h": 57
+   "w": 260,
+   "h": 230
   },
   {
    "name": "fort-town",
-   "w": 152,
-   "h": 64
+   "w": 260,
+   "h": 204
   },
   {
    "name": "fort-city",
-   "w": 258,
-   "h": 66
+   "w": 260,
+   "h": 213
   },
   {
    "name": "trading-post-outpost",
-   "w": 112,
-   "h": 57
+   "w": 260,
+   "h": 207
   },
   {
    "name": "trading-post-town",
-   "w": 156,
-   "h": 76
+   "w": 260,
+   "h": 188
   },
   {
    "name": "trading-post-city",
-   "w": 248,
-   "h": 83
+   "w": 260,
+   "h": 198
   },
   {
    "name": "mission-outpost",
-   "w": 116,
-   "h": 66
+   "w": 228,
+   "h": 240
   },
   {
    "name": "mission-town",
-   "w": 164,
-   "h": 79
+   "w": 227,
+   "h": 240
   },
   {
    "name": "mission-city",
-   "w": 272,
-   "h": 73
+   "w": 260,
+   "h": 222
   },
   {
    "name": "plantation-outpost",
-   "w": 127,
-   "h": 64
+   "w": 260,
+   "h": 217
   },
   {
    "name": "plantation-town",
-   "w": 180,
-   "h": 76
+   "w": 260,
+   "h": 215
   },
   {
    "name": "plantation-city",
-   "w": 276,
-   "h": 78
+   "w": 260,
+   "h": 209
   },
   {
    "name": "mine-outpost",
-   "w": 124,
-   "h": 64
+   "w": 260,
+   "h": 225
   },
   {
    "name": "mine-town",
-   "w": 183,
-   "h": 74
+   "w": 243,
+   "h": 240
   },
   {
    "name": "mine-city",
-   "w": 285,
-   "h": 84
+   "w": 260,
+   "h": 220
   },
   {
    "name": "port-outpost",
-   "w": 128,
-   "h": 66
+   "w": 260,
+   "h": 209
   },
   {
    "name": "port-town",
-   "w": 180,
-   "h": 85
+   "w": 260,
+   "h": 236
   },
   {
    "name": "port-city",
-   "w": 308,
-   "h": 95
+   "w": 260,
+   "h": 220
   }
  ],
  "units": [

@@ -8,7 +8,7 @@ import { eraAt } from '../data/eras';
 import { fmt } from './format';
 import { spriteUrl } from '../render/assets';
 import { Icon, Crest } from './theme/icons';
-import { Medal } from './theme/Art';
+import { Medal, CrestArt } from './theme/Art';
 import { sfx } from './sound';
 
 const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th'];
@@ -33,7 +33,7 @@ export function Hud() {
     <header className="hud">
       <Armillary />
       <div className="hud-crest" title={`${crown.name}. ${crown.edge.label}`}>
-        <Crest primary={colours.css2} secondary={colours.css} size={46} />
+        <CrestArt realm={game.crown} size={56} fallback={<Crest primary={colours.css2} secondary={colours.css} size={46} />} />
       </div>
       <div className="hud-date" title={`${era.blurb} The age ends in ${1492 + Math.floor(game.endTurn / 4)}${game.ended ? ' (passed: playing on)' : ''}.`}>
         <div className="season">{SEASONS[seasonOf(game.turn)]} {yearOf(game.turn)}</div>

@@ -5,6 +5,7 @@ import { GAME_LENGTHS, DEFAULT_UNTIL } from '../data/eras';
 import { CROWNS, type CrownId } from '../data/rivals';
 import { CROWN } from '../render/palette';
 import { cityById } from '../data/europe';
+import { CrestArt } from './theme/Art';
 
 export function Menu() {
   const hasSave = useStore((s) => s.hasSave);
@@ -19,8 +20,8 @@ export function Menu() {
   useEffect(() => { void checkSave(); }, [checkSave]);
   const loading = phase === 'loading';
   return (
-    <div className="menu">
-      <div className="menu-card">
+    <div className="menu painted" style={{ backgroundImage: `linear-gradient(180deg, rgba(8, 16, 24, .15), rgba(8, 16, 24, .55)), url(${import.meta.env.BASE_URL}sprites/art/title.webp)` }}>
+      <div className="menu-card adm-menu-card">
         <img className="menu-rose" src={spriteUrl('ornaments/compass-large')} alt="" />
         <h1>Age of Sail</h1>
         <p className="tagline">Chart the unknown. Trade across the ocean. Build an empire.</p>
@@ -33,7 +34,7 @@ export function Menu() {
           <div className="crowns" role="radiogroup" aria-label="Crown to lead">
             {CROWNS.map((c) => (
               <button key={c.id} role="radio" aria-checked={crown === c.id} className={`crown-pick ${crown === c.id ? 'on' : ''}`} onClick={() => setCrown(c.id)} title={c.blurb}>
-                <span className="crown-flag big" style={{ background: CROWN[c.id].css, borderColor: CROWN[c.id].css2 }} aria-hidden />
+                <CrestArt realm={c.id} size={56} fallback={<span className="crown-flag big" style={{ background: CROWN[c.id].css, borderColor: CROWN[c.id].css2 }} aria-hidden />} />
                 <span className="crown-pick-name">{c.name.replace(/^the /, "")}</span>
                 <span className="crown-pick-home">{cityById(c.home)?.name}</span>
               </button>
@@ -49,7 +50,7 @@ export function Menu() {
           </div>
           <label className="seed">World seed <input value={seed} onChange={(e) => setSeed(e.target.value.replace(/\D/g, ''))} inputMode="numeric" /></label>
         </div>
-        <p className="muted small">Version 0.9 · lead one of the five Atlantic crowns through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
+        <p className="muted small">Version 0.10 · lead one of the five Atlantic crowns through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
       </div>
     </div>
   );

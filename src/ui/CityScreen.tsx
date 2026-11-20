@@ -16,7 +16,7 @@ import { CROWN } from '../render/palette';
 import { fmt } from './format';
 import { Tabs } from './Drawers';
 import { ColonyCard, TaxRate } from './CitiesDrawer';
-import { Art, Medal } from './theme/Art';
+import { Art, Medal, CrestArt, buildingSlot, cityViewSlot } from './theme/Art';
 import { Frame } from './theme/Frame';
 import { Icon, Crest, type IconName } from './theme/icons';
 import { sfx } from './sound';
@@ -30,7 +30,10 @@ const BUILDING_SPRITE: Record<BuildingId, string> = {
 const ROLE: Record<BuildingId, string> = { docks: 'Shipyard', barracks: 'Military centre', church: 'Mission seat', university: 'Seat of learning', market: 'Trade centre' };
 const ROLE_LONG: Record<BuildingId, string> = { docks: 'a shipyard', barracks: 'a military centre', church: 'a mission seat', university: 'a seat of learning', market: 'a trade centre' };
 
-const buildingArt = (b: BuildingId) => <Art slot={`building/${b}`} fallback={<img src={spriteUrl(BUILDING_SPRITE[b])} alt="" />} />;
+const buildingArt = (b: BuildingId, lv = 1) => {
+  const slot = buildingSlot(b, lv);
+  return slot ? <Art slot={slot} fallback={null} /> : <img src={spriteUrl(BUILDING_SPRITE[b])} alt="" />;
+};
 const unitArt = (u: UnitType) => <Art slot={`unit/${u}`} fallback={<img src={spriteUrl(UNIT_INFO[u].sprite)} alt="" />} />;
 const shipArt = (t: ShipType) => <Art slot={`ship/${t}`} fallback={<img src={spriteUrl(`ships/${t}`)} alt="" />} />;
 
@@ -66,8 +69,8 @@ function CityScreen({ cityId, onList }: { cityId: string; onList: () => void }) 
   return (
     <>
       <header className="drawer-head city-head">
-        <div className="vignette"><Art slot={`city/${cityId}`} fallback={<img src={spriteUrl(city.inland ? 'colonies/fort-city' : 'colonies/port-city')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'right center', opacity: .9 }} />} /></div>
-        <Crest primary={colours.css2} secondary={colours.css} size={52} />
+        <div className="vignette"><Art slot={cityViewSlot(cityId, city.inland, city.size)} fallback={<img src={spriteUrl(city.inland ? 'colonies/fort-city' : 'colonies/port-city')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'right center', opacity: .9 }} />} /></div>
+        <CrestArt realm={game.crown} size={64} fallback={<Crest primary={colours.css2} secondary={colours.css} size={52} />} />
         <div>
           <h2>{port.name}</h2>
           <div className="sub">{kind}</div>
@@ -154,7 +157,7 @@ function Buildings({ city }: { city: City }) {
         {tiles.map((t) => (
           <button key={`${t.b}${t.lv}`} className={`tile ${sel === t.b && t.lv === city.buildings[t.b] ? 'selected' : ''}`}
             onClick={() => { sfx('select'); setSel(t.b); }} aria-label={`${BUILDINGS[t.b].name} level ${t.lv}`}>
-            <span className="art">{buildingArt(t.b)}</span>
+            <span className="art">{buildingArt(t.b, t.lv)}</span>
             <span>{BUILDINGS[t.b].name} {ROMAN[t.lv]}</span>
             <span className="level">{ROMAN[t.lv]}</span>
           </button>
@@ -165,7 +168,7 @@ function Buildings({ city }: { city: City }) {
             <button className={`tile busy ${fresh === building.building ? 'fresh' : ''}`} onClick={() => { sfx('select'); setSel(building.building); }}
               aria-label={`${BUILDINGS[building.building].name} under construction, ${building.turnsLeft} seasons left`}>
               <svg className="ring" viewBox="0 0 100 100" aria-hidden><circle className="bg" cx="50" cy="50" r="44" /><circle className="fg" cx="50" cy="50" r="44" strokeDasharray={c} strokeDashoffset={c * (1 - Math.max(0.06, done))} /></svg>
-              <span className="art" style={{ opacity: .55 }}>{buildingArt(building.building)}</span>
+              <span className="art" style={{ opacity: .55 }}>{buildingArt(building.building, city.buildings[building.building] + 1)}</span>
               <span>{building.turnsLeft} season{building.turnsLeft === 1 ? '' : 's'}</span>
               <span className="level">{ROMAN[city.buildings[building.building] + 1]}</span>
             </button>
@@ -182,7 +185,7 @@ function Buildings({ city }: { city: City }) {
       </div>
       {sel && selCost ? (
         <div className="detail-card" key={sel}>
-          <span className="art">{buildingArt(sel)}</span>
+          <span className="art">{buildingArt(sel, Math.max(1, lvSel))}</span>
           <h3>{BUILDINGS[sel].name} {lvSel ? ROMAN[lvSel] : ''}</h3>
           <div>{BUILDINGS[sel].blurb}</div>
           <div className="effects">
@@ -235,7 +238,7 @@ function BuildPicker({ city, onClose, onBuild }: { city: City; onClose: () => vo
             const top = !BUILDINGS[b].levels[lv];
             return (
               <div key={b} className={`choice ${top ? 'done' : ''}`}>
-                <span className="art">{buildingArt(b)}</span>
+                <span className="art">{buildingArt(b, Math.min(lv, BUILDINGS[b].levels.length - 1))}</span>
                 <span className="t"><b>{BUILDINGS[b].name}{lv > 1 && !top ? ` ${ROMAN[lv]}` : ''}</b><span>{top ? 'As large as it can be' : c.allowed ? BUILDINGS[b].effect[lv] : c.why}</span></span>
                 <span className="cost-tag">{!top && c.allowed && <>{fmt(c.cost)} <img src={spriteUrl('goods/gold')} alt="ducats" /> · {c.build} s.</>}</span>
                 <button className="info" aria-expanded={info === b} aria-label={`More about ${BUILDINGS[b].name}`} onClick={() => { sfx('page'); setInfo(info === b ? null : b); }}>i</button>
@@ -352,7 +355,7 @@ function CityList({ onPick }: { onPick: (id: string) => void }) {
       <div className="tiles">
         {all.map((c) => (
           <button key={c.id} className="tile" onClick={() => onPick(c.id)} title={`${SIZE_NAME[c.size]}${c.inland ? ', inland' : ''} · +${cityTaxes(c)} a season`}>
-            <span className="art"><Art slot={`city/${c.id}`} fallback={<img src={spriteUrl(c.inland ? (c.size === 1 ? 'colonies/fort-outpost' : 'colonies/fort-town') : c.size === 1 ? 'colonies/port-outpost' : 'colonies/port-town')} alt="" />} /></span>
+            <span className="art"><Art slot={cityViewSlot(c.id, c.inland, c.size)} fallback={<img src={spriteUrl(c.inland ? (c.size === 1 ? 'colonies/fort-outpost' : 'colonies/fort-town') : c.size === 1 ? 'colonies/port-outpost' : 'colonies/port-town')} alt="" />} /></span>
             <span>{portById(world, c.id)!.name}</span>
             <span className="level">{c.size === 3 ? 'III' : c.size === 2 ? 'II' : 'I'}</span>
           </button>
