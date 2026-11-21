@@ -47,8 +47,48 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   `nativeForce`, `rivalForce`, `freeForce`); unit numbers live in `src/data/army.ts`. Player-ordered
   battles push a `kind: 'battle'` event with the report. Check odds with `tools/battles.ts`.
   Count soldiers with `isMilitary(type)`, never `type === 'infantry'`.
+- **Stories are data.** A new story is an entry in its family's file under `src/data/stories/`
+  (types and the list of text variables in `types.ts`): `about` binds its subjects, `when` its
+  conditions, each choice has `effects` from the fixed vocabulary, and optionally a `roll` with an
+  `else`. Never write a realm's own place or family names in a story: use `{capital}`, `{house}`,
+  `{school}`, `{bankers}`, `{saint}`, `{ruler}` (crown data in `src/data/dynasty.ts`); only the
+  `history` family may. A follow-up is `chained: true` and reached with `['later', id, seasons]`.
+  A new effect or condition is a case in `carry` or `holds` in `src/sim/stories.ts` plus its type.
+  `stories.test.ts` tells every story with every choice for every crown: keep it passing.
+- **What helps the realm goes through `realmMods(s)`** (`src/sim/dynasty.ts`): the ruler's gift, the
+  era's path, every subject known and every law in force, added up. A subject or a law that
+  changes a number carries `mods` (the keys are in `Mods`, `src/data/tech.ts`); a new key needs
+  one line in `add()` and one read at the rule it affects. `knowledgeMods(s)` is the same without
+  ruler and age. A subject that makes something possible lists it in `unlocks`, and the rule that
+  allows it asks `techFor` or `wallsTech`.
+- **Slavery** (`src/sim/slavery.ts`, numbers in `src/data/slavery.ts`) is in the game by the owner's
+  decision, as a count of captives in a hold and of enslaved people in a colony. Keep the rule the
+  file's header states: nothing in it feeds the score, `s.revenue`, an objective or an ambition, and
+  text states what happens without praise or lecture. `late.test.ts` checks the objectives.
+- **Fights at sea** go through `seaFight()` (`src/sim/seafight.ts`) and put a `sea` report on a
+  battle card, as land battles put a `battle` report.
+- **Europe** (`src/sim/europe.ts`, numbers in `src/data/diplomacy.ts`): a realm's regard for you is
+  read with `regardOf` (a rival crown's lives in `s.rivals`, the rest in `s.europe`); treaties with
+  `treatyWith`, `pacted`, `enemyOf`. A new quarrel is a line in `QUARRELS`.
+- **Courtiers** remember through `recallDeed(s, p, amount, why)` (in `court.ts`), which moves their
+  loyalty and shows the reason; never write `loyalty` directly.
+- **Rival crowns** (`src/sim/rivals.ts`, numbers in `RIVAL_ECON`): each has a treasury, hulls and a
+  plan. A new thing a rival can do is an `Option` in `options()` with a want (`u`), a cost and a
+  `run`; `decide` picks. Every ship must come from a hull (`spawn`) and return it (`reachHome`) or
+  be lost (`loseShip`): `hulls + ships at sea === built` is tested. Change a people's regard for a
+  crown through `st.crowns[crown]`; show what a rival does through `rivalDoing`.
 - **Markets** move in `seasonTick`: `src/sim/trade.ts` adds regional taste and shocks to consumption
-  (`demandFactor`), rival merchants, and factories (`factorySeason`); numbers in `src/data/trade.ts`.
+  (`demandFactor`), and factories (`factorySeason`); rival cargoes arrive with their ships; numbers in `src/data/trade.ts`.
+- **Objectives** (the first voyage, advisers' ambitions): words, order and rewards in
+  `src/data/objectives.ts`, conditions in `src/sim/objectives.ts` (`MET`, one function per id).
+  A first-voyage step can carry `inScreen` (the hint shown inside the screen it opens) and `point`
+  (where the map ring sits); what differs by crown goes in `OPENINGS`.
+  `checkObjectives` runs after every order (in the worker) and every season; it pays once and
+  logs to the chronicle. A new objective is a data entry plus a condition; never pay a reward
+  anywhere else.
+- **Difficulty** (`state.difficulty`): read levers through `difficultySpec(s.difficulty)` from
+  `src/data/difficulty.ts`. Captain must leave every number as it was; add a lever there rather
+  than branching on the level in rules.
 - **The world is regenerated from the seed on load**, not saved. Any change to `mapgen.ts`
   output changes every existing save's map: bump the generator version (see Saves).
 
@@ -79,8 +119,39 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   icons) and `Art` slots for painted pictures (`src/ui/theme/Art.tsx`, list in `art/PROMPTS.md`).
 - Sounds go through `sfx()` in `src/ui/sound.ts` (synthesized, no files). Game orders get their
   sound in `store.run`; panels, tabs and pickers play their own.
+- **Keys** live in one table, `src/ui/keys.ts`: the handler in `App.tsx` and the guide's Controls page
+  both read it. A new shortcut is a row there and a case in the handler. Keys act on the topmost
+  layer only (card, welcome, reminder, guide, ledger, screen, map); with a screen open, Enter and
+  Space are left to the focused control.
+- **Where things live.** Seven screens: Cities, Markets, Fleets, Court (People, Petitioners,
+  Dynasty), Diplomacy (Peoples, Rival crowns, Europe), Research (Subjects, Laws, Expedition),
+  Chronicle. Beside the map, one panel with two tabs: Goals and Realm (the outliner, `Realm.tsx`).
+  Anything that lists what the player owns belongs in the outliner's `rows()`; money belongs on a
+  `LedgerLine`, tallied in `seasonTick` with `tally(s, line)` after the rule that moves it.
+- **Words with a meaning** are in `src/data/glossary.ts`; wrap prose the player reads in `<Gloss text>`
+  and they become tooltips, nested. A new term of art gets an entry there, not a sentence in the
+  guide.
+- **Undo** (`store.undo`): an order is undoable only if nothing in it is left to chance. A new
+  `Command` kind goes in `UNDOABLE` in `src/store.ts` only if that holds; one that cannot be taken
+  back and is easy to give by mistake goes in `CONFIRM`.
+- **A list, then a page.** A screen that holds many of a thing (fleets) shows them as a list and opens
+  one on its own page, with tabs for its parts and a way back; what a thing needs is done on its own
+  page (a fleet's leader is chosen on the fleet, not at Court). `store.fleetOpen` says which fleet's
+  page is open; any link to a fleet's page sets it with `drawer: 'fleets'`.
+- **What needs the player** is one list, `attention()` in `src/ui/attention.ts` (pure, no rules):
+  End Turn's reminder, the count on its button and any future outliner read it. A new kind of
+  reminder goes there, with a stable id so the player is asked once. Jump to things with
+  `store.goTo(target)`.
+- Per-player choices that are not part of a voyage (reminders on or off, a folded panel) go in
+  `src/ui/prefs.ts` (localStorage), never in `GameState`.
 - Screens (the `Drawer`) open centred over everything, HUD included, on a dimmed backdrop; a
   click outside or Escape closes them. Nothing on the map moves when one opens.
+- Screens are lists; a thing (fleet, person, city, colony) opens in its own window
+  (`src/ui/Windows.tsx`, `openWindow(ref, over)`), over the screen or the map. `over` keeps the
+  window underneath for Back; Escape closes the top window. Never show a thing's detail inside a
+  list screen, and link names (a fleet's leader, a city's governor) to their windows.
+- Goods you buy go to the port's stores (`storesAt`: a colony's stock, a factor's, or
+  `GameState.stores` in your cities), never into a ship the UI picked; fleets move them with `stow`.
 - Overlays opened from inside a screen must portal to `.game`: the panel's transform traps
   `position: fixed`.
 
@@ -88,9 +159,20 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
 
 - Tuning numbers belong in `src/data/` (goods, ships, tech, city, rivals, eras), not inline in
   `src/sim/`. When you touch an inline number, move it out.
-- Check balance headlessly with the scripts in `tools/` (`rivals.ts`, `voyage.ts`, `colony.ts`,
-  `crossing.ts`, `seed-sweep.ts`, `audit-perf.ts`), run with `npx vite-node tools/<file>.ts`.
-  Report numbers before and after a change.
+- **The harness** is `npx vite-node tools/autoplay.ts [seeds] [until] [crowns] [strategies] [difficulty]`:
+  the bot of `tools/bot.ts` plays whole games by the same commands the interface sends (three
+  ways: `trader`, `settler`, `balanced`; `none` leaves the rivals alone) and prints treasury,
+  sales, colonies, scores, races and losses by year. `tools/trace.ts` plays one game and tallies
+  what went wrong and which goods paid; `tools/rivalsizes.ts` shows rival colonies by year. A change
+  to a number that matters is measured before and after, on at least two crowns and two seeds.
+  The bot never tires and has no ideas: at trade it is closer to a ceiling than a floor, at
+  colonies and diplomacy a floor. On Captain it should end just behind the rivals.
+- **Crowns are compared on one scale.** A rival's `revenue` is its profit on a cargo; yours is the
+  whole sale, reckoned at `VICTORY.salesAsProfit` wherever crowns are compared (`score`, `races`).
+  Never compare `s.revenue` with a rival's directly. Score weights are `SCORE`, prestige for deeds
+  `PRESTIGE` (both in `src/data/scenarios.ts`).
+- The smaller scripts (`rivals.ts`, `voyage.ts`, `colony.ts`, `crossing.ts`, `seed-sweep.ts`,
+  `audit-perf.ts`) still answer narrow questions; run with `npx vite-node tools/<file>.ts`.
 
 ## Verify loop
 
@@ -100,7 +182,9 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
    (`--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist`).
    In dev the page exposes `window.__store` (Zustand) and `window.__view` (the MapView) for
    driving and inspecting the game. Screenshot at 1440×900 and 1280×720.
-4. Bump the README "Now playing" line and `docs/ROADMAP.md` when a milestone or pass lands.
+4. Bump the README "Now playing" line when a phase lands, and in `docs/ROADMAP.md` set the status
+   of each action item you finish (ids like P1-16) and the phase's done count. Why an item exists
+   is in `docs/PRODUCTION-AUDIT.md`.
 
 ## Gotchas
 

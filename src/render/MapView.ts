@@ -15,6 +15,8 @@ import { CROWN, NATIVE, type CrownKey } from './palette';
 import { RESOURCES, RESOURCE_IDS } from '../data/city';
 import { UNIT_INFO } from '../data/court';
 import { colonyKind } from './colonyKind';
+import { territory } from '../sim/natives';
+import { territoryOf } from '../sim/colony';
 
 export interface RoutePreview { path: number[]; turns: number; risk: number; turnEnds: number[]; cross: boolean }
 
@@ -28,6 +30,8 @@ export interface ViewUi {
   showWind: boolean;
   showGrid: boolean;
   highlightAll: boolean;
+  /** what is washed over the chart: nothing, what was surveyed, peoples by regard, colonies by loyalty */
+  mode: 'realms' | 'finds' | 'peoples' | 'loyalty';
 }
 
 export interface MapCallbacks {
@@ -129,6 +133,7 @@ class Scene {
   rumourLayer = new Container();
   parties = new Container();
   landingG = new Graphics();
+  modeG = new Graphics();
   colonyLayer = new Container();
   nationLayer = new Container();
   rivalLayer = new Container();
@@ -210,7 +215,7 @@ class Scene {
     this.root.addChild(this.grid);
     this.root.addChild(this.portalBand());
     this.buildMonsters();
-    this.root.addChild(this.monsters, this.windG, this.territoryG, this.labels, this.nationLayer, this.resLayer, this.rumourLayer, this.routes, this.landingG, this.turnMarks, this.highlight,
+    this.root.addChild(this.monsters, this.windG, this.territoryG, this.labels, this.nationLayer, this.resLayer, this.rumourLayer, this.modeG, this.routes, this.landingG, this.turnMarks, this.highlight,
       this.ports, this.colonyLayer, this.rivalLayer, this.parties, this.rivalShipLayer, this.fleets, this.plateLayer, this.hover, this.previewLabel);
     this.buildLabels();
     this.buildPorts();
@@ -510,7 +515,7 @@ class Scene {
     const surveyed = state.surveyed[g.id];
     let sk = 0;
     for (let i = 0; i < surveyed.length; i++) sk += surveyed[i];
-    const findsKey = `${sk}|${state.rumoursDone[g.id].length}|${fogKey}`;
+    const findsKey = `${sk}|${state.rumoursDone[g.id].length}|${fogKey}|${state.land?.name ?? ''}`;
     if (findsKey !== this.lastFinds) { this.lastFinds = findsKey; this.drawFinds(state); }
     this.syncColonies(state);
     this.syncNations(state, fogKey);
@@ -523,6 +528,35 @@ class Scene {
     }
     this.drawRoutes(state, ui);
     this.drawHighlight(ui);
+    this.drawMode(state, ui);
+  }
+
+  /** A wash over the chart for the map mode in force. Green is good, red is bad. */
+  private drawMode(state: GameState, ui: ViewUi) {
+    const { g, m } = this;
+    const mg = this.modeG;
+    mg.clear();
+    if (ui.mode === 'realms') return;
+    const fog = state.fog[g.id];
+    const shade = (v: number) => { const t = Math.max(0, Math.min(1, v)); const r = Math.round(200 - 150 * t), gr = Math.round(60 + 110 * t); return (r << 16) | (gr << 8) | 50; };
+    if (ui.mode === 'finds') {
+      const sv = state.surveyed[g.id];
+      for (let i = 0; i < g.N; i++) {
+        if (fog[i] < Fog.Charted || isWater(m.terrain[i])) continue;
+        if (sv[i]) mg.poly(g.corners(i)).fill({ color: m.resource[i] ? 0xe3b95e : 0x6b8f5a, alpha: m.resource[i] ? 0.55 : 0.22 });
+        else mg.poly(g.corners(i, 0.9)).stroke({ width: 1, color: 0x5a4630, alpha: 0.35 });
+      }
+    } else if (ui.mode === 'peoples') {
+      for (const n of m.nations) {
+        const st = state.natives[n.id];
+        if (!st?.met) continue;
+        const c = st.relation === 'war' ? 0xb0261c : st.relation === 'subject' ? 0x4a6fa5 : shade((st.attitude + 100) / 200);
+        for (const h of territory(n)) if (fog[h] >= Fog.Charted) mg.poly(g.corners(h)).fill({ color: c, alpha: 0.42 });
+      }
+    } else {
+      for (const c of state.colonies) if (c.map === g.id) for (const h of territoryOf(c)) mg.poly(g.corners(h)).fill({ color: shade(c.loyalty / 100), alpha: 0.5 });
+      for (const f of state.freeStates) if (f.map === g.id && !f.recognised) for (const h of g.within(f.hex, 1)) mg.poly(g.corners(h)).fill({ color: 0x222222, alpha: 0.45 });
+    }
   }
 
   /** Resources found on foot, and rumours seen but not yet followed. */
@@ -543,6 +577,12 @@ class Scene {
       node.addChild(icon);
       node.position.set(g.cx(i) + HEX_R * 0.35, g.cy(i) - HEX_R * 0.3);
       this.resLayer.addChild(node);
+    }
+    // the name you gave the land, written where it was first sighted
+    if (state.land && state.land.map === g.id) {
+      const t = label(state.land.name, 30, { italic: true, spacing: 6, halo: true });
+      t.position.set(g.cx(state.land.hex) + HEX_W * 2.5, g.cy(state.land.hex) - HEX_R * 1.6);
+      this.rumourLayer.addChild(t);
     }
     const fog = state.fog[g.id];
     for (const r of m.rumours) {
@@ -631,7 +671,7 @@ class Scene {
     const cols = state.rivalColonies.filter((c) => c.map === g.id && fog[c.hex] >= Fog.Charted);
     const ships = state.rivalShips.filter((x) => x.map === g.id && fog[x.hex] >= Fog.Explored);
     const free = state.freeStates.filter((c) => c.map === g.id);
-    const key = `${cols.map((c) => `${c.id}${c.pop}${c.level}`).join(',')}|${ships.map((x) => `${x.id}@${x.hex}`).join(',')}|${free.map((f) => f.id + f.pop).join(',')}|${fogKey}`;
+    const key = `${cols.map((c) => `${c.id}${c.pop}${c.level}`).join(',')}|${ships.map((x) => `${x.id}@${x.hex}`).join(',')}|${free.map((f) => f.id + f.pop).join(',')}|${state.rebels.map((r) => `${r.id}@${r.hex}`).join(',')}|${fogKey}`;
     if (key === this.lastRivals) return;
     this.lastRivals = key;
     this.rivalLayer.removeChildren().forEach((c) => c.destroy({ children: true }));
@@ -664,11 +704,20 @@ class Scene {
       this.plates.push(plate);
       this.rivalLayer.addChild(plate);
     }
+    for (const r of state.rebels.filter((x) => x.map === g.id && fog[x.hex] >= Fog.Charted)) {
+      const node = new Container();
+      node.addChild(new Graphics().ellipse(0, 0, HEX_W * 0.42, HEX_W * 0.17).fill({ color: 0x3b3b3b, alpha: 0.7 }).stroke({ width: 2.4, color: 0x111111 }));
+      const sp = new Sprite(this.assets.tex('units/pikeman'));
+      sp.anchor.set(0.5, 0.82); sp.width = HEX_W * 0.85; sp.scale.y = sp.scale.x;
+      node.addChild(sp);
+      node.position.set(g.cx(r.hex), g.cy(r.hex));
+      this.rivalShipLayer.addChild(node);
+    }
     for (const x of ships) {
       const crown = CROWN[x.crown];
       const node = new Container();
-      node.addChild(new Graphics().ellipse(0, 0, HEX_W * 0.42, HEX_W * 0.17).fill({ color: crown.primary, alpha: 0.6 }).stroke({ width: x.kind === 'privateer' ? 2.4 : 1.4, color: x.kind === 'privateer' ? 0x111111 : crown.secondary }));
-      const sp = new Sprite(this.assets.tex(`ships/${x.kind === 'privateer' ? 'sloop' : x.kind === 'trader' ? 'fluyt' : 'carrack'}`));
+      node.addChild(new Graphics().ellipse(0, 0, HEX_W * 0.42, HEX_W * 0.17).fill({ color: crown.primary, alpha: 0.6 }).stroke({ width: x.kind === 'privateer' || x.kind === 'raid' ? 2.4 : 1.4, color: x.kind === 'privateer' || x.kind === 'raid' ? 0x111111 : crown.secondary }));
+      const sp = new Sprite(this.assets.tex(x.kind === 'army' ? 'units/pikeman' : `ships/${x.kind === 'privateer' ? 'sloop' : x.kind === 'trader' || x.kind === 'supply' ? 'fluyt' : 'carrack'}`));
       sp.anchor.set(0.5, 0.82);
       sp.width = HEX_W * 0.85;
       sp.scale.y = sp.scale.x;

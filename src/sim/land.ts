@@ -1,4 +1,5 @@
 /** Parties ashore: landing, walking, surveying for resources, following rumours, and boarding again. */
+import { PRESTIGE } from '../data/scenarios';
 import { T, isWater } from '../data/terrain';
 import { UNIT_INFO } from '../data/court';
 import { UNIT_SPECS, RESOURCES, RESOURCE_IDS } from '../data/city';
@@ -88,7 +89,7 @@ export function surveyAround(world: World, s: GameState, p: Party, log: (kind: '
     if (!r) continue;
     const id = RESOURCE_IDS[r - 1];
     s.finds.push({ map: p.map, hex: h, resource: id, turn: s.turn, by: who });
-    s.prestige += id === 'gold' || id === 'silver' ? 5 : 2;
+    s.prestige += id === 'gold' || id === 'silver' ? PRESTIGE.find[0] : PRESTIGE.find[1];
     addResearch(1);
     if (leader) leader.discoveries += 3;
     found.push(RESOURCES[id].name.toLowerCase());
@@ -216,6 +217,7 @@ export function boardParty(s: GameState, p: Party, f: Fleet): Result {
   if (units.length + (leader ? 1 : 0) > room) return fail(`Not enough room aboard ${f.name}.`);
   for (const u of units) { u.party = null; u.fleet = f.id; }
   if (leader) { f.leader = leader.id; leader.fleet = f.id; }
+  if (p.captives) f.captives = (f.captives ?? 0) + p.captives;
   const food = Math.floor(p.food ?? 0);
   if (food > 0) f.cargo.food = (f.cargo.food ?? 0) + food;
   s.parties = s.parties.filter((x) => x !== p);

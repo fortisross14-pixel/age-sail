@@ -1,4 +1,12 @@
 import type { GoodId } from '../data/goods';
+import type { Difficulty } from '../data/difficulty';
+import type { LawId } from '../data/laws';
+import type { ScenarioId, VictoryKind } from '../data/scenarios';
+import type { SeaReport } from './seafight';
+import type { Treaty } from '../data/diplomacy';
+import type { Gift } from '../data/dynasty';
+import type { Family } from '../data/stories/types';
+import type { ObjectiveId } from '../data/objectives';
 import type { ShipType } from '../data/ships';
 import type { TechId } from '../data/tech';
 import type { BuildingId, ResourceId } from '../data/city';
@@ -82,6 +90,8 @@ export interface MarketGood {
   history: number[];
   /** what this region will pay over (or under) the usual, with any shock under way: multiplies the price */
   demand?: number;
+  /** the most that ever waits here, as a multiple of `ref` (5 when not set): a people's ground keeps a small pile */
+  pile?: number;
 }
 
 export interface Ship {
@@ -112,12 +122,50 @@ export interface Person {
   unitType: UnitType | null;
   /** fleet they lead */
   fleet: number | null;
+  /** the fleet they are to take command of as soon as they are ready and it lies in their port */
+  posted?: number | null;
   /** home city where they are when not at sea (or the city they govern) */
   city: string | null;
   alive: boolean;
   died?: number;
   /** hexes of new land charted, people met */
   discoveries: number;
+  /** 0..100: how far they can be counted on; it follows what they remember */
+  loyalty: number;
+  /** what they hold for and against you */
+  memory: Memory[];
+  /** rivals, friends and kin at court */
+  bonds: { with: number; kind: 'rival' | 'friend' | 'kin' }[];
+  /** something they are waiting for, and since when */
+  want: { kind: 'rank' | 'command'; since: number } | null;
+}
+
+export interface RealmState { attitude: number; treaty: Treaty; /** the season your last envoy or proposal was heard */ envoy: number; /** you pay their corsairs to leave you alone */ tribute: boolean }
+export interface EuroWar { id: number; a: string; b: string; cause: string; since: number; until: number; side: string | null }
+
+/** Militia of a free state marching overland to raise, or take, one of your colonies. */
+export interface RebelArmy { id: number; free: string; name: string; map: MapId; hex: number; target: number; path: number[]; strength: number; trail: number[] }
+
+export type LedgerLine = 'orders' | 'taxes' | 'factories' | 'routes' | 'peoples' | 'upkeep' | 'wages' | 'interest' | 'empire' | 'europe' | 'sea' | 'events';
+/** `mark` is the treasury when it was last accounted for: whatever has changed since belongs to the next line tallied. */
+export interface Ledger { mark: number; lines: Partial<Record<LedgerLine, number>>; last: { turn: number; lines: Partial<Record<LedgerLine, number>>; total: number } | null }
+
+/** One of the ruling house. */
+export interface Royal { id: number; name: string; numeral?: number; sex: 'm' | 'f'; born: number; gift: Gift; from?: string; frail?: number }
+export interface MarriageOffer { id: number; realm: string; name: string; sex: 'm' | 'f'; born: number; gift: Gift; dowry: number }
+/** Who rules, who follows, and the realms the house is tied to by marriage. */
+export interface Dynasty {
+  house: string;
+  ruler: Royal;
+  consort: Royal | null;
+  heirs: Royal[];
+  /** the ruler is a child: a regent governs */
+  regency: boolean;
+  reigns: { name: string; from: number; to: number | null }[];
+  /** rulers of each name so far, for numerals */
+  counts: Record<string, number>;
+  offers: MarriageOffer[];
+  ties: string[];
 }
 
 export interface Unit {
@@ -144,6 +192,8 @@ export interface Party {
   trail: number[];
   /** food carried, in rations (a company eats one a season, half of it foraged) */
   food: number;
+  /** captives taken when a village fell, marched with the party */
+  captives?: number;
 }
 
 export type ColonyLevel = 'outpost' | 'town' | 'city';
@@ -157,6 +207,8 @@ export interface Colony {
   founded: number;
   /** colonists living and working here */
   pop: number;
+  /** enslaved people held here, who work the land beside the colonists */
+  enslaved?: number;
   level: ColonyLevel;
   /** goods in the colony's warehouse */
   stock: Partial<Record<GoodId, number>>;
@@ -227,6 +279,14 @@ export interface NativeState {
   memory: Memory[];
   /** a siege they are laying to one of your colonies */
   siege: { colony: string; since: number } | null;
+  /** how they regard each of the other crowns, -100..100 (absent means they have not dealt with them) */
+  crowns: Partial<Record<CrownId, number>>;
+  /** a war with another people, which keeps their warriors busy */
+  feud: { with: string; since: number } | null;
+  /** captives of their own wars, offered for sale at their trading ground (African coast) */
+  captives?: number;
+  /** a people they are allied with against a common enemy */
+  pact: string | null;
 }
 
 /** One remembered deed, good or bad, and how much it still weighs. */
@@ -235,11 +295,27 @@ export interface Memory { why: string; amount: number; turn: number }
 export type { CrownId };
 
 /** How a rival crown stands with Castile. */
+export type RivalPlanKind = 'idle' | 'settle' | 'trade' | 'supply' | 'build' | 'saving' | 'privateer' | 'raid';
+
 export interface RivalState {
   attitude: number;
   relation: 'peace' | 'war';
-  /** season when their next colony expedition sails */
+  /** the season before which they attempt nothing new: the first sailing, then a pause after each venture */
   next: number;
+  /** ducats to spend on ships and ventures */
+  treasury: number;
+  /** ships lying in the home port, free to sail; and all the ships they own */
+  hulls: number;
+  built: number;
+  /** what they did last, or what they are saving for */
+  plan: { kind: RivalPlanKind; for?: RivalPlanKind };
+  /** how they regard each of the other rival crowns, and which they are at war with */
+  toward: Partial<Record<CrownId, number>>;
+  wars: CrownId[];
+  rivalWarSince: Partial<Record<CrownId, number>>;
+  /** what their pilots have learned of the ocean crossing, paid for season by season; and whether they have it */
+  learning: number;
+  volta: boolean;
   /** abstract earnings from trade, for their score */
   revenue: number;
   /** trading posts they hold at native grounds (site ids) */
@@ -260,6 +336,12 @@ export interface RivalColony {
   garrison: number;
   /** the player has seen it */
   seen: boolean;
+  /** seasons of stores from home left; at none the colony stops growing and shrinks */
+  supply: number;
+  /** produce waiting for a ship home */
+  stock: number;
+  /** births less deaths so far: a whole one joins or leaves */
+  growth: number;
 }
 
 /** A rival ship on the map, sailing with a purpose. */
@@ -268,7 +350,13 @@ export interface RivalShip {
   crown: CrownId;
   map: MapId;
   hex: number;
-  kind: 'settlers' | 'trader' | 'privateer';
+  /** `army` is soldiers marching overland: no ship, and no hull */
+  kind: 'settlers' | 'trader' | 'privateer' | 'supply' | 'raid' | 'army';
+  name: string;
+  /** the errand is done and she is sailing home, where her hull is free again */
+  homeward: boolean;
+  /** a colony's produce, carried home to be sold */
+  cargo: { good: GoodId; qty: number } | null;
   /** where it is going: a hex to settle, a port to trade at, or home */
   target: number | null;
   path: number[] | null;
@@ -322,6 +410,10 @@ export interface Fleet {
   /** hexes moved through most recently, for animation */
   trail: number[];
   movedThisTurn: boolean;
+  /** a standing order the fleet carries out by itself, season after season */
+  standing?: { mode: 'explore' | 'home' | 'patrol'; /** where a patrol keeps station */ anchor?: number } | null;
+  /** captives carried in the hold: people, counted, not a named unit and not a good */
+  captives?: number;
   /** sailed through deep ocean this season */
   deepThisTurn: boolean;
 }
@@ -354,8 +446,12 @@ export interface GameEvent {
   kind: 'landfall' | 'people' | 'lost' | 'tech' | 'story' | 'era' | 'end' | 'battle';
   /** for battles: the report */
   battle?: BattleReport;
+  /** for fights at sea: the report */
+  sea?: SeaReport;
   /** for stories with choices: which story, and what it is about */
   story?: string;
+  /** which kind of story, for its picture */
+  family?: Family;
   ctx?: Record<string, string | number>;
   choices?: EventChoice[];
   title: string;
@@ -412,6 +508,10 @@ export interface GameState {
   seed: number;
   /** the crown you lead */
   crown: CrownId;
+  /** chosen on the menu: starting gold, the rivals' pace, storms */
+  difficulty: Difficulty;
+  /** the first voyage and your advisers' ambitions: the season each was achieved */
+  objectives: { done: Partial<Record<ObjectiveId, number>>; catchUp?: boolean };
   turn: number;
   treasury: number;
   prestige: number;
@@ -428,7 +528,7 @@ export interface GameState {
   rumoursDone: Record<MapId, number[]>;
   colonies: Colony[];
   /** colonies that broke away from the Crown */
-  freeStates: { id: string; name: string; map: MapId; hex: number; pop: number; level: ColonyLevel; since: number }[];
+  freeStates: { id: string; name: string; map: MapId; hex: number; pop: number; level: ColonyLevel; since: number; /** you have recognised it: it trades with you and stirs up nobody */ recognised?: boolean; /** a rival crown that has recognised it and will defend it */ by?: CrownId }[];
   natives: Record<string, NativeState>;
   /** the game ends (with a final reckoning) after this season; play may go on */
   endTurn: number;
@@ -437,6 +537,33 @@ export interface GameState {
   loans: { perSeason: number; left: number }[];
   /** stories already told, so they are not repeated too often */
   told: Record<string, number>;
+  /** what earlier choices left behind: a flag and the season it was set */
+  flags: Record<string, number>;
+  /** stories that will follow an earlier choice, and when */
+  pending: { story: string; at: number; ctx: Record<string, string | number> }[];
+  dynasty: Dynasty;
+  /** the path chosen for the present era, and where its goal stood when it was chosen */
+  eraPath: { era: string; path: string; base: number } | null;
+  /** how the other realms of Europe stand with you (a rival crown's regard is in `rivals`) */
+  europe: Record<string, RealmState>;
+  /** wars between realms of Europe; `side` is the realm you have joined, if any */
+  euroWars: EuroWar[];
+  /** letters of marque are out */
+  marque: boolean;
+  /** the treasury's account: what each kind of thing brought in or cost, this turn so far and last turn */
+  ledger: Ledger;
+  /** armed men of the free states on the march against your colonies */
+  rebels: RebelArmy[];
+  /** the first crown to win one of the races, and which */
+  victory: { kind: VictoryKind; crown: CrownId; turn: number } | null;
+  /** a scenario chosen on the menu, and how it ended */
+  scenario: { id: ScenarioId; done: 'won' | 'lost' | null } | null;
+  /** laws in force */
+  laws: LawId[];
+  /** a scientific expedition you have funded: what its explorers have found of what it was sent for */
+  expedition: { since: number; done: number; need: number } | null;
+  /** the name you gave the land across the ocean */
+  land: { name: string; map: MapId; hex: number } | null;
   rivals: Record<CrownId, RivalState>;
   rivalColonies: RivalColony[];
   rivalShips: RivalShip[];
@@ -454,6 +581,11 @@ export interface GameState {
   events: GameEvent[];
   /** your factories in European ports */
   factories: Factory[];
+  /**
+   * Goods you keep ashore in your own cities, by city id: what you buy there waits here until a fleet
+   * loads it. Colonies keep theirs in `Colony.stock` and factors in `Factory.stock` (see `storesAt`).
+   */
+  stores: Record<string, Partial<Record<GoodId, number>>>;
   /** shocks to demand under way */
   shocks: MarketShock[];
   nextId: number;
@@ -466,6 +598,8 @@ export interface GameState {
     progress: number;
     /** points earned from discoveries this season, added at the end of the turn */
     pending: number;
+    /** subjects to study next, in order */
+    queue?: TechId[];
   };
 }
 

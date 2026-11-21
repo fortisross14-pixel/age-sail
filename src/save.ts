@@ -1,5 +1,8 @@
 import { GEN_VERSION } from './sim/version';
 import type { GameState } from './sim/types';
+import { RIVAL_ECON, rivalSpec, type CrownId } from './data/rivals';
+import { dynastyFor } from './sim/dynasty';
+import { initEurope } from './sim/europe';
 
 /**
  * Save format. Bump SAVE_VERSION when the shape of GameState changes and add a migration from the
@@ -12,8 +15,21 @@ import type { GameState } from './sim/types';
  * Version 13 (M12) adds army supply (party food), colony walls and veteran ranks; old infantry are
  * pikemen.
  * Version 14 (M13) adds factories in European ports and market shocks.
+ * Version 15 (Phase 1, the first hour) adds the difficulty and objectives. An older voyage is Captain,
+ * and ticks the objectives it has already met without rewards when it is next loaded.
+ * Version 16 (Phase 2, a world that pushes back) gives rival crowns a purse, ships that come home, plans and
+ * relations with each other; their colonies stores and produce; peoples a regard for each crown and feuds.
+ * Version 17 (Phase 3, stories and dynasty) adds the ruling house, story flags and follow-ups, what courtiers
+ * remember and want, the era's path, the name of the new land, pacts between peoples, and what rivals have
+ * learned of the crossing. An older voyage gets a ruler in their prime, named from its seed.
+ * Version 18 (Phase 4, research and Europe) adds laws, a funded expedition, the other realms' regard and
+ * treaties, the wars of Europe and letters of marque. Subjects already mastered keep their names.
+ * Version 19 (Phase 4, second half) adds five buildings to every city, the first victory won and the scenario.
+ * Version 20 adds the free states' militia on the march.
+ * Version 21 (Phase 5) adds the ledger.
+ * Version 22 adds the stores in your own cities: what you buy there waits ashore until a fleet loads it.
  */
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 22;
 export const SAVE_KEY = 'age-sail:save';
 /** Keys used before the envelope. v9 is migrated; older ones can't be read and are removed. */
 export const LEGACY_KEY = 'age-sail:save:v9';
@@ -23,6 +39,8 @@ export interface SaveEnvelope {
   saveVersion: number;
   genVersion: number;
   state: GameState;
+  /** when it was written, for the list of saves */
+  at?: number;
 }
 
 export type LoadResult =
@@ -46,10 +64,41 @@ const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, 
     parties: (s.parties as Record<string, unknown>[]).map((p) => ({ ...p, food: 12 })),
   }),
   13: (s) => ({ ...s, factories: [], shocks: [] }),
+  14: (s) => ({ ...s, difficulty: 'captain', objectives: { done: {}, catchUp: true } }),
+  15: (s) => ({
+    ...s,
+    rivals: Object.fromEntries(Object.entries(s.rivals as Record<string, Record<string, unknown>>).map(([id, r]) => [id, {
+      ...r, treasury: RIVAL_ECON.startTreasury, hulls: RIVAL_ECON.startShips, built: RIVAL_ECON.startShips + (s.rivalShips as { crown: string }[]).filter((x) => x.crown === id).length,
+      plan: { kind: 'idle' }, toward: {}, wars: [], rivalWarSince: {},
+    }])),
+    rivalColonies: (s.rivalColonies as Record<string, unknown>[]).map((c) => ({ ...c, supply: RIVAL_ECON.supplyFull, stock: 0, growth: 0 })),
+    rivalShips: (s.rivalShips as Record<string, unknown>[]).map((x, i) => ({ ...x, name: `Ship ${i + 1}`, homeward: false, cargo: null })),
+    natives: Object.fromEntries(Object.entries(s.natives as Record<string, Record<string, unknown>>).map(([id, st]) => [id, { ...st, crowns: {}, feud: null }])),
+  }),
+  21: (s) => ({ ...s, stores: {} }),
+  20: (s) => ({ ...s, ledger: { mark: s.treasury as number, lines: {}, last: null } }),
+  19: (s) => ({ ...s, rebels: [] }),
+  18: (s) => ({
+    ...s, victory: null, scenario: null,
+    cities: Object.fromEntries(Object.entries(s.cities as Record<string, { buildings: Record<string, number> }>).map(([id, c]) => [id, { ...c, buildings: { warehouse: 0, arsenal: 0, fortress: 0, observatory: 0, cathedral: 0, ...c.buildings } }])),
+  }),
+  17: (s) => ({ ...s, laws: [], expedition: null, europe: initEurope(s.crown as CrownId), euroWars: [], marque: false }),
+  16: (s) => {
+    const person = (p: Record<string, unknown>) => ({ ...p, loyalty: 60, memory: [], bonds: [], want: null });
+    const turn = s.turn as number;
+    return {
+      ...s, flags: {}, pending: [], eraPath: null, land: null, dynasty: dynastyFor(s.crown as CrownId, s.seed as number, turn),
+      people: (s.people as Record<string, unknown>[]).map(person),
+      petitioners: (s.petitioners as { person: Record<string, unknown> }[]).map((x) => ({ ...x, person: person(x.person) })),
+      natives: Object.fromEntries(Object.entries(s.natives as Record<string, Record<string, unknown>>).map(([id, st]) => [id, { ...st, pact: null }])),
+      // they knew the crossing from a fixed season before: keep what they knew
+      rivals: Object.fromEntries(Object.entries(s.rivals as Record<string, Record<string, unknown>>).map(([id, r]) => [id, { ...r, learning: turn, volta: turn >= rivalSpec(id as CrownId).volta }])),
+    };
+  },
 };
 
 export function wrap(state: GameState): SaveEnvelope {
-  return { saveVersion: SAVE_VERSION, genVersion: GEN_VERSION, state };
+  return { saveVersion: SAVE_VERSION, genVersion: GEN_VERSION, state, at: Date.now() };
 }
 
 /** Wrap a bare M8 state (the legacy v9 key) as a version-10 envelope. */

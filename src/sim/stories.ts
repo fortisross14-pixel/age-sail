@@ -1,233 +1,417 @@
 /**
- * Stories: event cards with choices, in the spirit of Old World. Each has a condition (who or what it is about),
- * a few options, and consequences. One may come in any season; none repeats too soon.
+ * The story engine. Stories are data (`src/data/stories/`): this file binds their subjects, checks
+ * their conditions, fills their text, and carries out their effects. One story may come in a
+ * season; a story not yet told always comes before one that has been; follow-ups arrive when due.
  */
-import { SHIPS } from '../data/ships';
-import { SKILLS, yearOf, type EventChoice, type GameEvent, type GameState, type Person, type World, type Skill } from './types';
-import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
-import { personById, skill } from './court';
-import { rivalSpec, crownSpec, type CrownId } from '../data/rivals';
+import { STORIES, STORY_PACE } from '../data/stories';
+import type { About, ChoiceDef, Cond, Effect, Family, Outcome, StoryDef } from '../data/stories/types';
+import { HOUSES } from '../data/dynasty';
+import { REALMS, realmSpec, type RealmId } from '../data/realms';
+import { rivalSpec, crownSpec, rivalsOf, type CrownId } from '../data/rivals';
 import { CITIES } from '../data/europe';
-
-const CITY_NAME: Record<string, string> = Object.fromEntries(CITIES.map((c) => [c.id, c.name]));
+import { SKILL_INFO } from '../data/court';
+import { isMilitary } from '../data/army';
+import { SKILLS, Fog, yearOf, type GameEvent, type GameState, type Person, type World, type Skill, type TraitId } from './types';
+import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { GRIDS } from './hex';
-import { Fog } from './types';
-import { allNations, remember } from './natives';
+import { personById, skill, ageOf, recallDeed } from './court';
+import { REGION_OF } from '../data/trade';
+import { allNations, remember, territory } from './natives';
+import { score } from './colony';
+import { rivalScore } from './rivals';
+import { styled, titleOf, heirOf, chooseEraPath, royalAge } from './dynasty';
+import { joinWar } from './europe';
 
 type Log = (kind: 'discovery' | 'peril' | 'court' | 'trade', text: string) => void;
 type Ctx = Record<string, string | number>;
+const BY_ID = new Map(STORIES.map((s) => [s.id, s]));
+export const storyById = (id: string) => BY_ID.get(id);
+const CITY_NAME: Record<string, string> = Object.fromEntries(CITIES.map((c) => [c.id, c.name]));
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-interface Story {
-  id: string;
-  /** seasons before it can come again */
-  cooldown: number;
-  when: (w: World, s: GameState, rng: Rng) => Ctx | null;
-  title: (s: GameState, c: Ctx) => string;
-  text: (s: GameState, c: Ctx, w: World) => string;
-  choices: (s: GameState, c: Ctx) => (EventChoice & { apply: (w: World, s: GameState, c: Ctx, rng: Rng, log: Log) => string })[];
+// ---------- who a story is about ----------
+
+const leadsParty = (s: GameState, p: Person) => s.parties.some((x) => x.leader === p.id);
+const PERSON: Record<string, (s: GameState, p: Person) => boolean> = {
+  any: () => true,
+  atCourt: (s, p) => p.fleet == null && !leadsParty(s, p) && p.rank !== 'governor',
+  atSea: (_s, p) => p.fleet != null,
+  explorer: (_s, p) => p.rank === 'explorer', merchant: (_s, p) => p.rank === 'merchant', governor: (_s, p) => p.rank === 'governor',
+  ranked: (_s, p) => p.rank !== 'courtier', plain: (_s, p) => p.rank === 'courtier',
+  young: (s, p) => ageOf(p, s.turn) < 35, old: (s, p) => ageOf(p, s.turn) >= 50,
+  disloyal: (_s, p) => p.loyalty < 35, loyal: (_s, p) => p.loyalty >= 70,
+  ambitious: (_s, p) => p.trait === 'ambitious', pious: (_s, p) => p.trait === 'pious', learned: (_s, p) => p.trait === 'learned', bold: (_s, p) => p.trait === 'bold',
+  navigator: (_s, p) => p.skills.navigation >= 3, soldier: (_s, p) => p.skills.military >= 3, trader: (_s, p) => p.skills.commerce >= 3,
+  builder: (_s, p) => p.skills.construction >= 3, envoy: (_s, p) => p.skills.diplomacy >= 3,
+};
+/** Find subjects for a story, or null when it has nobody to be about. */
+function bind(w: World, s: GameState, about: About | undefined, rng: Rng): Ctx | null {
+  const ctx: Ctx = { n: int(rng, 0, 999) };
+  if (!about) return ctx;
+  const garrison = (id: string) => s.units.some((u) => u.colony === id && isMilitary(u.type));
+  if (about.fleet) {
+    const FLEET: Record<string, (f: GameState['fleets'][number]) => boolean> = {
+      any: () => true, atSea: (f) => !f.at, inPort: (f) => !!f.at && !!s.cities[f.at], led: (f) => f.leader != null, lowStores: (f) => f.supplies <= 2,
+      deep: (f) => !!w[f.map].deep[f.hex], cargo: (f) => Object.values(f.cargo).some((n) => (n ?? 0) > 0), newWorld: (f) => f.map === 'new', big: (f) => f.ships.length >= 2,
+    };
+    const fs = s.fleets.filter((f) => about.fleet!.split(' ').every((k) => FLEET[k]?.(f) ?? true));
+    if (!fs.length) return null;
+    ctx.fleet = pick(rng, fs).id;
+  }
+  if (about.courtier) {
+    const keys = about.courtier.split(' ');
+    let ps = s.people.filter((p) => p.alive && keys.every((k) => (k === 'leader' ? true : PERSON[k]?.(s, p) ?? true)));
+    if (keys.includes('leader')) { const f = s.fleets.find((x) => x.id === ctx.fleet); ps = ps.filter((p) => p.id === f?.leader); }
+    if (!ps.length) return null;
+    ctx.courtier = pick(rng, ps).id;
+  }
+  if (about.other) {
+    const first = personById(s, Number(ctx.courtier));
+    const keys = about.other.split(' ');
+    const ps = s.people.filter((p) => p.alive && p.id !== first?.id && keys.every((k) =>
+      k === 'rivalOf' ? !!first?.bonds.some((b) => b.with === p.id && b.kind === 'rival')
+        : k === 'friendOf' ? !!first?.bonds.some((b) => b.with === p.id && b.kind === 'friend') : PERSON[k]?.(s, p) ?? true));
+    if (!ps.length) return null;
+    ctx.other = pick(rng, ps).id;
+  }
+  if (about.colony) {
+    const COLONY: Record<string, (c: GameState['colonies'][number]) => boolean> = {
+      any: () => true, disloyal: (c) => c.loyalty < 45, loyal: (c) => c.loyalty >= 70, big: (c) => c.pop >= 6, hungry: (c) => c.last.hungry,
+      old: (c) => s.turn - c.founded >= 40, new: (c) => s.turn - c.founded < 12, chartered: (c) => c.charter, uncharted: (c) => !c.charter,
+      garrison: (c) => garrison(c.id), nogarrison: (c) => !garrison(c.id),
+      nearRival: (c) => s.rivalColonies.some((x) => x.map === c.map && GRIDS[c.map].distance(x.hex, c.hex) <= 6),
+    };
+    const cs = s.colonies.filter((c) => about.colony!.split(' ').every((k) => COLONY[k]?.(c) ?? true));
+    if (!cs.length) return null;
+    ctx.colony = pick(rng, cs).id;
+  }
+  const colony = s.colonies.find((c) => c.id === ctx.colony);
+  if (about.people) {
+    const keys = about.people.split(' ');
+    const ns = allNations(w).filter((n) => {
+      const st = s.natives[n.id];
+      if (!st?.met) return false;
+      return keys.every((k) => k === 'met' ? true : k === 'peace' ? st.relation === 'peace' : k === 'allied' ? st.relation === 'allied' : k === 'subject' ? st.relation === 'subject'
+        : k === 'hostile' ? st.relation === 'war' || st.attitude <= -40 : k === 'friendly' ? st.attitude >= 40 && st.relation !== 'war' : k === 'post' ? st.post : k === 'mission' ? st.mission
+          : k === 'feud' ? !!st.feud : k === 'strong' ? st.warriors >= 12 : k === 'weak' ? st.warriors < 6
+            : k === 'neighbour' ? !!colony && n.map === colony.map && territory(n).some((h) => GRIDS[n.map].distance(h, colony.hex) <= 3) : true);
+    });
+    if (!ns.length) return null;
+    ctx.people = pick(rng, ns).id;
+  }
+  if (about.crown) {
+    const mine = score(s, w).total;
+    const keys = about.crown.split(' ');
+    const rs = rivalsOf(s.crown).filter((r) => {
+      const st = s.rivals[r.id];
+      return keys.every((k) => k === 'peace' ? st.relation === 'peace' : k === 'war' ? st.relation === 'war' : k === 'hostile' ? st.attitude < 0 : k === 'friendly' ? st.attitude >= 30
+        : k === 'ahead' ? rivalScore(s, r.id).total > mine : k === 'behind' ? rivalScore(s, r.id).total <= mine
+          : k === 'neighbour' ? !!colony && s.rivalColonies.some((x) => x.crown === r.id && x.map === colony.map && GRIDS[colony.map].distance(x.hex, colony.hex) <= 6) : true);
+    });
+    if (!rs.length) return null;
+    ctx.crown = pick(rng, rs).id;
+  }
+  if (about.realm) {
+    const rs = REALMS.filter((r) => r.id !== s.crown && (about.realm === 'tied' ? s.dynasty.ties.includes(r.id) : about.realm === 'untied' ? !s.dynasty.ties.includes(r.id) : true));
+    if (!rs.length) return null;
+    ctx.realm = pick(rng, rs).id;
+  }
+  if (about.coast) {
+    const map = s.newWorldFound && rng() < 0.6 ? 'new' : 'old';
+    const unknown = [...Array(GRIDS[map].N).keys()].filter((i) => s.fog[map][i] === Fog.Unknown && !(map === 'old' && GRIDS.old.lat(i) > 28) && w[map].terrain[i] > 1);
+    if (unknown.length <= 50) return null;
+    ctx.map = map; ctx.hex = pick(rng, unknown);
+  }
+  return ctx;
 }
 
-const atCourt = (s: GameState) => s.people.filter((p) => p.alive && p.fleet == null && !s.parties.some((x) => x.leader === p.id) && p.rank !== 'governor');
-const person = (s: GameState, c: Ctx, k = 'person') => personById(s, Number(c[k])) as Person;
-/** Your crown's main port: where news reaches the court. */
-const homeId = (s: GameState) => crownSpec(s.crown).home;
-const homeHex = (w: World, s: GameState) => w.old.ports.find((p) => p.id === homeId(s))!.hex;
-const bump = (p: Person, k: Skill, d: number) => { p.skills[k] = Math.max(0, Math.min(5, p.skills[k] + d)); };
+function holds(s: GameState, c: Cond, rng: Rng): boolean {
+  const cmp = (v: number, op: string, n: number) => (op === '<' ? v < n : v >= n);
+  switch (c[0]) {
+    case 'year': return cmp(yearOf(s.turn), c[1], c[2]);
+    case 'treasury': return cmp(s.treasury, c[1], c[2]);
+    case 'prestige': return cmp(s.prestige, c[1], c[2]);
+    case 'colonies': return cmp(s.colonies.length, c[1], c[2]);
+    case 'fleets': return cmp(s.fleets.length, c[1], c[2]);
+    case 'flag': return s.flags[c[1]] != null;
+    case 'noflag': return s.flags[c[1]] == null;
+    case 'crown': return (c.slice(1) as string[]).includes(s.crown);
+    case 'tech': return s.research.known.includes(c[1] as never);
+    case 'notech': return !s.research.known.includes(c[1] as never);
+    case 'newWorld': return s.newWorldFound;
+    case 'noNewWorld': return !s.newWorldFound;
+    case 'married': return !!s.dynasty.consort;
+    case 'unmarried': return !s.dynasty.consort;
+    case 'heir': return s.dynasty.heirs.length > 0;
+    case 'noheir': return s.dynasty.heirs.length === 0;
+    case 'regency': return s.dynasty.regency;
+    case 'noregency': return !s.dynasty.regency;
+    case 'rulerOld': return royalAge(s.dynasty.ruler, s.turn) >= 50;
+    case 'rulerYoung': return royalAge(s.dynasty.ruler, s.turn) < 30;
+    case 'atWar': return rivalsOf(s.crown).some((r) => s.rivals[r.id].relation === 'war');
+    case 'atPeace': return rivalsOf(s.crown).every((r) => s.rivals[r.id].relation !== 'war');
+    case 'found': return s.finds.some((f) => (c.slice(1) as string[]).includes(f.resource));
+    case 'galleonHome': return s.fleets.some((f) => f.at === crownSpec(s.crown).home && f.ships.some((x) => x.type === 'galleon'));
+    case 'chance': return rng() < c[1];
+  }
+}
 
-const STORIES: Story[] = [
-  {
-    id: 'mutiny', cooldown: 16,
-    when: (_w, s) => {
-      const f = s.fleets.find((x) => !x.at && x.supplies <= 2 && x.leader != null);
-      return f ? { fleet: f.id, person: f.leader! } : null;
-    },
-    title: () => 'Mutiny brewing',
-    text: (s, c) => { const f = s.fleets.find((x) => x.id === c.fleet); return `With food running short, the crews of ${f?.name ?? 'the fleet'} gather at the mast. They want to turn back, and they want it now. ${person(s, c).name} must answer them.`; },
-    choices: () => [
-      { label: 'Hang the ringleaders', hint: 'Military decides how it ends', apply: (_w, s, c, rng) => {
-        const f = s.fleets.find((x) => x.id === c.fleet); const p = person(s, c);
-        if (!f) return 'The moment passes.';
-        if (rng() < 0.4 + skill(p, 'military') * 0.12) return `${p.name} hangs two sailors from the yard. The rest go back to work, silent.`;
-        const lost = Math.ceil(f.crew * 0.2); f.crew -= lost;
-        return `The hanging sparks a fight on deck. ${lost} sailors die before order returns.`;
-      } },
-      { label: 'Promise them a share of the profits', hint: '−300 ducats', apply: (_w, s) => { s.treasury -= 300; return 'Promises of silver quiet the crews, for now.'; } },
-      { label: 'Give in, and turn back', hint: 'The fleet drops its orders', apply: (_w, s, c) => { const f = s.fleets.find((x) => x.id === c.fleet); if (f) f.order = null; return 'The fleet stops where it is and waits for new orders.'; } },
-    ],
-  },
-  {
-    id: 'plague', cooldown: 40,
-    when: (_w, _s, rng) => (rng() < 0.3 ? {} : null),
-    title: (s) => `Plague in ${CITY_NAME[homeId(s)]}`,
-    text: () => 'Sickness has come in with a ship from the south. The physicians fear it will spread through the city.',
-    choices: () => [
-      { label: 'Close the port', hint: 'No taxes from your main port this season; the yards stop', apply: (_w, s) => {
-        s.treasury -= 160; const c = s.cities[homeId(s)]; if (c?.project) c.project.turnsLeft++;
-        return 'The port is closed. The plague burns out in a few weeks, and trade resumes.';
-      } },
-      { label: 'Keep trade moving', hint: 'Someone at court may fall ill', apply: (_w, s, _c, rng) => {
-        const p = atCourt(s).filter((x) => x.trait !== 'hardy');
-        if (p.length && rng() < 0.5) { const v = pick(rng, p); v.alive = false; v.died = s.turn; return `Trade goes on, and the plague takes ${v.name}.`; }
-        return 'Trade goes on. The plague takes some of the poor quarters, and passes.';
-      } },
-    ],
-  },
-  {
-    id: 'quarrel', cooldown: 20,
-    when: (_w, s, rng) => {
-      const p = atCourt(s);
-      if (p.length < 4) return null;
-      const a = pick(rng, p), b = pick(rng, p.filter((x) => x !== a));
-      return { a: a.id, b: b.id };
-    },
-    title: () => 'A quarrel at court',
-    text: (s, c) => `${person(s, c, 'a').name} and ${person(s, c, 'b').name} have come to blows over precedence at a banquet. The whole court is watching to see whom you favour.`,
-    choices: (s, c) => [
-      { label: `Favour ${personById(s, Number(c.a))?.name.split(' ')[0]}`, hint: 'The other leaves court', apply: (_w, st, cc) => { const b = person(st, cc, 'b'); st.people = st.people.filter((x) => x !== b); bump(person(st, cc, 'a'), 'diplomacy', 1); return `${b.name} leaves court in a rage.`; } },
-      { label: `Favour ${personById(s, Number(c.b))?.name.split(' ')[0]}`, hint: 'The other leaves court', apply: (_w, st, cc) => { const a = person(st, cc, 'a'); st.people = st.people.filter((x) => x !== a); bump(person(st, cc, 'b'), 'diplomacy', 1); return `${a.name} leaves court in a rage.`; } },
-      { label: 'Fine them both', hint: '+200 ducats, −5 prestige', apply: (_w, st) => { st.treasury += 200; st.prestige -= 5; return 'Both pay a fine to the treasury. Neither forgives you.'; } },
-    ],
-  },
-  {
-    id: 'bankers', cooldown: 30,
-    when: (_w, s) => (s.treasury < 1500 ? {} : null),
-    title: () => 'The Genoese bankers',
-    text: () => 'Bankers from Genova offer you a loan of 4,000 ducats, repaid at 150 a season for ten years.',
-    choices: () => [
-      { label: 'Take the loan', hint: '+4,000 now, −150 a season for 40 seasons', apply: (_w, s) => { s.treasury += 4000; s.loans.push({ perSeason: 150, left: 40 }); return 'The money arrives in Sevilla in sealed chests.'; } },
-      { label: 'Refuse', apply: () => 'The bankers bow and leave.' },
-    ],
-  },
-  {
-    id: 'scholar', cooldown: 24,
-    when: (_w, s, rng) => { const p = atCourt(s); return p.length ? { person: pick(rng, p).id, skill: pick(rng, SKILLS) } : null; },
-    title: () => 'A learned visitor',
-    text: (s, c) => `A scholar from Salamanca offers to teach at court. ${person(s, c).name} is eager to study ${String(c.skill)} with him.`,
-    choices: (s, c) => [
-      { label: 'Pay for the lessons', hint: `−400 ducats, ${personById(s, Number(c.person))?.name.split(' ')[0]} +1 ${String(c.skill)}`, apply: (_w, st, cc) => { st.treasury -= 400; bump(person(st, cc), cc.skill as Skill, 1); return `${person(st, cc).name} studies all winter and comes out wiser.`; } },
-      { label: 'Ask him to teach the scholars instead', hint: '−400 ducats, +15 research', apply: (_w, st) => { st.treasury -= 400; st.research.pending += 15; return 'The court’s scholars fill notebooks with his lectures.'; } },
-      { label: 'Send him away', apply: () => 'The scholar goes on to Lisboa.' },
-    ],
-  },
-  {
-    id: 'pilot', cooldown: 30,
-    when: (w, s, rng) => {
-      const map = s.newWorldFound && rng() < 0.6 ? 'new' : 'old';
-      const unknown = [...Array(GRIDS[map].N).keys()].filter((i) => s.fog[map][i] === Fog.Unknown && !(map === 'old' && GRIDS.old.lat(i) > 28) && w[map].terrain[i] > 1);
-      return unknown.length > 50 ? { map, hex: pick(rng, unknown) } : null;
-    },
-    title: () => 'A pilot’s secret',
-    text: (_s, c) => `An old pilot in the taverns of Sevilla says he has seen coasts no chart shows, ${c.map === 'new' ? 'far across the ocean' : 'down the African coast'}. For a price he will draw them.`,
-    choices: () => [
-      { label: 'Buy his chart', hint: '−300 ducats', apply: (_w, s, c) => {
-        s.treasury -= 300;
-        const map = c.map as 'old' | 'new';
-        for (const h of GRIDS[map].within(Number(c.hex), 6)) if (s.fog[map][h] < Fog.Charted) s.fog[map][h] = Fog.Charted;
-        return 'His chart is rough, but true: a stretch of unknown coast is now on your maps.';
-      } },
-      { label: 'Laugh him out of the room', apply: () => 'The pilot spits, and goes looking for a Portuguese buyer.' },
-    ],
-  },
-  {
-    id: 'charter_plea', cooldown: 16,
-    when: (_w, s) => { const c = s.colonies.find((x) => x.loyalty < 55 && !x.charter && x.pop >= 3); return c ? { colony: c.id } : null; },
-    title: (s, c) => `A petition from ${s.colonies.find((x) => x.id === c.colony)?.name}`,
-    text: (s, c) => `The settlers of ${s.colonies.find((x) => x.id === c.colony)?.name} send a petition: they ask for a council of their own, and lighter taxes.`,
-    choices: () => [
-      { label: 'Grant a royal charter', hint: 'Loyalty up; half taxes from this colony', apply: (_w, s, c) => { const col = s.colonies.find((x) => x.id === c.colony); if (col) { col.charter = true; col.loyalty = Math.min(100, col.loyalty + 20); } return 'The settlers ring the church bells for the King.'; } },
-      { label: 'Send gifts and a kind letter', hint: '−400 ducats, loyalty up a little', apply: (_w, s, c) => { s.treasury -= 400; const col = s.colonies.find((x) => x.id === c.colony); if (col) col.loyalty = Math.min(100, col.loyalty + 10); return 'The settlers are pleased, but not satisfied.'; } },
-      { label: 'Refuse', hint: 'Loyalty falls', apply: (_w, s, c) => { const col = s.colonies.find((x) => x.id === c.colony); if (col) col.loyalty -= 12; return 'The petition is read aloud in the colony square and torn up.'; } },
-    ],
-  },
-  {
-    id: 'survivors', cooldown: 24,
-    when: (_w, s, rng) => { const f = s.fleets.find((x) => !x.at); return f && rng() < 0.5 ? { fleet: f.id, crown: pick(rng, ['portugal', 'england', 'netherlands']) } : null; },
-    title: () => 'Survivors at sea',
-    text: (s, c) => `${s.fleets.find((x) => x.id === c.fleet)?.name ?? 'One of your fleets'} finds a boat of survivors from a wrecked ship of ${rivalSpec(c.crown as CrownId).name}, half dead from thirst.`,
-    choices: () => [
-      { label: 'Take them aboard and send them home', hint: 'Their crown thinks better of you', apply: (_w, s, c) => { s.rivals[c.crown as CrownId].attitude += 15; return 'The survivors are landed at the next port with food and a letter of courtesy.'; } },
-      { label: 'Hold them for ransom', hint: '+400 ducats; their crown is angered', apply: (_w, s, c) => { s.treasury += 400; s.rivals[c.crown as CrownId].attitude -= 20; return 'Their families pay. Their King does not forget.'; } },
-    ],
-  },
-  {
-    id: 'envoys', cooldown: 20,
-    when: (w, s, rng) => { const n = allNations(w).filter((x) => s.natives[x.id]?.met && s.natives[x.id].relation === 'peace'); return n.length ? { nation: pick(rng, n).id } : null; },
-    title: () => 'Envoys from across the sea',
-    text: (_s, c, w) => { const n = allNations(w).find((x) => x.id === c.nation)!; return `Envoys of the ${n.people} have come aboard one of your ships, with gifts of feathers and gold, asking what the strangers want in their land.`; },
-    choices: () => [
-      { label: 'Exchange gifts and swear friendship', hint: '−200 ducats; they think better of you', apply: (_w, s, c) => { s.treasury -= 200; remember(s, s.natives[String(c.nation)], 'Friendship sworn with their envoys', 20); return 'The envoys leave with mirrors, cloth and a sword for their chief.'; } },
-      { label: 'Ask them to guide your explorers', hint: 'Their lands are charted', apply: (w, s, c) => { const n = allNations(w).find((x) => x.id === c.nation)!; for (const h of [n.siteHex, ...n.villages].flatMap((v) => GRIDS[n.map].within(v, 3))) if (s.fog[n.map][h] < Fog.Explored) s.fog[n.map][h] = Fog.Explored; return 'They draw their country in the sand: rivers, villages, mountains.'; } },
-      { label: 'Send them away', hint: 'They are offended', apply: (_w, s, c) => { remember(s, s.natives[String(c.nation)], 'Their envoys sent away', -15); return 'The envoys leave in silence.'; } },
-    ],
-  },
-  {
-    id: 'armada', cooldown: 999,
-    when: (_w, s) => (s.crown === 'spain' && yearOf(s.turn) >= 1586 && yearOf(s.turn) <= 1590 ? {} : null),
-    title: () => 'The Great Armada',
-    text: () => 'Your admirals urge a great armada against England, and every port is asked to give a ship or the money for one.',
-    choices: (s) => {
-      const g = s.fleets.find((f) => f.at === homeId(s) && f.ships.some((x) => x.type === 'galleon'));
-      return [
-        ...(g ? [{ label: 'Send a galleon', hint: 'Lose the ship; +40 prestige; war with England', apply: (_w: World, st: GameState) => { const f = st.fleets.find((x) => x.id === g.id)!; const ship = f.ships.find((x) => x.type === 'galleon')!; f.ships = f.ships.filter((x) => x !== ship); if (!f.ships.length) st.fleets = st.fleets.filter((x) => x !== f); st.prestige += 40; st.rivals.england.relation = 'war'; st.rivals.england.warSince = st.turn; return `The ${ship.name} sails with the Armada. She does not come back, but the King remembers who answered.`; } }] : []),
-        { label: 'Pay for the fleet', hint: '−3,000 ducats; +15 prestige', apply: (_w, st) => { st.treasury -= 3000; st.prestige += 15; return 'Your ducats pay for cannon and biscuit.'; } },
-        { label: 'Not this year', hint: '−20 prestige', apply: (_w, st) => { st.prestige -= 20; return 'The admirals grumble, and the court talks of nothing else for a season.'; } },
-      ];
-    },
-  },
-  {
-    id: 'prices', cooldown: 999,
-    when: (_w, s) => (yearOf(s.turn) >= 1550 && s.finds.some((f) => f.resource === 'silver' || f.resource === 'gold') ? {} : null),
-    title: () => 'The price revolution',
-    text: () => 'So much gold and silver has come from beyond the sea that prices rise all over Europe. Bread, cloth and timber cost more every year.',
-    choices: () => [
-      { label: 'So be it', hint: 'European staples cost a third more', apply: (_w, s) => {
-        for (const id of Object.keys(s.cities)) for (const g of ['tools', 'timber', 'cloth', 'wine', 'food', 'stone'] as const) { const m = s.markets[id]?.[g]; if (m) m.base = Math.round(m.base * 1.33); }
-        return 'The price of everything in your cities rises.';
-      } },
-    ],
-  },
-  {
-    id: 'marriage', cooldown: 24,
-    when: (_w, s, rng) => { const p = atCourt(s).filter((x) => yearOf(s.turn) - x.born < 40); return p.length ? { person: pick(rng, p).id } : null; },
-    title: () => 'A match proposed',
-    text: (s, c) => `A great house of Toledo proposes a marriage for ${person(s, c).name}. It would bring lands and friends at court, and a larger household to keep.`,
-    choices: () => [
-      { label: 'Bless the match', hint: '+10 prestige; their salary rises', apply: (_w, s, c) => { s.prestige += 10; const p = person(s, c); p.trait = 'ambitious'; return `${p.name} marries with all the court in attendance.`; } },
-      { label: 'Forbid it', hint: 'They may leave court', apply: (_w, s, c, rng) => { const p = person(s, c); if (rng() < 0.4) { s.people = s.people.filter((x) => x !== p); return `${p.name} leaves court to marry anyway.`; } return `${p.name} obeys, unhappily.`; } },
-    ],
-  },
-];
+// ---------- words ----------
+
+const first = (name: string) => name.split(' ')[0];
+/** Fill a story's text with the names of its subjects and of your own realm. */
+export function fill(text: string, w: World, s: GameState, ctx: Ctx): string {
+  const h = HOUSES[s.crown];
+  const p = personById(s, Number(ctx.courtier)), o = personById(s, Number(ctx.other));
+  const n = allNations(w).find((x) => x.id === ctx.people);
+  const crown = ctx.crown ? rivalSpec(ctx.crown as CrownId) : undefined;
+  const heir = heirOf(s.dynasty);
+  const vars: Record<string, string | undefined> = {
+    courtier: p?.name, 'courtier.first': p && first(p.name), other: o?.name, 'other.first': o && first(o.name),
+    fleet: s.fleets.find((f) => f.id === ctx.fleet)?.name, colony: s.colonies.find((c) => c.id === ctx.colony)?.name,
+    people: n && `the ${n.people}`, crown: crown?.name, 'crown.people': crown?.people,
+    realm: ctx.realm ? realmSpec(ctx.realm as RealmId).name : undefined,
+    capital: CITY_NAME[crownSpec(s.crown).home], me: crownSpec(s.crown).name,
+    ruler: styled(s.crown, s.dynasty.ruler), 'ruler.title': titleOf(s.crown, s.dynasty.ruler),
+    heir: heir ? `${heir.sex === 'm' ? 'Prince' : 'Princess'} ${heir.name}` : 'the heir',
+    house: h.houses[Number(ctx.n ?? 0) % h.houses.length], school: h.school, bankers: h.bankers, saint: h.saint, court: h.court,
+    land: s.land?.name ?? 'the New World',
+    foe: ctx.foe ? realmSpec(ctx.foe as RealmId).name : undefined, cause: ctx.cause != null ? String(ctx.cause) : undefined,
+  };
+  return text.replace(/\{([a-z.]+)\}/gi, (m, k: string) => vars[k] ?? m);
+}
+
+const signed = (n: number) => `${n > 0 ? '+' : '−'}${Math.abs(n).toLocaleString('en-US')}`;
+/** What a choice will do, in a few words, when the story does not say. */
+function hintOf(ch: ChoiceDef, w: World, s: GameState, ctx: Ctx): string | undefined {
+  if (ch.hint) return fill(ch.hint, w, s, ctx);
+  const parts: string[] = [];
+  for (const e of ch.effects) {
+    switch (e[0]) {
+      case 'ducats': parts.push(`${signed(e[1])} ducats`); break;
+      case 'prestige': parts.push(`${signed(e[1])} prestige`); break;
+      case 'research': parts.push(`${signed(e[1])} research`); break;
+      case 'loan': parts.push(`+${e[1].toLocaleString('en-US')} now, −${e[2]} a season for ${e[3]} seasons`); break;
+      case 'skill': parts.push(`${fill(`{${e[1]}.first}`, w, s, ctx)} ${signed(e[3])} ${e[2] === 'best' || e[2] === 'worst' ? 'skill' : e[2]}`); break;
+      case 'leave': parts.push(`${fill(`{${e[1]}.first}`, w, s, ctx)} leaves court`); break;
+      case 'opinion': parts.push(`${fill(`{${e[1]}.first}`, w, s, ctx)} will ${e[2] > 0 ? 'be grateful' : 'resent it'}`); break;
+      case 'loyalty': case 'loyaltyAll': parts.push(e[1] > 0 ? 'Loyalty rises' : 'Loyalty falls'); break;
+      case 'regard': parts.push(e[1] > 0 ? 'They think better of you' : 'They are offended'); break;
+      case 'attitude': case 'attitudeAll': parts.push(e[1] > 0 ? 'Their crown thinks better of you' : 'Their crown is angered'); break;
+      case 'war': parts.push('War'); break;
+      case 'crew': parts.push('Sailors may die'); break;
+      case 'halt': parts.push('The fleet drops its orders'); break;
+      case 'courtAll': parts.push(e[1] > 0 ? 'The court approves' : 'The court murmurs'); break;
+    }
+  }
+  if (ch.roll && ch.roll[0] !== 'none') parts.push(`${SKILL_INFO[ch.roll[1] as Skill]?.name ?? 'Fortune'} decides how it ends`);
+  else if (ch.roll) parts.push('A gamble');
+  return parts.length ? parts.join('; ') : undefined;
+}
+
+// ---------- deeds ----------
+
+function special(name: string, w: World, s: GameState, ctx: Ctx) {
+  if (name === 'allyJoin') { joinWar(s, Number(ctx.war), String(ctx.realm), () => {}); return; }
+  if (name === 'allySpurn') { const st = s.europe[String(ctx.realm)]; if (st) { st.treaty = 'pact'; st.attitude = Math.max(-100, st.attitude - 25); } return; }
+  if (name === 'allyGold') { const st = s.europe[String(ctx.realm)]; if (st) st.attitude = Math.min(100, st.attitude + 8); return; }
+  if (name === 'chartCoast') {
+    const map = ctx.map as 'old' | 'new';
+    for (const h of GRIDS[map].within(Number(ctx.hex), 6)) if (s.fog[map][h] < Fog.Charted) s.fog[map][h] = Fog.Charted;
+  } else if (name === 'guideLands') {
+    const n = allNations(w).find((x) => x.id === ctx.people);
+    if (n) for (const h of [n.siteHex, ...n.villages].flatMap((v) => GRIDS[n.map].within(v, 3))) if (s.fog[n.map][h] < Fog.Explored) s.fog[n.map][h] = Fog.Explored;
+  } else if (name === 'priceRevolution') {
+    for (const id of Object.keys(s.cities)) for (const g of ['tools', 'timber', 'cloth', 'wine', 'food', 'stone'] as const) { const m = s.markets[id]?.[g]; if (m) m.base = Math.round(m.base * 1.33); }
+  } else if (name === 'sendGalleon') {
+    const f = s.fleets.find((x) => x.at === crownSpec(s.crown).home && x.ships.some((y) => y.type === 'galleon'));
+    const ship = f?.ships.find((x) => x.type === 'galleon');
+    if (f && ship) { f.ships = f.ships.filter((x) => x !== ship); if (!f.ships.length) { const l = personById(s, f.leader); if (l) { l.fleet = null; l.city = crownSpec(s.crown).home; } s.fleets = s.fleets.filter((x) => x !== f); } }
+  } else if (name === 'defect') {
+    // they take service with a rival crown, and take what they know
+    const p = personById(s, Number(ctx.courtier));
+    const to = s.rivals[ctx.crown as CrownId];
+    if (p && to) { to.treasury += 300; if (p.skills.navigation >= 3) to.learning += 6; }
+  }
+}
+
+function person(s: GameState, ctx: Ctx, slot: 'courtier' | 'other') { return personById(s, Number(ctx[slot])); }
+function carry(effects: Effect[], w: World, s: GameState, ctx: Ctx, rng: Rng) {
+  const fleet = s.fleets.find((f) => f.id === ctx.fleet);
+  const colony = s.colonies.find((c) => c.id === ctx.colony);
+  const nation = s.natives[String(ctx.people)];
+  const rival = ctx.crown ? s.rivals[ctx.crown as CrownId] : undefined;
+  for (const e of effects) {
+    switch (e[0]) {
+      case 'ducats': s.treasury += e[1]; break;
+      case 'prestige': s.prestige += e[1]; break;
+      case 'research': s.research.pending += e[1]; break;
+      case 'loan': s.treasury += e[1]; s.loans.push({ perSeason: e[2], left: e[3] }); break;
+      case 'skill': {
+        const p = person(s, ctx, e[1]); if (!p) break;
+        const k = (e[2] === 'best' ? [...SKILLS].sort((a, b) => p.skills[b] - p.skills[a])[0] : e[2] === 'worst' ? [...SKILLS].sort((a, b) => p.skills[a] - p.skills[b])[0] : e[2]) as Skill;
+        p.skills[k] = clamp(p.skills[k] + e[3], 0, 5);
+        break;
+      }
+      case 'trait': { const p = person(s, ctx, e[1]); if (p) p.trait = e[2] as TraitId; break; }
+      case 'leave': case 'die': {
+        const p = person(s, ctx, e[1]); if (!p) break;
+        const f = p.fleet != null ? s.fleets.find((x) => x.id === p.fleet) : undefined;
+        if (f) { f.leader = null; f.route = null; }
+        for (const c of Object.values(s.cities)) if (c.governor === p.id) c.governor = null;
+        for (const pt of s.parties) if (pt.leader === p.id) pt.leader = null;
+        if (e[0] === 'die') { p.alive = false; p.died = s.turn; p.fleet = null; } else s.people = s.people.filter((x) => x !== p);
+        break;
+      }
+      case 'opinion': { const p = person(s, ctx, e[1]); if (p) recallDeed(s, p, e[2], fill(e[3], w, s, ctx)); break; }
+      case 'bond': {
+        const a = person(s, ctx, 'courtier'), b = person(s, ctx, 'other'); if (!a || !b) break;
+        a.bonds = [...a.bonds.filter((x) => x.with !== b.id), { with: b.id, kind: e[1] }];
+        b.bonds = [...b.bonds.filter((x) => x.with !== a.id), { with: a.id, kind: e[1] }];
+        break;
+      }
+      case 'courtAll': for (const p of s.people) if (p.alive) recallDeed(s, p, e[1], fill(e[2], w, s, ctx)); break;
+      case 'crew': if (fleet) fleet.crew = Math.max(1, fleet.crew - Math.ceil(fleet.crew * e[1])); break;
+      case 'stores': if (fleet) fleet.supplies = Math.max(0, fleet.supplies + e[1]); break;
+      case 'hull': if (fleet) for (const x of fleet.ships) x.hull = clamp(x.hull + e[1], 10, 100); break;
+      case 'halt': if (fleet) fleet.order = null; break;
+      case 'cargoLose': if (fleet) for (const k of Object.keys(fleet.cargo) as (keyof typeof fleet.cargo)[]) fleet.cargo[k] = Math.floor((fleet.cargo[k] ?? 0) * (1 - e[1])); break;
+      case 'loyalty': if (colony) colony.loyalty = clamp(colony.loyalty + e[1], 0, 100); break;
+      case 'loyaltyAll': for (const c of s.colonies) c.loyalty = clamp(c.loyalty + e[1], 0, 100); break;
+      case 'pop': if (colony) colony.pop = Math.max(1, colony.pop + e[1]); break;
+      case 'food': if (colony) colony.stock.food = Math.max(0, (colony.stock.food ?? 0) + e[1]); break;
+      case 'charter': if (colony) colony.charter = true; break;
+      case 'garrison': if (colony) for (let k = 0; k < e[1]; k++) s.units.push({ id: s.nextId++, type: 'infantry', fleet: null, city: null, party: null, colony: colony.id }); break;
+      case 'regard': if (nation) remember(s, nation, fill(e[2], w, s, ctx), e[1]); break;
+      case 'warriors': if (nation) nation.warriors = Math.max(1, Math.round(nation.warriors * (1 + e[1]))); break;
+      case 'convert': if (nation) nation.converted = clamp(nation.converted + e[1], 0, 1); break;
+      case 'attitude': if (rival) rival.attitude = clamp(rival.attitude + e[1], -100, 100); break;
+      case 'attitudeAll': for (const r of rivalsOf(s.crown)) s.rivals[r.id].attitude = clamp(s.rivals[r.id].attitude + e[1], -100, 100); break;
+      case 'war': if (rival && rival.relation !== 'war') { rival.relation = 'war'; rival.warSince = s.turn; rival.attitude = Math.min(rival.attitude, -60); } break;
+      case 'rivalDucats': if (rival) rival.treasury += e[1]; break;
+      case 'realmTie': if (ctx.realm && !s.dynasty.ties.includes(String(ctx.realm))) s.dynasty.ties.push(String(ctx.realm)); break;
+      case 'shock': s.shocks.push({ kind: e[1], region: e[2] === 'home' ? REGION_OF[s.crown] : e[2], since: s.turn, until: s.turn + 12 }); break;
+      case 'flag': s.flags[e[1]] = s.turn; break;
+      case 'unflag': delete s.flags[e[1]]; break;
+      case 'later': s.pending.push({ story: e[1], at: s.turn + e[2], ctx: { ...ctx } }); break;
+      case 'heirBorn': { const h = HOUSES[s.crown]; const sex = rng() < 0.5 ? 'm' : 'f'; s.dynasty.heirs.push({ id: s.nextId++, name: pick(rng, h.names[sex]), sex, born: yearOf(s.turn), gift: pick(rng, [...SKILLS]) }); break; }
+      case 'heirGift': { const h = heirOf(s.dynasty); if (h) h.gift = e[1] as Skill; break; }
+      case 'rulerFrail': s.dynasty.ruler.frail = (s.dynasty.ruler.frail ?? 0) + e[1]; break;
+      case 'consortDies': if (s.dynasty.consort?.from) s.dynasty.ties = s.dynasty.ties.filter((t) => t !== s.dynasty.consort!.from); s.dynasty.consort = null; break;
+      case 'special': special(e[1], w, s, ctx); break;
+    }
+  }
+}
+
+// ---------- telling ----------
+
+/** How much a kind of story matters just now: stories follow what the player is doing. */
+function relevance(w: World, s: GameState, f: Family): number {
+  switch (f) {
+    case 'sea': return Math.min(2.5, 0.5 + 0.5 * s.fleets.filter((x) => !x.at).length);
+    case 'colonies': return Math.min(2.5, 0.6 + 0.4 * s.colonies.length);
+    case 'peoples': return Math.min(2.5, 0.6 + 0.3 * allNations(w).filter((n) => s.natives[n.id]?.met).length);
+    case 'crowns': return 1 + rivalsOf(s.crown).filter((r) => s.rivals[r.id].relation === 'war').length;
+    case 'history': return 4;
+    default: return 1;
+  }
+}
+
+/** The choices open now, by their place in the story's list. */
+const open = (s: GameState, def: StoryDef, rng: Rng) => def.choices.map((c, i) => ({ c, i })).filter(({ c }) => (c.need ?? []).every((n) => holds(s, n, rng)));
+
+function card(w: World, s: GameState, def: StoryDef, ctx: Ctx, rng: Rng): GameEvent | null {
+  const offered = open(s, def, rng);
+  if (!offered.length) return null;
+  const hex = w.old.ports.find((p) => p.id === crownSpec(s.crown).home)!.hex;
+  return {
+    kind: 'story', story: def.id, family: def.family, ctx: { ...ctx, c: offered.map((x) => x.i).join(',') },
+    title: fill(def.title, w, s, ctx), text: fill(def.text, w, s, ctx), map: 'old', hex,
+    choices: offered.map(({ c }) => ({ label: fill(c.label, w, s, ctx), hint: hintOf(c, w, s, ctx) })),
+  };
+}
+
+/** The people, ships and places a follow-up was about must still be there. */
+function stillThere(s: GameState, ctx: Ctx) {
+  if (ctx.courtier != null && !personById(s, Number(ctx.courtier))?.alive) return false;
+  if (ctx.other != null && !personById(s, Number(ctx.other))?.alive) return false;
+  if (ctx.fleet != null && !s.fleets.some((f) => f.id === ctx.fleet)) return false;
+  if (ctx.colony != null && !s.colonies.some((c) => c.id === ctx.colony)) return false;
+  return true;
+}
+
+/** Subjects for a story as things stand, ignoring its conditions: for tests and tools. */
+export function bindFor(w: World, s: GameState, id: string, rng: Rng): Ctx | null {
+  const def = BY_ID.get(id);
+  return def ? bind(w, s, def.about, rng) : null;
+}
+
+/** Tell a story now, by name: for follow-ups and for the rules (a courtier about to leave). */
+export function tell(w: World, s: GameState, id: string, ctx: Ctx, ev: (e: GameEvent) => void): boolean {
+  const def = BY_ID.get(id);
+  if (!def || !stillThere(s, ctx)) return false;
+  const e = card(w, s, def, { n: 0, ...ctx }, mulberry32(hashSeed(s.seed, s.turn, 107)));
+  if (!e) return false;
+  s.told[id] = s.turn;
+  ev(e);
+  return true;
+}
 
 /** Perhaps tell a story this season. */
 export function maybeStory(w: World, s: GameState, ev: (e: GameEvent) => void) {
   if (s.events.some((e) => e.kind === 'story')) return;
-  const rng = mulberry32(hashSeed(s.seed, s.turn, 101));
-  if (s.turn < 3 || rng() > 0.3) return;
-  const ready = STORIES.filter((st) => s.turn - (s.told[st.id] ?? -999) >= st.cooldown);
-  for (const st of [...ready].sort(() => rng() - 0.5)) {
-    const ctx = st.when(w, s, rng);
-    if (!ctx) continue;
-    s.told[st.id] = s.turn;
-    ev({
-      kind: 'story', story: st.id, ctx, title: st.title(s, ctx), text: st.text(s, ctx, w), map: 'old', hex: homeHex(w, s),
-      choices: st.choices(s, ctx).map(({ label, hint }) => ({ label, hint })),
-    });
-    return;
+  const due = s.pending.find((p) => p.at <= s.turn);
+  if (due) {
+    s.pending = s.pending.filter((p) => p !== due);
+    if (tell(w, s, due.story, due.ctx, ev)) return;
   }
+  const rng = mulberry32(hashSeed(s.seed, s.turn, 101));
+  if (s.turn < STORY_PACE.quietStart || rng() > STORY_PACE.chance) return;
+  const ready = STORIES.filter((d) => !d.chained && (s.told[d.id] == null || (d.again != null && s.turn - s.told[d.id] >= d.again)));
+  const found: { def: StoryDef; ctx: Ctx; w: number }[] = [];
+  for (const def of ready) {
+    if (!(def.when ?? []).every((c) => holds(s, c, rng))) continue;
+    const ctx = bind(w, s, def.about, rng);
+    if (ctx) found.push({ def, ctx, w: (def.weight ?? 1) * relevance(w, s, def.family) });
+  }
+  // a story not yet told always comes before one that has been
+  const fresh = found.filter((x) => s.told[x.def.id] == null);
+  const pool = fresh.length ? fresh : found;
+  if (!pool.length || (!fresh.length && rng() > STORY_PACE.retold)) return;
+  let roll = rng() * pool.reduce((t, x) => t + x.w, 0);
+  const chosen = pool.find((x) => (roll -= x.w) <= 0) ?? pool[0];
+  const e = card(w, s, chosen.def, chosen.ctx, rng);
+  if (!e) return;
+  s.told[chosen.def.id] = s.turn;
+  ev(e);
 }
 
 /** The player chose an option on the story card at the front of the queue. */
 export function resolveStory(w: World, s: GameState, index: number, log: Log): { ok: true; message?: string } | { ok: false; error: string } {
   const e = s.events[0];
   if (!e || e.kind !== 'story') return { ok: false, error: 'No story to answer.' };
-  const st = STORIES.find((x) => x.id === e.story);
-  const ch = st?.choices(s, e.ctx ?? {})[index];
   s.events.shift();
-  if (!st || !ch) return { ok: true };
+  if (e.story?.startsWith('era:')) {
+    const out = chooseEraPath(w, s, e.story.slice(4), index);
+    if (out) log('court', out);
+    return { ok: true, message: out || undefined };
+  }
+  const def = e.story ? BY_ID.get(e.story) : undefined;
+  if (!def) return { ok: true };
+  const ctx = e.ctx ?? {};
+  const offered = String(ctx.c ?? '').split(',').filter(Boolean).map(Number);
+  const ch = def.choices[offered[index] ?? index];
+  if (!ch) return { ok: true };
   const rng = mulberry32(hashSeed(s.seed, s.turn, index, 103));
-  const out = ch.apply(w, s, e.ctx ?? {}, rng, log);
-  log('court', `${e.title}: ${out}`);
-  return { ok: true, message: out };
+  let out: Outcome = ch;
+  if (ch.roll && ch.else) {
+    const [who, k, base, per] = ch.roll;
+    const pts = who === 'ruler' ? (!s.dynasty.regency && s.dynasty.ruler.gift === k ? 3 : 1) : who === 'none' ? 0 : skill(person(s, ctx, who), k as Skill);
+    if (rng() >= base + per * pts) out = ch.else;
+  }
+  // words first, while everyone they name is still here
+  const text = fill(out.text, w, s, ctx);
+  carry(out.effects, w, s, ctx, rng);
+  log('court', `${e.title}: ${text}`);
+  return { ok: true, message: text };
 }
-
-void SHIPS; void int;

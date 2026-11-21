@@ -7,10 +7,13 @@ import { isWater } from '../data/terrain';
 import { UNIT_INFO } from '../data/court';
 import { GOOD_INFO, type GoodId } from '../data/goods';
 import { GRIDS } from './hex';
-import { mulberry32, hashSeed, int, type Rng } from './rng';
+import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { personById, skill } from './court';
 import type { Colony, Fleet, GameEvent, GameState, NationDef, NativeState, Party, World, MapId, Person, Stance, Unit } from './types';
-import { NATIVE } from '../data/colony';
+import { NATIVE, NATIVE_FEUD } from '../data/colony';
+import { PRESTIGE } from '../data/scenarios';
+import { takeCaptives } from './slavery';
+import { seasonOf } from './types';
 import { COMBAT } from '../data/army';
 import { fight, battleOdds, casualties, recordLosses, blood, partyForce, colonyForce, assaultColony, type Force } from './battle';
 export { partyForce, colonyForce };
@@ -43,7 +46,7 @@ export function nationAt(w: World, map: MapId, hex: number): NationDef | undefin
 export function initNatives(w: World): Record<string, NativeState> {
   return Object.fromEntries(allNations(w).map((n) => [n.id, {
     met: false, attitude: 10, relation: 'peace' as const, warriors: n.warriors, converted: 0, post: false, mission: false, lost: [], contact: null, epidemic: false,
-    memory: [], siege: null,
+    memory: [], siege: null, crowns: {}, feud: null, pact: null,
   }]));
 }
 
@@ -263,7 +266,7 @@ export function tradingPost(w: World, s: GameState, f: Fleet): Result {
   for (const [g, q] of needs) { f.cargo[g] = (f.cargo[g] ?? 0) - q; if (!f.cargo[g]) delete f.cargo[g]; }
   st.post = true;
   remember(s, st, 'The trading post', 10);
-  s.prestige += 5;
+  s.prestige += PRESTIGE.tradingPost;
   return { ok: true, message: `A trading post rises beside the ground of ${nameOf(n)}. Trade will grow.` };
 }
 
@@ -319,6 +322,8 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
     blood(s.units.filter((u) => u.party === p.id));
     st.lost.push(hex);
     remember(s, st, 'You burned their villages', -40);
+    const taken = takeCaptives(s, n, rng);
+    if (taken) { p.captives = (p.captives ?? 0) + taken; log('peril', `${taken} of the villagers are taken as captives and marched with ${p.name}.`); }
     const all = [n.siteHex, ...n.villages].every((h) => st.lost.includes(h));
     if (hex === n.siteHex || all || st.warriors < 3) {
       st.relation = 'subject';
@@ -457,8 +462,62 @@ function siegeSeason(w: World, s: GameState, n: NationDef, st: NativeState, rng:
 // ---------- the season ----------
 
 /** One season for every people: drift, missions, trade, encroachment, sickness, raids and ambushes. */
+/** Peoples have quarrels of their own, whether or not you have met them. */
+function feuds(w: World, s: GameState, log: Log) {
+  const rng = mulberry32(hashSeed(s.seed, s.turn, 56));
+  const all = allNations(w);
+  for (const n of all) {
+    const st = s.natives[n.id];
+    if (!st || st.relation === 'subject') continue;
+    if (st.feud) {
+      const foe = all.find((x) => x.id === st.feud!.with), fs = foe ? s.natives[foe.id] : undefined;
+      if (!foe || !fs || fs.feud?.with !== n.id) { st.feud = null; continue; }
+      if (n.id > foe.id) continue; // each war once a season
+      if (rng() < NATIVE_FEUD.skirmish) st.warriors = Math.max(1, st.warriors - 1);
+      if (rng() < NATIVE_FEUD.skirmish) fs.warriors = Math.max(1, fs.warriors - 1);
+      if (rng() < NATIVE_FEUD.battle || s.turn - st.feud.since >= NATIVE_FEUD.longest) {
+        // an ally's warriors count for half
+        const help = (x: NativeState) => (x.pact && s.natives[x.pact] ? s.natives[x.pact].warriors * NATIVE_FEUD.allyShare : 0);
+        const a = st.warriors + help(st), b = fs.warriors + help(fs);
+        const mineWins = rng() < a / (a + b);
+        const [win, lose, loser] = mineWins ? [n, foe, fs] : [foe, n, st];
+        loser.warriors = Math.max(1, Math.round(loser.warriors * NATIVE_FEUD.defeat));
+        st.feud = fs.feud = null;
+        // beaten badly enough, they give up a village and move away from their enemies
+        if (loser.warriors < lose.warriors * NATIVE_FEUD.flee) {
+          const left = lose.villages.filter((v) => !loser.lost.includes(v));
+          if (left.length) {
+            loser.lost.push(left.sort((x, y) => GRIDS[lose.map].distance(x, win.siteHex) - GRIDS[lose.map].distance(y, win.siteHex))[0]);
+            if (loser.met) log('court', `${cap(nameOf(lose))} abandon a village and move away from ${nameOf(win)}.`);
+          }
+        }
+        if (st.met || fs.met) log('court', `The war between ${nameOf(n)} and ${nameOf(foe)} is over. ${cap(nameOf(win))} have the better of it; ${nameOf(lose)} are weakened.`);
+      }
+      continue;
+    }
+    if (seasonOf(s.turn) !== 0 || st.siege) continue;
+    // peoples with a common enemy make common cause
+    if (st.pact && (!s.natives[st.pact] || s.natives[st.pact].pact !== n.id)) st.pact = null;
+    if (!st.pact && rng() < NATIVE_FEUD.pact) {
+      const friend = all.find((m) => m.id !== n.id && m.map === n.map && !n.rivals.includes(m.id) && !m.rivals.includes(n.id) && !s.natives[m.id]?.pact
+        && s.natives[m.id]?.relation !== 'subject' && m.rivals.some((r) => n.rivals.includes(r)));
+      if (friend) {
+        st.pact = friend.id; s.natives[friend.id].pact = n.id;
+        if (st.met || s.natives[friend.id].met) log('court', `${cap(nameOf(n))} and ${nameOf(friend)} have sworn to stand together against their enemies.`);
+      }
+    }
+    const foes = n.rivals.map((id) => all.find((x) => x.id === id)).filter((x): x is NationDef => !!x && !!s.natives[x.id] && !s.natives[x.id].feud && s.natives[x.id].relation !== 'subject');
+    if (!foes.length || rng() >= NATIVE_FEUD.chance) continue;
+    const foe = pick(rng, foes);
+    st.feud = { with: foe.id, since: s.turn };
+    s.natives[foe.id].feud = { with: n.id, since: s.turn };
+    if (st.met || s.natives[foe.id].met) log('court', `${cap(nameOf(n))} and ${nameOf(foe)} have gone to war with each other.`);
+  }
+}
+
 export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
   const rng = mulberry32(hashSeed(s.seed, s.turn, 55));
+  feuds(w, s, log);
   for (const n of allNations(w)) {
     const st = s.natives[n.id];
     if (!st) continue;
@@ -484,10 +543,18 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
     // colonies on their land wear them down; friends trade them food
     const near = s.colonies.filter((c) => c.map === n.map && g.within(c.hex, 2).some((h) => land.has(h)));
     for (const c of near) {
-      const k = st.relation === 'allied' ? 0.5 : st.post || st.mission ? 1 : 2.5;
+      const k = st.relation === 'allied' ? NATIVE.crowding[0] : st.post || st.mission ? NATIVE.crowding[1] : NATIVE.crowding[2];
       if (st.relation !== 'subject') remember(s, st, `Settlers at ${c.name} on their land`, -k);
       const friendly = st.relation === 'allied' || st.relation === 'subject' || (st.relation === 'peace' && st.attitude >= NATIVE.friendly);
       if (friendly && !st.siege) c.stock.food = (c.stock.food ?? 0) + (st.relation === 'peace' ? NATIVE.friendFood : NATIVE.allyFood);
+    }
+    // crowded out: a weak people that has had enough of settlers gives up a village and goes inland
+    if (near.length && st.attitude <= NATIVE.furious && st.warriors < NATIVE_FEUD.crowded && st.relation !== 'subject' && rng() < 0.1) {
+      const left = n.villages.filter((v) => !st.lost.includes(v));
+      if (left.length) {
+        st.lost.push(left.sort((x, y) => g.distance(x, near[0].hex) - g.distance(y, near[0].hex))[0]);
+        log('court', `${cap(nameOf(n))} abandon a village near ${near[0].name} and move inland, away from the settlers.`);
+      }
     }
     // sickness: some seasons after first contact, an epidemic
     if (!st.epidemic && s.turn - st.contact >= 4 + (hashSeed(s.seed, n.siteHex) % 5)) {
@@ -506,7 +573,8 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
       siegeSeason(w, s, n, st, rng, log, _ev);
       continue;
     }
-    if (!isHostile(st) || st.warriors < 2) continue;
+    // at war with another people, their warriors are elsewhere
+    if (!isHostile(st) || st.warriors < 2 || st.feud) continue;
     // furious and strong: lay siege to the weakest colony near their land
     const reach = s.colonies.filter((c) => c.map === n.map && g.within(c.hex, 4).some((h) => land.has(h)));
     if ((st.attitude <= NATIVE.furious || st.relation === 'war') && st.warriors >= NATIVE.siegeWarriors && reach.length && rng() < NATIVE.siegeChance) {
@@ -519,7 +587,7 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
     }
     // otherwise they raid colonies near their land
     for (const c of reach) {
-      if (rng() > 0.3) continue;
+      if (rng() > NATIVE.raidChance) continue;
       const r = assaultColony(s, c, nativeForce(n, st, 0.5), w[c.map].terrain[c.hex], rng);
       st.warriors = Math.max(1, Math.round(st.warriors - st.warriors * 0.5 * r.lost));
       if (r.win) {

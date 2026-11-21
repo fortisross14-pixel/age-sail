@@ -17,6 +17,11 @@ Every prompt starts with the same style paragraph, describing the concept art's 
 > the top left, a fine dark outline, rich but readable detail. No text, letters, numbers or
 > labels anywhere.
 
+**What is coming.** The production plan in `docs/ROADMAP.md` lists the art still to ask for: a
+larger portrait set (P7-03) and painted colonist and missionary figures (P7-06). Visual polish is
+the last phase, so those prompts are written when their items start, not before. The story
+paintings (P3-12) have their slots in the game already and their prompt below, under "Asked for".
+
 ---
 
 ## Done (cut and in the game)
@@ -191,3 +196,74 @@ Every prompt starts with the same style paragraph, describing the concept art's 
 | units | recruitment cards, explorer commissions, fleet lists |
 | cities | the picture in each city screen's header (capitals; the rest by kind) |
 | title | the menu background |
+
+
+---
+
+## Asked for: story paintings (P3-12, painted in P7-04)
+
+Every story card has a picture slot for its family (`story/<family>` in `src/ui/theme/Art.tsx`).
+Until this sheet is cut in, the card shows the empty cartouche. Save the result as
+`art/source/ui/stories.png`; the nine tiles are cut to `public/sprites/art/story/` under the names
+below, and each name is added to `PAINTED`.
+
+> **Style:** full-colour, hand-painted illustrations for a premium
+> historical strategy game, like detailed painted miniatures. Warm natural colours (terracotta
+> roofs, pale stone, weathered timber, green grass, blue water, red pennants), soft daylight from
+> the top left, a fine dark outline, rich but readable detail. No text, letters, numbers or
+> labels anywhere.
+>
+> A sheet of **nine scenes in a strict 3 × 3 grid** on a flat navy background (#0e1c28). Each
+> scene sits in its own identical landscape tile (3 wide by 2 high) with a thin gold frame and an
+> equal navy gutter between tiles. Nothing crosses a frame. Europe and the Atlantic around the
+> year 1500. Row by row, left to right:
+>
+> **Row 1.** (1) *At sea:* the deck of a caravel in a heavy swell, sailors hauling on ropes, a
+> pilot at the rail with an astrolabe. (2) *The court:* a candle-lit audience hall, courtiers in
+> dark velvet and fur whispering in two groups, an empty throne on a dais. (3) *The colonies:* a
+> palisaded settlement on a green tropical shore, a timber church half built, settlers unloading
+> barrels from a boat.
+>
+> **Row 2.** (4) *The peoples:* a meeting on a beach, envoys of a coastal people in cloaks and
+> gold ornaments facing bearded sailors, gifts laid on a mat between them, canoes drawn up
+> behind. (5) *Rival crowns:* two ambassadors in different colours facing each other across a
+> table spread with a sea chart, a hand of each on the same coast. (6) *Europe:* a walled port
+> city under a cathedral, a crowded market square, a comet low in the evening sky.
+>
+> **Row 3.** (7) *The age:* a shipyard at sunrise, the ribs of a great galleon on the slip,
+> a printing press and a globe in the foreground. (8) *The dynasty:* a royal bedchamber, a
+> crowned figure in a great chair with a child at their knee, a physician and a bishop waiting
+> in the doorway. (9) *History:* a fleet of many ships leaving a harbour, crowds on the quay,
+> banners and church bells.
+
+File names, in the same order: `sea`, `court`, `colonies`, `peoples`, `crowns`, `europe`, `eras`,
+`dynasty`, `history`.
+
+---
+
+## Asked for: three more buildings (P4-11)
+
+The arsenal, the observatory and the cathedral have no painting yet and show an ink sprite. The
+warehouses and the fortress already use `warehouse-1` and `fortress-1` from the buildings sheet.
+Save the result as `art/source/ui/buildings-2.png`; the tiles are cut to
+`public/sprites/art/building/` as `arsenal-1`, `observatory-1` and `cathedral-1`, and each name is
+added to `PAINTED` in `src/ui/theme/Art.tsx`.
+
+> **Style:** full-colour, hand-painted illustrations for a premium
+> historical strategy game, like detailed painted miniatures. Warm natural colours (terracotta
+> roofs, pale stone, weathered timber, green grass, blue water, red pennants), soft daylight from
+> the top left, a fine dark outline, rich but readable detail. No text, letters, numbers or
+> labels anywhere.
+>
+> A sheet of **three buildings in one row (1 row × 3 columns)** on a flat navy background
+> (#0e1c28). Each building sits alone in its own identical square tile with a thin gold frame and
+> an equal navy gutter between tiles, seen from the same raised three-quarter view, on a small
+> patch of ground, filling most of its tile. Nothing crosses a frame. Southern Europe around the
+> year 1500. Left to right:
+>
+> (1) *An arsenal:* a long covered shipbuilding shed open at the water's edge with the hull of a
+> ship on the slip inside, a ropewalk beside it, bronze cannon lined up on the quay.
+> (2) *An observatory:* a round stone tower on a university roof, an open gallery at the top with
+> a large brass armillary sphere and a quadrant, a scholar looking up.
+> (3) *A cathedral:* a great Gothic cathedral with two towers, a rose window and flying
+> buttresses, scaffolding still on one tower, tiny figures on the steps.

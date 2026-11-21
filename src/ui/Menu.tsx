@@ -3,6 +3,8 @@ import { useStore, clearSave } from '../store';
 import { spriteUrl } from '../render/assets';
 import { GAME_LENGTHS, DEFAULT_UNTIL } from '../data/eras';
 import { CROWNS, type CrownId } from '../data/rivals';
+import { DIFFICULTIES, DEFAULT_DIFFICULTY, type Difficulty } from '../data/difficulty';
+import { SCENARIOS, type ScenarioId } from '../data/scenarios';
 import { CROWN } from '../render/palette';
 import { cityById } from '../data/europe';
 import { CrestArt } from './theme/Art';
@@ -17,6 +19,8 @@ export function Menu() {
   const [seed, setSeed] = useState(() => String(Math.floor(Math.random() * 1e6)));
   const [until, setUntil] = useState<number>(DEFAULT_UNTIL);
   const [crown, setCrown] = useState<CrownId>('spain');
+  const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
+  const [scenario, setScenario] = useState<ScenarioId | null>(null);
   useEffect(() => { void checkSave(); }, [checkSave]);
   const loading = phase === 'loading';
   return (
@@ -28,7 +32,8 @@ export function Menu() {
         <div className="menu-actions">
           {saveProblem && <p className="save-problem" role="status">{saveProblem}</p>}
           {hasSave && <button className="primary" disabled={loading} onClick={() => void continueGame()}>Continue voyage</button>}
-          <button className={hasSave ? '' : 'primary'} disabled={loading} onClick={async () => { await clearSave(); await newGame(Number(seed) || 1492, until, crown); }}>
+          <button disabled={loading} onClick={() => useStore.getState().set({ showSaves: true })}>Saved voyages</button>
+          <button className={hasSave ? '' : 'primary'} disabled={loading} onClick={async () => { await clearSave(); await newGame(Number(seed) || 1492, until, crown, difficulty, scenario); }}>
             {loading ? 'Preparing the charter…' : 'New voyage'}
           </button>
           <div className="crowns" role="radiogroup" aria-label="Crown to lead">
@@ -48,9 +53,22 @@ export function Menu() {
               </button>
             ))}
           </div>
+          <div className="lengths" role="radiogroup" aria-label="Difficulty">
+            {DIFFICULTIES.map((d) => (
+              <button key={d.id} role="radio" aria-checked={difficulty === d.id} className={difficulty === d.id ? 'on' : ''} title={d.blurb} onClick={() => setDifficulty(d.id)}>{d.name}</button>
+            ))}
+          </div>
+          <p className="muted small menu-note">{DIFFICULTIES.find((d) => d.id === difficulty)!.blurb}</p>
+          <div className="lengths" role="radiogroup" aria-label="Scenario">
+            <button role="radio" aria-checked={scenario == null} className={scenario == null ? 'on' : ''} title="No goal but your own." onClick={() => setScenario(null)}>Free game</button>
+            {SCENARIOS.map((x) => (
+              <button key={x.id} role="radio" aria-checked={scenario === x.id} className={scenario === x.id ? 'on' : ''} title={x.blurb} onClick={() => setScenario(x.id)}>{x.name}</button>
+            ))}
+          </div>
+          <p className="muted small menu-note">{scenario ? `${SCENARIOS.find((x) => x.id === scenario)!.blurb} Goal: ${SCENARIOS.find((x) => x.id === scenario)!.ask}, by ${SCENARIOS.find((x) => x.id === scenario)!.by}.` : 'No goal but your own: the crown with the highest score when the age ends wins.'}</p>
           <label className="seed">World seed <input value={seed} onChange={(e) => setSeed(e.target.value.replace(/\D/g, ''))} inputMode="numeric" /></label>
         </div>
-        <p className="muted small">Version 0.13 · lead one of the five Atlantic crowns through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
+        <p className="muted small">Version 0.22 · lead one of the five Atlantic crowns through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
       </div>
     </div>
   );

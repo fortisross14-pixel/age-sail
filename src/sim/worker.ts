@@ -3,6 +3,10 @@ import * as Comlink from 'comlink';
 import type { GoodId } from '../data/goods';
 import type { TechId } from '../data/tech';
 import type { CrownId } from '../data/rivals';
+import { DEFAULT_DIFFICULTY, type Difficulty } from '../data/difficulty';
+import type { ObjectiveId } from '../data/objectives';
+import type { LawId } from '../data/laws';
+import type { FavourId, ScenarioId } from '../data/scenarios';
 import { generateWorld } from './mapgen';
 import { previewParty } from './land';
 import * as G from './game';
@@ -12,6 +16,9 @@ import type { GameState, World, ProjectKind, Rank, UnitType, TradeRoute, Stance 
 export type Command =
   | { kind: 'buy'; fleet: number; good: GoodId; qty: number }
   | { kind: 'sell'; fleet: number; good: GoodId; qty: number }
+  | { kind: 'storeBuy'; port: string; good: GoodId; qty: number }
+  | { kind: 'storeSell'; port: string; good: GoodId; qty: number }
+  | { kind: 'stow'; fleet: number; good: GoodId; qty: number }
   | { kind: 'provision'; fleet: number }
   | { kind: 'repair'; fleet: number }
   | { kind: 'move'; fleet: number; hex: number }
@@ -20,7 +27,8 @@ export type Command =
   | { kind: 'project'; city: string; project: ProjectKind }
   | { kind: 'assignLeader'; person: number; fleet: number }
   | { kind: 'recall'; fleet: number }
-  | { kind: 'promote'; person: number; rank: Rank; unit?: UnitType; city?: string }
+  | { kind: 'promote'; person: number; rank: Rank; unit?: UnitType; city?: string; fleet?: number }
+  | { kind: 'post'; person: number; fleet: number | null }
   | { kind: 'relieve'; person: number }
   | { kind: 'hire'; person: number }
   | { kind: 'embark'; unit: number; fleet: number }
@@ -59,6 +67,29 @@ export type Command =
   | { kind: 'retake'; party: number; free: string; stance?: Stance }
   | { kind: 'rivalPeace'; crown: CrownId }
   | { kind: 'storm'; party: number; colony: string; stance?: Stance }
+  | { kind: 'buyCaptives'; fleet: number; qty: number }
+  | { kind: 'sellCaptives'; fleet: number; qty: number }
+  | { kind: 'landCaptives'; fleet: number }
+  | { kind: 'favour'; favour: FavourId }
+  | { kind: 'recognise'; free: string }
+  | { kind: 'engageRebels'; party: number; rebels: number; stance?: Stance }
+  | { kind: 'envoy'; realm: string }
+  | { kind: 'realmGift'; realm: string }
+  | { kind: 'treaty'; realm: string; treaty: 'trade' | 'pact' | 'alliance' }
+  | { kind: 'breakTreaty'; realm: string }
+  | { kind: 'joinWar'; war: number; side: string }
+  | { kind: 'marque'; on: boolean }
+  | { kind: 'tribute'; realm: string; on: boolean }
+  | { kind: 'queueResearch'; tech: TechId }
+  | { kind: 'standing'; fleet: number; mode: 'explore' | 'home' | 'patrol' | null }
+  | { kind: 'fundExpedition' }
+  | { kind: 'enactLaw'; law: LawId }
+  | { kind: 'repealLaw'; law: LawId }
+  | { kind: 'marry'; offer: number }
+  | { kind: 'renameColony'; colony: string; name: string }
+  | { kind: 'nameLand'; name: string; map: 'old' | 'new'; hex: number }
+  | { kind: 'intercept'; fleet: number; ship: number }
+  | { kind: 'engage'; party: number; ship: number; stance?: Stance }
   | { kind: 'dismissEvent' };
 
 let world: World | null = null;
@@ -70,8 +101,8 @@ function need() {
 }
 
 const api = {
-  newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain') {
-    const g = G.newGame(seed, until, crown);
+  newGame(seed: number, until: number = DEFAULT_UNTIL, crown: CrownId = 'spain', difficulty: Difficulty = DEFAULT_DIFFICULTY, scenario: ScenarioId | null = null) {
+    const g = G.newGame(seed, until, crown, difficulty, scenario);
     world = g.world;
     state = g.state;
     return g;
@@ -79,6 +110,8 @@ const api = {
   load(saved: GameState) {
     world = generateWorld(saved.seed, saved.crown);
     state = saved;
+    // a save from before objectives existed ticks what is already done, without rewards
+    G.checkObjectives(world, state);
     return { world, state };
   },
   preview(fleet: number, hex: number) {
@@ -90,12 +123,15 @@ const api = {
     const p = state.parties.find((x) => x.id === party);
     return p ? previewParty(world, state, p, hex) : null;
   },
-  command(c: Command): { result: G.CommandResult; state: GameState } {
+  command(c: Command): { result: G.CommandResult; state: GameState; achieved: ObjectiveId[] } {
     const { world, state } = need();
     let result: G.CommandResult;
     switch (c.kind) {
       case 'buy': result = G.buy(world, state, c.fleet, c.good, c.qty); break;
       case 'sell': result = G.sell(world, state, c.fleet, c.good, c.qty); break;
+      case 'storeBuy': result = G.storeBuy(world, state, c.port, c.good, c.qty); break;
+      case 'storeSell': result = G.storeSell(world, state, c.port, c.good, c.qty); break;
+      case 'stow': result = G.stow(state, c.fleet, c.good, c.qty); break;
       case 'provision': result = G.provision(world, state, c.fleet); break;
       case 'repair': result = G.repair(world, state, c.fleet); break;
       case 'move': result = G.moveFleet(world, state, c.fleet, c.hex); break;
@@ -104,7 +140,8 @@ const api = {
       case 'project': result = G.startProject(state, c.city, c.project); break;
       case 'assignLeader': result = G.assignLeader(state, c.person, c.fleet); break;
       case 'recall': result = G.recall(world, state, c.fleet); break;
-      case 'promote': result = G.promote(state, c.person, c.rank, { unit: c.unit, city: c.city }); break;
+      case 'promote': result = G.promote(state, c.person, c.rank, { unit: c.unit, city: c.city, fleet: c.fleet }); break;
+      case 'post': result = G.postLeader(world, state, c.person, c.fleet); break;
       case 'relieve': result = G.relieve(state, c.person); break;
       case 'hire': result = G.hire(state, c.person); break;
       case 'embark': result = G.embark(world, state, c.unit, c.fleet); break;
@@ -143,9 +180,33 @@ const api = {
       case 'retake': result = G.retakeFree(world, state, c.party, c.free, c.stance); break;
       case 'rivalPeace': result = G.rivalPeace(state, c.crown); break;
       case 'storm': result = G.stormColony(world, state, c.party, c.colony, c.stance); break;
+      case 'buyCaptives': result = G.buyCaptives(world, state, c.fleet, c.qty); break;
+      case 'sellCaptives': result = G.sellCaptives(world, state, c.fleet, c.qty); break;
+      case 'landCaptives': result = G.landCaptives(state, c.fleet); break;
+      case 'favour': result = G.favour(state, c.favour); break;
+      case 'engageRebels': result = G.engageRebels(world, state, c.party, c.rebels, c.stance); break;
+      case 'recognise': result = G.recognise(state, c.free); break;
+      case 'envoy': result = G.sendEnvoy(state, c.realm); break;
+      case 'realmGift': result = G.sendGift(state, c.realm); break;
+      case 'treaty': result = G.proposeTreaty(state, c.realm, c.treaty); break;
+      case 'breakTreaty': result = G.breakTreaty(state, c.realm); break;
+      case 'joinWar': result = G.joinWar(state, c.war, c.side); break;
+      case 'marque': result = G.setMarque(state, c.on); break;
+      case 'tribute': result = G.setTribute(state, c.realm, c.on); break;
+      case 'queueResearch': result = G.queueResearch(state, c.tech); break;
+      case 'standing': result = G.setStanding(world, state, c.fleet, c.mode); break;
+      case 'fundExpedition': result = G.fundExpedition(state); break;
+      case 'enactLaw': result = G.enactLaw(state, c.law); break;
+      case 'repealLaw': result = G.repealLaw(state, c.law); break;
+      case 'marry': result = G.marry(state, c.offer); break;
+      case 'renameColony': result = G.renameColony(state, c.colony, c.name); break;
+      case 'nameLand': result = G.nameLand(state, c.name, c.map, c.hex); break;
+      case 'intercept': result = G.intercept(world, state, c.fleet, c.ship); break;
+      case 'engage': result = G.engage(world, state, c.party, c.ship, c.stance); break;
       case 'dismissEvent': state.events.shift(); result = { ok: true }; break;
     }
-    return { result, state };
+    const achieved = result.ok ? G.checkObjectives(world, state).map((o) => o.id) : [];
+    return { result, state, achieved };
   },
   endTurn() {
     const { world, state } = need();

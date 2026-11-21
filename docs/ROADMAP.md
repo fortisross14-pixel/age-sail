@@ -1,6 +1,7 @@
 # Roadmap
 
-Decisions agreed so far and the milestones toward a playable game. The game design document
+Decisions agreed so far, the milestones that built the game, and the production plan that takes it from here
+(every action item, with its status, under [Production plan](#production-plan)). The game design document
 (Claude Docs: "Age of Sail — Game Design Document") is the long-form vision; this file is the
 working plan and wins where they differ.
 
@@ -76,6 +77,52 @@ other. Later: wars with rival crowns for space, and independence wars against in
   (15–17 colonies by 1542) and France and the Netherlands weakest (1–4): for the balance pass.
   A season costs under 0.6 ms with 35 markets; a save is about 150 KB.
 
+- Phase 2: with no player orders, the four rivals hold 5–8 colonies between them by 1512 (it was 8–14 between
+  three before they had purses) and about 42 by 1642, with 6–15 wars among themselves in 150 years. Their
+  treasuries run to hundreds of thousands of ducats late on, because trading posts pay for ever and there is
+  little left to buy: for Phase 6. France now plants colonies; the Netherlands still starts last. A season
+  costs about 4 ms with rivals routing ships out and home (it was under 1 ms): for Phase 7.
+
+- Phase 3: in two full games played with no orders and every card answered in turn, about 170 stories were
+  told in 158 years, 37 of the 114 distinct, because most stories need fleets at sea, colonies or peoples met;
+  a playing game binds far more. Castile had ten reigns in that time and England six. With nobody hired, the
+  court dies out. A season costs about 5 ms. Story frequency against story count is P6-07.
+
+- Phase 4: the whole tree costs about 2,700 research points; the court alone, choosing subjects in order, knew 14
+  of 32 by 1522. Subjects already gate arquebusiers, lancers, field guns, galleons and the star fort, which
+  were open from the start before: the opening is a little poorer in soldiers until the war branch is begun.
+  Treaty thresholds (20, 40, 60) and the price of envoys and wars are first guesses.
+
+- Phase 4, second half: with no player, the Netherlands' trade passed 200,000 ducats by about 1575 in three
+  games, so the trade race is set at 520,000 for a standard game and the empire race at 260 colonists and 420
+  hexes (rivals reach about 0.4 to 0.7 of that by 1650). Whether a player's sales are on the same scale as a
+  rival's is not known: for P6-09. Slavery's prices and death rates are first numbers. A season costs about 6 ms.
+
+- Phase 6 (v0.21), measured with `tools/autoplay.ts` (the bot of `tools/bot.ts`; medians over 2 or 3 seeds,
+  Captain, standard game unless said). The bot never tires and has no ideas: at trade it is nearer a ceiling
+  than a floor, at colonies and diplomacy a floor.
+  - **Before.** Prestige passed 280 by 1495 (a quarter point for every hex of land seen) and the prestige race
+    was won by 1513. Trading by hand won the trade race by 1520 to 1545 and banked 440,000 to 1,270,000 ducats
+    by 1650. One privateer per sea hunted the nearest fleet every season of a war and never went home: 20 to 50
+    fleets lost a game. A colony beside a people was raided about twice a year for ever. Every rival colony was
+    a city of 24 by 1600, and rivals ended on 5,000 to 6,500 points with France near 3,000.
+  - **The cause under the score.** A rival's revenue was its profit on a cargo; the player's was the whole
+    sale. The same hold of pepper counted five times more for the player, in the score and in the trade race.
+  - **After.** With nobody playing, the rivals end on 2,300 to 4,000 points: Castile 2,800 to 3,300, Portugal
+    3,400 to 3,900, England 2,300 to 3,500, France 2,800 to 3,500, the Netherlands 3,400 to 4,000. The bot ends
+    on 2,000 to 2,800 playing both trade and colonies, 1,400 to 2,900 settling first, about 1,500 to 1,700
+    trading only: 4th or 5th on Captain, 2nd or 3rd on Squire, last on Admiral. The trade race is decided
+    between 1591 and 1640, by the bot in 7 games of 15 and by a rival in 8 (the Netherlands in 7 of those 8, and
+    in 12 of 15 when nobody plays: for a later pass). Nobody reaches the prestige race without meaning to (the
+    bot ends on 120 to 460 of 650), nor the empire race (the bot peaks near 75 to 95 colonists of 170). Fleets
+    lost: 0 to 12 a game. A short game's races are scaled to 0.45 of a standard one and fall between 1540 and 1548 (at 0.3 the
+    empire race was won by 1527 to 1535; in a short game the bot ends 1st or 2nd, because rivals start late); a full game's trade race falls between 1657 and 1691.
+  - **Still to do.** Money has too little to buy late on: the bot ends with 45,000 to 390,000 ducats unspent,
+    and has 45,000 to 60,000 by 1510 when it works the African coast with two ships. The settle-first opening is
+    poor for decades. Both want new things to spend on more than new numbers, and a person's games (P1-20)
+    before another pass. The spice race asks 60,000 ducats of sales (30,000) and the era promises ask totals
+    near what the bot has when each era ends.
+
 ## Milestones
 
 | # | Milestone | Status |
@@ -95,11 +142,17 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | M11 | Colonies and natives: turns of half a year until 1550, then a year (seasons still pass one by one underneath); colonies grow by births over deaths (slow; the tropics are deadly), so settlers come from home and spend a season "seasoning" before they work; soldiers and friars eat from the warehouse or desert; peoples remember why they feel as they do (gifts, trade, posts, missions, settlers on their land, attacks, sickness); friendly peoples trade food to nearby colonies and raise births; furious ones besiege a colony (no fields worked, an assault each season) and can burn it | done |
 | M12 | Armies: pikemen, swordsmen, crossbowmen, arquebusiers, lancers and field guns (barracks II for the last three), each with fire, melee, toughness and pursuit; parties ashore are armies under a general, carrying food (a small band forages, an army starves without supply, and restocks beside a colony); automatic battles in three rounds (fire, melee, pursuit) decided by morale, with terrain (horse and guns poor in rough country, defenders stronger there), firearms frightening peoples who have never met them, assault or steady stance, and a battle report; colony walls (palisade, stone walls, star fort) that field guns breach; veterans; native raids, sieges and ambushes, rival raids and storms, and retaking free states all fought the same way | done |
 | M13 | A living market: factories in any European port (yours or foreign, with dues abroad) that hold your goods, sell them slowly at fair prices and buy what you need while it is cheap; regional tastes (wine and spices in the North, silver and sugar in Italy, no wine in the Maghreb); shocks that move a region's demand for a few years (bad harvests, plague, war, a royal wedding, a fashion, a good peace); rival merchants who ship their colonies' sugar, tobacco and furs into their home ports and buy tools and cloth there; colonies wear out tools and work slower without them; glut and scarce markers. Paris trades through Rouen | done |
-| M14 | The Mediterranean front (corsairs, the Ottomans, Venice and Genoa) and European treaties | next |
-| M15 | Knowledge: research from research buildings and funded scientific expeditions (a scientific explorer completes one in the New World); a tree of about 30 subjects that unlock ships, units, buildings and laws | |
-| Pass 3 | Balance: tuning numbers in one place, autoplay harness, retune for five crowns | |
-| later | Scenarios with goals (the old Crown's charge belongs here), Mediterranean powers as playable nations | |
-| later | Rival AI depth (real fleets and economies, rival-native alliances), Old World depth (buildings, full research), events and characters' stories, eras, score and victory, Chronicle, iPad performance, an illustrator's cohesive art set | |
+| Phase 1 | **The first hour** (v0.14): objectives (a first voyage of eight steps, then advisers' ambitions with rewards), an objectives panel with "Show me", a short welcome in place of the help wall, a tabbed guide, End Turn reminders with a count on the button, three difficulty levels, and small interface fixes. Items P1-01 to P1-23 below | 22 of 23 done; P1-20 (watching new players) needs people |
+| Phase 2 | **A world that pushes back** (v0.15): rivals with a treasury, ships that sail out and home, colonies that live on convoys, and plans chosen by what they want and can afford; crowns that fight each other; peoples who judge every crown and fight their own wars; soldiers that come by sea where you can see them. Items P2-01 to P2-15 below | done |
+| Phase 3 | **Stories and dynasty** (v0.16): 114 stories as data with chains, written for any crown; a ruling house with heirs, regencies, successions and royal marriages; courtiers who remember, want and can be lost to a rival; three historical set pieces per crown; eras that open with a choice of path; the land and colonies named by the player; the reign told back. Items P3-01 to P3-14 below | done |
+| Phase 4 | **Depth** (v0.18): a research tree of 32 subjects, ten laws, scientific expeditions; European diplomacy, wars to join, corsairs and the Levant trade; slavery, with what it costs and a law that ends it; three races to win beside the score; four scenarios, one of which begins in 1690; uses for prestige; fights at sea in three rounds; five more buildings; free states to recognise or retake, and ambitions for the later ages. Items P4-01 to P4-20 below | done |
+| Phase 5 | **Interface depth** (v0.20): keys on one table, and changeable; a Realm tab listing everything you own; the ledger; one card for the turn's news; a Diplomacy screen; nested tooltips; trade help; map modes; a comparison table; undo; saved voyages; standing fleet orders; research drawn as a tree with a queue; report cards; a size setting. Items P5-01 to P5-20 below | done |
+| Phase 6 | **Balance** (v0.21): a bot that plays whole games, and a first pass of tuning against it: prestige, the score and the races, African trade, rival growth, the five crowns, difficulty, privateers and corsairs, the crossing. Items P6-01 to P6-10 below | first pass done |
+| Phase 7 | Technical and visual polish: music, portraits, event paintings, a living map, the open engineering items. Deliberately last | deferred |
+
+The phases come from the production audit ([PRODUCTION-AUDIT.md](PRODUCTION-AUDIT.md)) and replace
+the old "M14, M15, Pass 3, later" tail of this table. Every action item is listed under
+[Production plan](#production-plan) at the end of this file.
 
 ## M9: Your realm (plan)
 
@@ -137,7 +190,10 @@ Decided with the player after M8:
 - **Research** comes from research buildings and from scientific expeditions you fund.
 - **Turns** are half a year, then a year from 1550.
 - **Battles** are automatic with a high-level report: this is Civilization, not Europa Universalis.
-- **Slavery** is left out for now.
+- **Slavery is in the game** (owner's decision after the production audit; it replaces "left out
+  for now"). Enslaved people are a hybrid of a good and a unit: they are bought and sold in
+  markets, taken in wars and battles, carried in a fleet's hold, and put to work in your colonies.
+  Built in Phase 4 (P4-14 to P4-17).
 
 ## M10: GUI pass (plan)
 
@@ -152,3 +208,202 @@ Decided with the player after M8:
 - **Icons and numbers first** in the HUD, drawers and news; prose moves to tooltips and info
   panels. Readable sizes (no text under 14 px), Escape closes anything, reduced motion honoured.
 - Art requests for portraits and building icons: `art/PROMPTS.md`.
+
+## Production plan
+
+Where the game goes from v0.13, as action items. The reasoning behind each is the production audit
+([PRODUCTION-AUDIT.md](PRODUCTION-AUDIT.md)); the "Answers" column names the finding there
+(N narrative, G gameplay, D difficulty, M mechanics, U interface, A art).
+
+**How to use this list.** Each item has an id that never changes. Status is one of **done**,
+**open**, or **deferred** (parked on purpose until its phase). When an item lands, set its status
+here and update the count in the milestones table. New ideas get the next free number in their
+phase; nothing is renumbered.
+
+**Order.** Phases 1 to 5 were worked in order, then balance (Phase 6). Technical and visual polish
+(Phase 7) comes last by the owner's decision: until then new looks use what the theme already has.
+A number that matters is changed against the harness (`tools/autoplay.ts`), before and after.
+
+| Phase | Theme | Items | Done |
+|---|---|---|---|
+| 1 | The first hour | 23 | 22 |
+| 2 | A world that pushes back | 15 | 15 |
+| 3 | Stories and dynasty | 14 | 14 |
+| 4 | Depth | 20 | 20 |
+| 5 | Interface depth | 21 | 21 |
+| 6 | Balance | 10 | 8 |
+| 7 | Technical and visual polish (deferred) | 14 | 0 |
+
+### Phase 1: The first hour
+
+Goal: a new player always knows what to do next, is told when they forget something, and can pick
+how hard the world pushes. Done when a first-time player reaches a first colony without opening
+the guide.
+
+| Id | Action item | Answers | Status |
+|---|---|---|---|
+| P1-01 | Objectives as a rule system: conditions over the game state in `src/sim/objectives.ts`, checked after every order and every season, each paid once and written in the chronicle; words, order and rewards in `src/data/objectives.ts` | G1, G2 | done |
+| P1-02 | The first voyage: eight steps (commission an explorer, load goods, give them a fleet, sail beyond the known coast, meet a people, sell a cargo, send a party ashore, found a colony). Any step can be done out of order | G1 | done |
+| P1-03 | Ambitions: twelve goals asked by named advisers (treasurer, pilot major, chancellor, governor), each waiting on earlier ones, three pressed at a time | G2 | done |
+| P1-04 | Objectives panel on the right of the map: the next step open with how to do it, the reward, progress where it counts, and "Show me" that opens the right screen or selects the fleet. Folds away, and remembers that | G1, G3 | done |
+| P1-05 | A toast and a chime when an objective is met, saying what it paid | G1 | done |
+| P1-06 | A short welcome card at the start of a voyage (who you are, what you have, where the first voyage is listed) in place of the 13-paragraph help | G3 | done |
+| P1-07 | The guide as a reference in six tabs (First steps, At sea, Colonies, Peoples and crowns, Your realm, Controls), listing keys 1 to 6 | G3, U6 | done |
+| P1-08 | An attention list (`src/ui/attention.ts`): no explorer, idle scholars, leaders without a fleet, fleets adrift, parties without orders, colonies hungry or besieged (urgent); low stores, idle ships in port, idle shipyards, petitioners (worth a look) | U2 | done |
+| P1-09 | End Turn asks first when something urgent is undone: each line jumps to the thing, each thing is asked about once, and Settings can turn the reminders off | U2 | done |
+| P1-10 | The End Turn button shows how many things need you, and lists them in its tooltip | U2 | done |
+| P1-11 | Difficulty on the menu: Squire, Captain, Admiral (`src/data/difficulty.ts`). Four levers: starting treasury, the rivals' pace, storms, objective rewards. Captain is the game as it was | D1 | done (numbers provisional: P6-04) |
+| P1-12 | Fleets: one Embark button per kind of unit waiting, with the count, instead of one per unit | U7 | done |
+| P1-13 | Minimap: uncharted hexes drawn as chart paper so the unknown does not read as an empty box | U8 | done |
+| P1-14 | "Survivors at sea" picks only among the crowns you are not playing | N6 | done |
+| P1-15 | Save version 15: older voyages become Captain and tick what they have already achieved without paying for it; tests for objectives, difficulty, reminders and the migration | - | done |
+| P1-16 | Point at the map for the current step: a pulsing ring on your main port or on the edge of the known coast, resting at the screen's edge when that place is out of view | G1 | done |
+| P1-17 | First-time hints inside screens: when Court, Markets or Fleets open for the step in hand, one line says which control to use; closing it is remembered | G3 | done |
+| P1-18 | `N` and a button beside End Turn jump to the next thing that needs you, round the attention list, without ending the turn | U2 | done |
+| P1-19 | Openings per crown (`OPENINGS` in `src/data/objectives.ts`): a line on the welcome card about what the crown is good at, and the voyage south reworded for Portugal, England, France and the Netherlands | G1 | done |
+| P1-20 | Watch three people who have never played reach their first colony; write down where each stalls and add an item for each stall | G1 | open (needs people) |
+| P1-21 | News feed at the start of a turn: no more than two cards over the map, the rest behind "and 3 more" | U5 | done |
+| P1-22 | The first rival sail is an event ("Rival sails", with "Go there" to the ship), inside the first ten turns for every crown | G1, D2 | done |
+| P1-23 | A chosen option on the menu or in Settings keeps its dark look under the pointer | U9 | done |
+
+### Phase 2: A world that pushes back
+
+Goal: rivals play the same game as the player, and the world acts without waiting to be poked.
+Systems only: the numbers stay provisional until Phase 6.
+
+| Id | Action item | Answers | Status |
+|---|---|---|---|
+| P2-01 | Each rival has a treasury: the realm's allowance, trading posts and the profit of cargoes brought home; ships cost upkeep, and every venture has a price (`RIVAL_ECON` in `src/data/rivals.ts`). A crown sails when it can afford to, and otherwise saves for what it wants | D2 | done |
+| P2-02 | Rival colonies live on stores from home: a convoy fills them and lands a settler; supplied, they grow by births; unsupplied, they produce less, shrink and are abandoned in the end | D2 | done |
+| P2-03 | Rival ships persist: each crown owns named hulls that sail out, do their errand and sail home before they can be used again; ships are lost to storms and to your guns, and new ones are built for money, more as the crown's colonies multiply | D2 | done |
+| P2-04 | A plan per rival by utility scoring (`options` and `decide` in `src/sim/rivals.ts`): supply, settle, trade, build, and at war privateers and landings, weighted by each crown's taste for trade and for war | D2 | done |
+| P2-05 | Peoples judge every crown, not only yours (`NativeState.crowns`): trading posts win them, settlers on their land anger them, angry peoples raid and burn rival colonies, and a people friendly to a crown at war with you speaks against you | D3 | done |
+| P2-06 | Rivals answer what you do: they favour trading grounds you have found or hold a post at, hurry to coasts where your surveyors found riches, and send an ambassador to protest when you settle beside them (pay, promise or refuse) | D2, D3 | done |
+| P2-07 | The crowns you do not play have relations with each other: grudges, wars that cost them money, colonies and ships, and peaces; the enemy of your enemy warms to you | D3 | done |
+| P2-08 | Show intent: news when a rival sends settlers or soldiers, and a line per crown in Court, Crowns saying what it is doing, how many ships it has, how full its treasury is and whom it is fighting; Court, Peoples shows each people's friends, grudges and wars | D2, U3 | done |
+| P2-09 | Difficulty changes behaviour, not only numbers: an `aggression` lever scales how readily rivals declare war, land soldiers, and contest what you have found | D1 | done |
+| P2-10 | Rival cargoes are real: a colony's produce waits for a ship, sails home in it and is sold in the home market, where the convoy's tools, cloth and wine were bought. The abstract `rivalMerchants` flow is gone | D2 | done |
+| P2-11 | Peoples go to war with their rivals without being incited: skirmishes, a deciding battle, and warriors too busy to raid you meanwhile | M6 | done |
+| P2-12 | At war, a rival's soldiers are a ship on the map: they embark at their nearest colony, you are told where they are bound, and they land at your colony when they arrive (raids used to be an unseen roll) | D2 | done |
+| P2-13 | Peoples with a common enemy swear pacts (an ally's warriors count for half in their wars), and a people beaten badly, or crowded by settlers it is too weak to fight, abandons a village and moves away | M6 | done |
+| P2-14 | At war, a rival's soldiers march overland when your colony is within nine hexes by land, as an army on the map that one of your parties can meet in the field; and a fleet beside any rival ship can attack her (it is war if it was not already) | D2 | done |
+| P2-15 | Rivals learn the ocean crossing by paying their pilots season by season (`RIVAL_ECON.study`); a crown without money does not learn it, and a navigator who leaves your court for theirs brings it sooner | D2 | done |
+
+### Phase 3: Stories and dynasty
+
+Goal: a reign that reads like a story, with people the player cares about, and no repeated card in
+one game.
+
+| Id | Action item | Answers | Status |
+|---|---|---|---|
+| P3-01 | Stories are data (`src/data/stories/`, one file per family) read by a small engine in `src/sim/stories.ts`: subjects bound by filters, conditions, effects and uncertain outcomes from a fixed vocabulary, and hints written from the effects | N1 | done |
+| P3-02 | No story outside the set pieces names a particular realm's places: cities, great houses, a seat of learning, bankers, a saint and the ruler's title come from the crown's own data (`src/data/dynasty.ts`). A test enforces it | N5 | done |
+| P3-03 | 114 stories: at sea 17, the court 17, colonies 17, peoples 14, rival crowns 10, Europe 10, the age 5, the dynasty 6, history 18. The three largest families are three short of the 20 first aimed at | N1 | done |
+| P3-04 | Chains: story flags and follow-ups in the game state; nine follow-ups arrive seasons later because of an earlier choice (a ransom repaid in kind, a refused petition that returns, a guest prince who goes home, guns that change a war) | N2 | done |
+| P3-05 | Courtiers remember: a loyalty that follows what they hold for and against you, with the reasons shown; rivals, friends and kin at court, so that raising one person galls or pleases others | N3 | done |
+| P3-06 | A monarch: the house each crown had in 1492, a ruler with an age and a gift that helps the realm, a consort, heirs born and lost, death, succession by the eldest heir, a regency for a child, and a costly crisis when there is no heir (Court, Dynasty) | N4 | done |
+| P3-07 | Royal marriages: offers from the other realms every two years while the ruler is unmarried; a consort brings a dowry (larger with prestige), heirs, and a tie that keeps a rival crown from declaring war. Claims and alliances are left to P4-04 | N4, M2 | done |
+| P3-08 | Courtiers want a commission or a command; kept waiting they resent it, and a courtier whose loyalty runs out is offered a place by a rival crown: pay to keep them, let them go with what they know, or arrest them | N3 | done |
+| P3-09 | Three set pieces for each crown at about their years, told once and only to that crown (Granada, the Comuneros and the Armada; the road to India, Morocco and the union of crowns; Cabot, the break with Rome and the Armada's defeat; Naples, Verrazzano and the wars of religion; the towns' charters, the breaking of the images and the great company) | N7 | done |
+| P3-10 | Pacing: a story never told comes before any that has been; stories about what you are doing (fleets at sea, colonies, peoples met, wars) are likelier; when only old stories fit, they return half as often | N1 | done |
+| P3-11 | The reign told back: a history written from the chronicle, the dynasty and the standings, in the Chronicle and at the end of the age; and a short life of each courtier in Court | N9 | done |
+| P3-12 | A picture slot for each story family on the card, with the family named under it, and the 3 × 3 grid prompt in `art/PROMPTS.md`. Until the sheet is painted (P7-04) the card shows the cartouche | N8 | done |
+| P3-13 | Each new era opens with three paths: the one chosen gives a lasting advantage while the era lasts and sets a goal, judged when the era ends (30 prestige if met) | N10 | done |
+| P3-14 | Naming: the first landfall asks what the land shall be called, and the name goes on the map, into the chronicle and the stories; colonies can be renamed | N9 | done |
+
+### Phase 4: Depth
+
+Goal: enough to decide for a 200-turn game, and more than one way to win it.
+
+| Id | Action item | Answers | Status |
+|---|---|---|---|
+| P4-01 | A research tree of 32 subjects in four branches (navigation 10, commerce 8, state 7, war 7), in `src/data/tech.ts`: each gives the realm something (`mods`) or unlocks something (galleons, arquebusiers, lancers, field guns, the star fort, laws, alliances) | D5 | done |
+| P4-02 | Research comes from the court, universities, learned courtiers, the ruler and the age, and from the field; a funded scientific expedition makes everything your explorers chart, meet and survey count three times until it has found enough, then pays a reward | D5 | done |
+| P4-03 | Nine laws (`src/data/laws.ts`), each opened by a subject: a realm keeps two, and one more for every three subjects of state; some cannot stand together; enacting costs ducats, repealing costs prestige | D5, M2 | done |
+| P4-04 | European diplomacy (Court, Europe): every other realm has a regard for you, moved by envoys, gifts, marriages and what you do; regard wins a trade treaty (better prices in their ports), a pact (they will not attack you) and an alliance (a rival crown fights your enemies overseas, another realm pays toward your wars) | M2 | done |
+| P4-05 | The realms of Europe go to war over old quarrels and make peace; a war raises prices where it is fought, and you may take a side: the other side's ports close to you, it costs money each season, and the winner's friends share the indemnity. Letters of marque bring prize money while you have an enemy, and now and then a protest | M2 | done |
+| P4-06 | The Mediterranean: corsairs out of Ottoman and Moroccan ports take ships that pass near them, until you pay tribute, win a pact or win their regard; Venice and Genoa keep Italy's spice markets full, and an Ottoman war with either makes pepper scarce there | M2 | done |
+| P4-07 | Three races beside the score (`src/sim/victory.ts`): mastery of trade, an empire overseas, the first court of Europe. The first crown to finish one is remembered for it, you or a rival; the game goes on. Progress shows in Court, Crowns | D7, G2 | done |
+| P4-08 | Three scenarios chosen on the menu, each a goal and a year: the treasurer's charge (20,000 ducats by 1502), the spice race (30,000 ducats of sales by 1515), beyond the ocean (a colony across the Mar Océano by 1510). Won or lost, the voyage goes on as a free game. The independence crisis first planned as the third is P4-18 | G2 | done |
+| P4-09 | Prestige has uses: it raises dowries, draws better petitioners, makes treaties easier to win, and is spent on three favours (summon a renowned captain, a day of honours, a grand embassy) in Court, Dynasty | G6 | done |
+| P4-10 | Fights at sea in three rounds (gunnery, boarding, the chase) with a report on the card, for privateers that attack you and for ships you attack; the chase decides whether the beaten side is taken or gets away battered | M3 | done |
+| P4-11 | Five more buildings at home, each resting on an older one: warehouses (market), arsenal (docks II), fortress (barracks), observatory (university), cathedral (church) | M4 | done |
+| P4-12 | Decide how the game treats slavery and the plantation economy. **Decided: it is in**, as a hybrid of a good and a unit (see "Systems decisions") | M5 | done (decision) |
+| P4-13 | The late game: a colony that has broken away unsettles its neighbours until you recognise it (it then trades with you) or retake it; left alone, a rival crown takes it under protection, and retaking it means war. Six ambitions wait for the later ages (laws, treaties, a city overseas, twenty subjects, an age's promise kept, a hundred colonists). Free states that arm and band together are P4-19 | G2 | done |
+| P4-14 | Enslaved people in the game state: a count of captives in a fleet's hold (each takes the room of two units of cargo) and a count of enslaved people in a colony, up to twice the settlers its size allows; they are fed and given nothing else | M5 | done |
+| P4-15 | How they are acquired: bought at trading grounds on the African coast, which offer the prisoners of that people's own wars (more while it is at war), and taken when one of your parties storms a village | M5 | done |
+| P4-16 | How they are used: put ashore at a colony, where they work its land beside the colonists, or sold in the ports of Iberia, Italy and the Maghreb. The money goes to the treasury and is not counted as commerce | M5 | done |
+| P4-17 | What it costs: about one in ten dies each season at sea and one in fourteen each year in the fields; some flee; where they far outnumber the settlers they rise unless soldiers hold them down; the peoples they were taken from remember it. The law of abolition (natural philosophy) forbids the trade and frees everyone, half of whom stay as settlers. No objective, ambition or score counts any of it, and a test says so | M5 | done |
+| P4-18 | A fourth scenario, the restless empire: the years to 1690 are played out with no one on the throne (about four seconds), and you inherit five old colonies of doubtful loyalty and one already lost; keep four until 1720 | G2 | done |
+| P4-19 | Free states arm: two or more that you have not come to terms with form a league; their militia marches overland on your colonies, where a party can meet it in the field; a colony it breaks into is shaken, and goes over to them if its loyalty is low | G2 | done |
+| P4-20 | An ally at war calls on you with a card: honour the alliance (you enter the war), send money instead, or refuse (the alliance falls to a pact and they think much worse of you) | M2 | done |
+
+### Phase 5: Interface depth
+
+Goal: the player never hunts for what they own, what a word means, or what happened last turn.
+Function only: looks are Phase 7.
+
+| Id | Action item | Answers | Status |
+|---|---|---|---|
+| P5-01 | The Realm tab in the panel beside the map: every threat, fleet, party, colony and working city with a line of state, coloured when something is wrong; click to go there. The panel's other tab holds the goals | U3 | done |
+| P5-02 | Nested tooltips (`Gloss`, `Term`; 28 words in `src/data/glossary.ts`): the game's own words in the guide, in goals, in story cards and in first-time hints open for their meaning, and a meaning's own words open in turn | U4 | done |
+| P5-03 | The ledger (`L`, or click the treasury): every ducat of the last turn by line, your own orders included, and what the next turn brings before you do anything; the HUD shows that figure under the treasury | U3 | done |
+| P5-04 | One card for the turn that has passed, in place of stacked news: its news in groups (perils first), the treasury's change, and the way to the Chronicle | U5, G5 | done |
+| P5-05 | Settings choose which kinds of news the turn's card shows; the Chronicle keeps everything | U5 | done |
+| P5-06 | Trade help: in a market, each good aboard shows the port you know where it sells for most; a trade route shows about what one round earns at today's prices and how many seasons it takes, before it is started | G5 | done |
+| P5-07 | Map modes (`O`, or the rail): the plain chart, finds (what was surveyed and what is still to survey), peoples by their regard for you, colonies by their loyalty; a chip says which is on | U3 | done |
+| P5-08 | Undo (`Z`): the last order can be taken back if nothing was left to chance in it (buying, selling, building, commissioning, laws, routes and the like), until the next order or the end of the turn. Four orders that cannot be taken back ask first | U10 | done |
+| P5-09 | Saved voyages (Settings, or the menu): three places to keep a voyage, the last five turns kept automatically, and saving to and loading from a file | U10 | done |
+| P5-10 | Accessibility: a size setting for text and panels (the map is not scaled), no text under 14 px in either style sheet, and the keyboard focus moves into a screen when it opens | - | done |
+| P5-11 | One key table (`src/ui/keys.ts`) read by both the handler and the guide's Controls page. Keys act on the topmost layer only: Enter and Space no longer end a turn or sail behind an open screen, cards and reminders answer to the keyboard without needing the focus, a clicked button no longer fires again on Space, and Ctrl or Cmd shortcuts are left to the browser. Rebinding is P5-19 | U6 | done |
+| P5-12 | Cities, All cities and colonies: every colony and city in one table (people, room, loyalty and where it is heading, food, what it makes, garrison, state; taxes, buildings, work in hand), sorted by any column, a click to go there | U3 | done |
+| P5-13 | Standing fleet orders on the selection card: explore (chart unknown coast by itself, home to resupply when the stores are half gone, never onto the ocean road), go home and resupply, and patrol (cruise between a station and the nearest of your ports) | G5 | done |
+| P5-14 | The guide has three new pages (Europe and the dynasty, Research and law, Empire) and a Controls page drawn from the key table. First-time hints for the later systems are P5-20 | G3 | done |
+| P5-15 | Screens regrouped: a seventh screen, Diplomacy, holds Peoples, Rival crowns and Europe; Court keeps People, Petitioners and Dynasty; Research has tabs for Subjects, Laws and the Expedition | U3 | done |
+| P5-16 | The hover line names what is not yours and where it is going: rival ships and armies, militia on the march, free states. Selecting them is left for the outliner's Threats | U4 | done |
+| P5-17 | Research drawn as a tree: a column for each branch, a line from each subject to what rests on it, what a subject opens shown as pictures and tags, an estimate of seasons, and a queue that adds whatever a subject rests on | U3 | done |
+| P5-18 | Cards for outcomes that were only a line of news: a rising put down, a treaty signed, the end of a war you joined, an expedition's return (successions, risings that succeed and battles had theirs already) | U5 | done |
+| P5-19 | Keys can be changed on the guide's Controls page, each row at a time, with a refusal when another key in the same place already does that; the choice is kept with the player's other preferences | U6 | done |
+| P5-20 | First-time hints at the top of Diplomacy, Dynasty, Laws and the Expedition, each closed once and for all | G3 | done |
+| P5-21 | Fleets as a list, then a page for each fleet (owner's report: "clunky", "I cannot select the explorer"). The list shows every fleet with its leader, ships, hold, stores, place and task. A fleet's page has what she is doing at the top and three tabs: command and people, ships (remove one, add the others lying here), trade route. A leader is chosen on that page from everyone free in port, in one click; a courtier made explorer or merchant for a fleet takes command of it by themselves when ready (`Person.posted`, command `post`). The selection card has Choose a leader and Open fleet; a second click on a selected fleet opens her page. Court: an explicit Make explorer button, and giving command returns to the fleet on the map | G3 | done |
+| P5-22 | Stores and windows (owner's report: "when I buy tools they appear randomly in my ships", "very chaotic structure"). What you buy in one of your cities goes to its stores (`GameState.stores`, save v22), never into a ship: a fleet loads and unloads on its Cargo tab (command `stow`; the same tab works in colonies and where you keep a factor, whose warehouse is that port's store). Markets say what you trade from (your stores, or a ship you choose) instead of picking the first ship in port; in a foreign port or a trading ground you trade from a hold. Each city has a Stores tab with its harbour. Every fleet, person, city and colony has its own window (`Windows.tsx`, `openWindow`), opened from its screen or from the map, with Back to the window underneath; Fleets, Court and Cities are lists that open them | G3 | done |
+
+### Phase 6: Balance
+
+Parked until the systems above exist. Until then, record observations under "Balance notes" and
+keep new numbers in `src/data/`.
+
+| Id | Action item | Answers | Status |
+|---|---|---|---|
+| P6-01 | Collect the inline tuning numbers of `src/sim/` (about 430) into `src/data/` (AUDIT.md finding 6). Every number this pass touched now lives in data: `PRESTIGE`, `SCORE` and `VICTORY.salesAsProfit` (`scenarios.ts`), `NATIVE_TRADE` and `MARKET` (`trade.ts`), `CROSSING` (`ships.ts`), raid, siege and crowding numbers (`colony.ts`), corsairs (`diplomacy.ts`), rival growth (`rivals.ts`). The rest are still inline | D6 | open (part done) |
+| P6-02 | Autoplay harness: `tools/autoplay.ts` runs the bot of `tools/bot.ts` over seeds, crowns, three ways of playing and a difficulty, and reports treasury, sales, colonies, scores, races, losses, debt, stories and pace by year; `tools/trace.ts` tallies one game's losses and its trade by good; `tools/rivalsizes.ts` shows rival colonies by year | D6 | done |
+| P6-03 | Retune the five crowns as AI rivals: with nobody playing they now end a standard game between about 2,300 and 4,000 points (France was near 3,000 against 6,000; it settles from latitude 26 and starts a little sooner; England from 30) | D4 | done |
+| P6-04 | Tune the difficulty levers of P1-11 with the harness: a fifth lever, `rivalGrowth`, scales how fast rival colonies grow and what their trade earns, because the others only moved the start. The bot ends 2nd or 3rd on Squire, 4th or 5th on Captain, last and well behind on Admiral | D1 | done |
+| P6-05 | Objective rewards against the first voyage: measured, not changed. The first-voyage chain pays 1,600 ducats on a start of 5,000, and a bot that takes all of it and settles first still has under 5,000 in 1500 | G1 | done |
+| P6-06 | The crossing after *Volta do mar* (`CROSSING`): about one crossing in eight meets a storm, fewer with a good navigator and twice as many in the hurricane months; a ship never mended sinks in the end; with fewer than three seasons of stores the crew may refuse to sail | G4 | done |
+| P6-07 | Story frequency against the story count: measured, not changed. A standard game tells about 120 stories, about 80 of them different, at one every other turn early and three in five turns later | N1 | done |
+| P6-08 | Pace of a standard game: 216 turns; 0.75 cards a turn in the half-year era and 1.2 to 1.4 after; the bot gives 15 to 20 orders a turn early and about 35 late. Minutes per turn for a person need people (with P1-20) | G5 | open (bot measured) |
+| P6-09 | Score weights against the victory paths: a rival's books record its profit on a cargo (a fifth of the sale) and yours recorded the whole sale, so your commerce counted five times theirs. Sales are now reckoned at the same share wherever crowns are compared; the races are set from measured curves (trade 340,000 of profit, empire 170 colonists and 270 hexes, prestige 650, each scaled by the game's length) | D7 | done |
+| P6-10 | Colony growth under pressure: births 5% a year (3.5%); settlers on a people's land cost less of their regard, raids and sieges are rarer; rival colonies no longer all reach 24 by 1600 (a convoy lands settlers only in a small colony, births and raising are slower) | - | done |
+
+### Phase 7: Technical and visual polish (deferred)
+
+Last by the owner's decision. Art that needs painting gets its grid prompt in `art/PROMPTS.md`
+when its item starts.
+
+| Id | Action item | Answers | Status |
+|---|---|---|---|
+| P7-01 | Music: a licensed or commissioned period soundtrack, with tracks by era and a volume setting | A4 | deferred |
+| P7-02 | Ambient sound: sea, harbour, market and court beds under the synthesized effects | A4 | deferred |
+| P7-03 | Portraits: a set large enough that no two courtiers at one court share a face, varied by age, role and crown | A2 | deferred |
+| P7-04 | Paintings for the story families of P3-12, and for eras and endings | N8 | deferred |
+| P7-05 | A living map: moving water, wakes behind ships, a seasonal tint | A3 | deferred |
+| P7-06 | Painted colonist and missionary figures, and ships and armies that read at map scale | A5 | deferred |
+| P7-07 | The shorter, visual help and title screen planned in M10 | G3 | deferred |
+| P7-08 | An illustrator's cohesive pass over every sheet | A1 | deferred |
+| P7-09 | An end-of-game screen worth the 200 turns: standings, the history of P3-11, portraits of the reign | N9 | deferred |
+| P7-10 | AUDIT.md finding 4: GPU memory of the map art, measured on a real laptop | - | deferred |
+| P7-11 | AUDIT.md findings 11 to 13: split `game.ts` and `MapView.ts` by domain, add ESLint, give Pixi its own chunk | - | deferred |
+| P7-12 | Frame times and battery use measured on the target laptop and on an iPad | - | deferred |
+| P7-13 | Motion and sound for objectives, reminders and the turn summary in the Admiralty manner | - | deferred |
+| P7-14 | Readability pass at 1280×720 and on a tablet for every screen added since M10 | - | deferred |

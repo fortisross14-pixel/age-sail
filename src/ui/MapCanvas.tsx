@@ -58,6 +58,7 @@ export function MapCanvas() {
           }
           if (fleetId != null) {
             if (s.selectedFleet !== fleetId) s.selectFleet(fleetId);
+            else s.openWindow({ kind: 'fleet', id: fleetId });
             return;
           }
           const colony = g.colonies.find((c) => c.map === map && c.hex === hex);
@@ -66,14 +67,19 @@ export function MapCanvas() {
           const again = s.preview?.dest === hex && s.preview.map === map;
           // inland cities: yours open the city panel; foreign ones are names on the chart
           if (port && 'inland' in port && port.inland) {
-            if (port.kind === 'home') s.set({ selectedPort: port.id, preview: null, drawer: 'cities' });
+            if (port.kind === 'home') { s.set({ selectedPort: port.id, preview: null }); s.openWindow({ kind: 'city', id: port.id }); }
             return;
           }
           if (port) {
             if (fleet && fleet.hex !== hex) {
               if (again) void s.confirmPreview();
               else { s.set({ selectedPort: port.id }); void s.planTo(hex); }
-            } else s.set({ selectedPort: port.id, preview: null, drawer: port.kind === 'home' || port.kind === 'colony' ? 'cities' : 'port', ...(port.kind === 'colony' ? { selectedColony: port.id } : {}) });
+            } else if (port.kind === 'home' || port.kind === 'colony') {
+              // your own city or colony opens its window (on the market when a fleet lies there); a foreign port or trading ground its own screen
+              s.set({ selectedPort: port.id, preview: null, ...(port.kind === 'colony' ? { selectedColony: port.id } : {}) });
+              const docked = g.fleets.some((f) => f.at === port.id);
+              s.openWindow(port.kind === 'colony' ? { kind: 'colony', id: port.id } : { kind: 'city', id: port.id, ...(docked ? { tab: 'market' as const } : {}) });
+            } else s.set({ selectedPort: port.id, preview: null, drawer: 'port' });
             return;
           }
           const known = g.fog[map][hex] >= Fog.Charted;
@@ -105,13 +111,13 @@ export function MapCanvas() {
       let last: unknown[] = [];
       const push = () => {
         const s = useStore.getState();
-        const deps = [s.game, s.map, s.selectedFleet, s.selectedParty, s.preview, s.landing, s.showWind, s.showGrid, s.highlightAll];
+        const deps = [s.game, s.map, s.selectedFleet, s.selectedParty, s.preview, s.landing, s.showWind, s.showGrid, s.highlightAll, s.mapMode];
         if (deps.length === last.length && deps.every((d, i) => d === last[i])) return;
         last = deps;
         if (s.game) view!.update(s.game, {
           map: s.map, selectedFleet: s.selectedFleet, selectedParty: s.selectedParty, preview: s.preview && { ...s.preview },
           landing: s.landing ? landingHexes(s) : null,
-          showWind: s.showWind, showGrid: s.showGrid, highlightAll: s.highlightAll,
+          showWind: s.showWind, showGrid: s.showGrid, highlightAll: s.highlightAll, mode: s.mapMode,
         });
       };
       push();

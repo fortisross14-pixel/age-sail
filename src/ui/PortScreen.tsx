@@ -51,7 +51,7 @@ export function PortScreen() {
             {nation && st && <>
               <p><b>{STANDING[standing(st)].name}</b> ({standing(st) > 0 ? '+' : ''}{standing(st)}): {STANDING[standing(st)].blurb}</p>
               <p className="muted small">About {st.warriors} warriors{nation.empire ? ' · an empire' : ''}{st.post ? ' · your trading post' : ''}{st.mission ? ` · a mission (${Math.round(st.converted * 100)}% won over)` : ''}.</p>
-              <button onClick={() => set({ drawer: 'court', courtTab: 'peoples' })}>Deal with the {nation.people}</button>
+              <button onClick={() => set({ drawer: 'diplomacy', diploTab: 'peoples' })}>Deal with the {nation.people}</button>
             </>}
             {crown && rival && <p className="small">{crown.name} is <b>{rival.relation === 'war' ? 'at war with you' : rival.attitude >= 30 ? 'friendly' : rival.attitude <= -30 ? 'hostile' : 'at peace'}</b>. Their ports trade with you even so, at a price.</p>}
             {port.realm && !crown && <p className="small">{realmSpec(port.realm).name} is not a colonial rival: their ports trade with anyone.</p>}

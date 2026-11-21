@@ -1,6 +1,6 @@
 import type { UnitType } from '../sim/types';
 
-export type BuildingId = 'docks' | 'barracks' | 'church' | 'university' | 'market';
+export type BuildingId = 'docks' | 'barracks' | 'church' | 'university' | 'market' | 'warehouse' | 'arsenal' | 'fortress' | 'observatory' | 'cathedral';
 
 export interface BuildingSpec {
   name: string;
@@ -9,7 +9,12 @@ export interface BuildingSpec {
   /** what each level does, for the player */
   effect: string[];
   blurb: string;
+  /** another building this one rests on, and the level of it */
+  needs?: { building: BuildingId; level: number };
 }
+
+/** What the second wave of buildings does. Provisional numbers. */
+export const BUILDING_FX = { warehouseDues: 40, arsenalShips: 0.85, observatory: 3, cathedralPrestige: 0.25, cathedralLoyalty: 2, cathedralsCount: 2 };
 
 export const BUILDINGS: Record<BuildingId, BuildingSpec> = {
   docks: {
@@ -37,9 +42,34 @@ export const BUILDINGS: Record<BuildingId, BuildingSpec> = {
     levels: [{ cost: 0, build: 0 }, { cost: 1500, build: 2 }, { cost: 3500, build: 3 }],
     effect: ['', '+60 ducats in dues a season; better prices in this city.', '+120 ducats a season; better prices still.'],
   },
+  warehouse: {
+    name: 'Warehouses', blurb: 'Bonded stores along the quay, where cargoes wait for a better price.', needs: { building: 'market', level: 1 },
+    levels: [{ cost: 0, build: 0 }, { cost: 1400, build: 2 }, { cost: 2800, build: 3 }],
+    effect: ['', '+40 ducats in dues a season.', '+80 ducats in dues a season.'],
+  },
+  arsenal: {
+    name: 'Arsenal', blurb: 'Ropewalks, sail lofts and a gun wharf: a yard that builds ships as a mill grinds corn.', needs: { building: 'docks', level: 2 },
+    levels: [{ cost: 0, build: 0 }, { cost: 3000, build: 3 }],
+    effect: ['', 'Ships built here cost 15% less.'],
+  },
+  fortress: {
+    name: 'Fortress', blurb: 'A citadel and a standing garrison, where recruits are drilled by men who have seen war.', needs: { building: 'barracks', level: 1 },
+    levels: [{ cost: 0, build: 0 }, { cost: 2600, build: 3 }],
+    effect: ['', 'Soldiers trained here leave as veterans.'],
+  },
+  observatory: {
+    name: 'Observatory', blurb: 'A tower, instruments of brass, and a pension for whoever will watch the sky every clear night.', needs: { building: 'university', level: 1 },
+    levels: [{ cost: 0, build: 0 }, { cost: 3200, build: 3 }],
+    effect: ['', '+3 research points a season.'],
+  },
+  cathedral: {
+    name: 'Cathedral', blurb: 'A work of generations. Its bells are heard at sea, and its fame overseas.', needs: { building: 'church', level: 1 },
+    levels: [{ cost: 0, build: 0 }, { cost: 5000, build: 6 }],
+    effect: ['', 'Prestige grows every season, and your colonies are a little more loyal (two cathedrals count).'],
+  },
 };
 
-export const BUILDING_ORDER: BuildingId[] = ['docks', 'barracks', 'church', 'university', 'market'];
+export const BUILDING_ORDER: BuildingId[] = ['docks', 'barracks', 'church', 'university', 'market', 'warehouse', 'arsenal', 'fortress', 'observatory', 'cathedral'];
 
 /**
  * A crown's base taxes are scaled toward this total, within REALM_TAX_RANGE, so a realm of many

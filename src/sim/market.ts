@@ -1,5 +1,6 @@
 import type { GoodId } from '../data/goods';
 import type { MarketGood } from './types';
+import { MARKET } from '../data/trade';
 
 /** How sharply prices react to stock. */
 const K = 0.8;
@@ -34,8 +35,8 @@ export function tickMarket(m: MarketGood, adoption = 1): void {
   const consume = m.consumption * (0.35 + 0.65 * adoption);
   m.stock = Math.max(0, m.stock + m.production - consume);
   // other traders slowly nudge stock toward normal
-  m.stock += (m.ref - m.stock) * 0.06;
-  m.stock = Math.min(m.stock, m.ref * 5);
+  m.stock += (m.ref - m.stock) * MARKET.recovery;
+  m.stock = Math.min(m.stock, m.ref * (m.pile ?? 5));
   m.history.push(Math.round(unitPrice(m)));
   if (m.history.length > 16) m.history.shift();
 }

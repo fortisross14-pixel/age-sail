@@ -5,7 +5,7 @@ import type { NativeState } from '../sim/types';
 export function Standing({ st, compact = false }: { st: NativeState; compact?: boolean }) {
   const v = standing(st);
   return (
-    <span className={`standing s${v}`} title={`${STANDING[v].name}: ${STANDING[v].blurb}`}>
+    <span className={`np-standing s${v}`} title={`${STANDING[v].name}: ${STANDING[v].blurb}`}>
       <span className="scale" aria-hidden>
         {[-3, -2, -1, 0, 1, 2, 3].map((k) => <i key={k} className={k === v ? 'on' : ''} />)}
       </span>

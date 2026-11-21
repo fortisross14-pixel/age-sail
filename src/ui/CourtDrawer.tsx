@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { SKILL_INFO, TRAIT_INFO, RANK_INFO, UNIT_INFO } from '../data/court';
-import { TECHS, BRANCH_NAMES, techById, type Branch } from '../data/tech';
-import { has, basePoints, techAvailable, portById } from '../sim/game';
+import { TECHS } from '../data/tech';
+import { portById } from '../sim/game';
 import { ageOf, salary, hireCost } from '../sim/court';
 import { SKILLS, dateLabel, yearOf, type Person, type UnitType } from '../sim/types';
 import { fmt } from './format';
@@ -16,7 +16,12 @@ import { getView } from './MapCanvas';
 import { allNations, moodOf, envoy, populationOf } from '../sim/natives';
 import { Standing } from './Standing';
 import { rivalsOf, crownSpec } from '../data/rivals';
-import { rivalScore } from '../sim/rivals';
+import { rivalScore, rivalDoing, friendOf } from '../sim/rivals';
+import { Dynasty, CourtierStanding, ReignHistory } from './Dynasty';
+import { Europe, LawsAndExpedition } from './Europe';
+import { TechTree } from './More';
+import { Races } from './Late';
+import { RIVAL_ECON, rivalSpec } from '../data/rivals';
 import { score } from '../sim/colony';
 import { CROWN } from '../render/palette';
 import { SKILL_INFO as SK } from '../data/court';
@@ -30,13 +35,31 @@ export function Court() {
       <Tabs value={tab} onChange={(t) => set({ courtTab: t })} tabs={[
         ['people', `People (${game.people.filter((p) => p.alive).length})`],
         ['petitioners', `Petitioners${game.petitioners.length ? ` (${game.petitioners.length})` : ''}`],
-        ['peoples', `Peoples${Object.values(game.natives).filter((n) => n.met).length ? ` (${Object.values(game.natives).filter((n) => n.met).length})` : ''}`],
-        ['crowns', 'Crowns'],
+        ['dynasty', `Dynasty${game.dynasty.offers.length ? ` (${game.dynasty.offers.length})` : ''}`],
       ]} />
       {tab === 'people' && <People />}
       {tab === 'petitioners' && <Petitioners />}
+      {tab === 'dynasty' && <Dynasty />}
+    </>
+  );
+}
+
+/** Everyone outside your realm: the peoples overseas, the rival crowns, and the realms of Europe. */
+export function Diplomacy() {
+  const game = useStore((s) => s.game)!;
+  const tab = useStore((s) => s.diploTab);
+  const set = useStore((s) => s.set);
+  const met = Object.values(game.natives).filter((n) => n.met).length;
+  return (
+    <>
+      <Tabs value={tab} onChange={(t) => set({ diploTab: t })} tabs={[
+        ['peoples', `Peoples${met ? ` (${met})` : ''}`],
+        ['crowns', 'Rival crowns'],
+        ['europe', `Europe${game.euroWars.length ? ` (${game.euroWars.length} at war)` : ''}`],
+      ]} />
       {tab === 'peoples' && <Peoples />}
       {tab === 'crowns' && <Crowns />}
+      {tab === 'europe' && <Europe />}
     </>
   );
 }
@@ -59,15 +82,17 @@ function SkillBars({ p }: { p: Person }) {
   );
 }
 
-function CourtierCard({ p, selected, onPick, note }: { p: Person; selected: boolean; onPick: () => void; note?: string }) {
+function CourtierCard({ p, onPick, note, selected }: { p: Person; onPick: () => void; note?: string; selected?: boolean }) {
   const game = useStore((s) => s.game)!;
+  const world = useStore((s) => s.world)!;
   return (
-    <button className={`courtier tone-${RANK_TONE[p.rank]} ${selected ? 'selected' : ''} ${p.alive ? '' : 'dead'}`} onClick={() => { sfx('select'); onPick(); }} aria-pressed={selected}>
+    <button className={`courtier tone-${RANK_TONE[p.rank]} ${selected ? 'selected' : ''} ${p.alive ? '' : 'dead'}`} onClick={() => { sfx('select'); onPick(); }} aria-pressed={selected} title={selected == null ? `Open ${p.name}’s window` : undefined}>
       <span className="rank-ribbon">{note ?? RANK_INFO[p.rank].name}</span>
       <Portrait p={p} turn={game.turn} />
       <b>{p.name.replace(/ (de|van) /, ' $1\u00a0')}</b>
       <span className="meta">{p.alive ? `${ageOf(p, game.turn)} · ${TRAIT_INFO[p.trait].name}` : `died ${p.died != null ? yearOf(p.died) : ''}`}</span>
       <span className="top-skills">{topSkills(p).map((k) => <span key={k} title={SKILL_INFO[k].name}><Icon name={k} size={16} tone="ink" />{p.skills[k]}</span>)}</span>
+      {p.alive && selected == null && <span className="doing">{status(game, world, p)}</span>}
     </button>
   );
 }
@@ -85,38 +110,62 @@ function status(game: ReturnType<typeof useStore.getState>['game'], world: Retur
   return `Ready in ${where}, waiting for a fleet`;
 }
 
+/** Everyone at court, grouped by what they do; each opens their own window. */
 function People() {
   const game = useStore((s) => s.game)!;
-  const order = { explorer: 0, merchant: 1, governor: 2, courtier: 3 };
-  const people = [...game.people].sort((a, b) => Number(b.alive) - Number(a.alive) || order[a.rank] - order[b.rank]);
-  const [sel, setSel] = useState<number | null>(people[0]?.id ?? null);
-  const p = people.find((x) => x.id === sel) ?? people[0];
+  const openWindow = useStore((s) => s.openWindow);
+  const alive = game.people.filter((p) => p.alive);
+  const groups: [string, Person[]][] = [
+    ['Explorers', alive.filter((p) => p.rank === 'explorer')],
+    ['Merchants', alive.filter((p) => p.rank === 'merchant')],
+    ['Governors', alive.filter((p) => p.rank === 'governor')],
+    ['Courtiers, free to commission', alive.filter((p) => p.rank === 'courtier')],
+    ['The dead', game.people.filter((p) => !p.alive)],
+  ];
   return (
-    <div className="court-split">
-      <div className="courtiers">{people.map((x) => <CourtierCard key={x.id} p={x} selected={x.id === p?.id} onPick={() => setSel(x.id)} />)}</div>
-      {p && <PersonDetail key={p.id} p={p} />}
+    <div className="people-index">
+      {groups.filter(([, ps]) => ps.length).map(([title, ps]) => (
+        <section key={title}>
+          <div className="sec">{title} <span className="count">{ps.length}</span></div>
+          <div className="courtiers">{ps.map((x) => <CourtierCard key={x.id} p={x} onPick={() => openWindow({ kind: 'person', id: x.id }, true)} />)}</div>
+        </section>
+      ))}
     </div>
   );
 }
 
-function PersonDetail({ p }: { p: Person }) {
+/** A person's own window: who they are, what they do now, and what you can make of them. */
+export function PersonWindow({ p }: { p: Person }) {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
+  const openWindow = useStore((s) => s.openWindow);
+  const fleet = p.fleet != null ? game.fleets.find((f) => f.id === p.fleet) : undefined;
+  const governs = p.rank === 'governor' && p.city ? p.city : undefined;
   return (
-    <aside className="courtier-detail detail-card">
+    <div className="person-window courtier-detail">
       <div className="who">
         <Portrait p={p} turn={game.turn} size="large" />
         <div>
           <span className={`rank-ribbon tone-${RANK_TONE[p.rank]}`}>{RANK_INFO[p.rank].name}</span>
-          <h3>{p.name}</h3>
+          <h2>{p.name}</h2>
           <div className="muted">{p.alive ? `${ageOf(p, game.turn)} years · ${TRAIT_INFO[p.trait].name} · ${Math.round(salary(p))} a season` : ''}</div>
-          <div className="status">{status(game, world, p)}{p.unitType && p.alive ? ` · with a ${UNIT_INFO[p.unitType].name.toLowerCase()}` : ''}</div>
+          <div className="status">
+            {fleet ? <>Leading <button className="link" onClick={() => openWindow({ kind: 'fleet', id: fleet.id }, true)}>{fleet.name}</button></>
+              : governs ? <>Governor of <button className="link" onClick={() => openWindow({ kind: 'city', id: governs }, true)}>{portById(world, governs)?.name}</button></>
+              : status(game, world, p)}
+            {p.unitType && p.alive ? ` · with a ${UNIT_INFO[p.unitType].name.toLowerCase()}` : ''}
+          </div>
         </div>
       </div>
-      <SkillBars p={p} />
-      <p className="trait"><b>{TRAIT_INFO[p.trait].name}.</b> {TRAIT_INFO[p.trait].blurb}</p>
-      {p.alive && <PersonActions p={p} />}
-    </aside>
+      <div className="person-cols">
+        <div>
+          <SkillBars p={p} />
+          <p className="trait"><b>{TRAIT_INFO[p.trait].name}.</b> {TRAIT_INFO[p.trait].blurb}</p>
+          <CourtierStanding p={p} />
+        </div>
+        {p.alive && <PersonActions p={p} />}
+      </div>
+    </div>
   );
 }
 
@@ -131,28 +180,44 @@ function PersonActions({ p }: { p: Person }) {
   const ungoverned = Object.values(game.cities).filter((c) => c.governor == null);
   const [city, setCity] = useState(ungoverned[0]?.id ?? '');
   const units: UnitType[] = ['colonist', 'infantry', 'missionary'];
+  const [unit, setUnit] = useState<UnitType>('colonist');
+  const [post, setPost] = useState(String(fleetsHere[0]?.id ?? ''));
+  // commissioned for a fleet: back to that fleet, where the promise shows
+  const commission = async (rank: 'explorer' | 'merchant') => {
+    const fleet = post && fleetsHere.some((f) => String(f.id) === post) ? Number(post) : undefined;
+    if (await run({ kind: 'promote', person: p.id, rank, ...(rank === 'explorer' ? { unit } : {}), ...(fleet != null ? { fleet } : {}) }) && fleet != null) { selectFleet(fleet); useStore.getState().openWindow({ kind: 'fleet', id: fleet }, true); }
+  };
   return (
     <div className="commissions">
       {p.rank === 'courtier' && atHome && (
         <>
           <div className="sec">Commission</div>
+          {fleetsHere.length > 0 && (
+            <label className="row post-to">
+              <span>Then take command of</span>
+              <select value={post} onChange={(e) => setPost(e.target.value)} aria-label="Fleet to command when ready">
+                {fleetsHere.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                <option value="">no fleet yet</option>
+              </select>
+            </label>
+          )}
           <div className="commission">
             <div className="c-head"><Icon name="navigation" size={22} tone="ink" /><b>Explorer</b><span className="cost-tag">{fmt(RANK_INFO.explorer.cost)} · 2 seasons</span></div>
-            <div className="muted small">Leads a fleet into unknown waters, with one of these at their side:</div>
+            <div className="muted small">Leads a fleet into unknown waters. One unit comes with them, free: choose which.</div>
             <div className="unit-choice">
               {units.map((u) => (
-                <button key={u} className="offer-card mini" disabled={game.treasury < RANK_INFO.explorer.cost} title={UNIT_INFO[u].blurb}
-                  onClick={() => void run({ kind: 'promote', person: p.id, rank: 'explorer', unit: u })}>
+                <button key={u} className={`offer-card mini ${unit === u ? 'selected' : ''}`} aria-pressed={unit === u} title={UNIT_INFO[u].blurb} onClick={() => setUnit(u)}>
                   <Art slot={`unit/${u}`} fallback={<img src={`${import.meta.env.BASE_URL}sprites/${UNIT_INFO[u].sprite}.png`} alt="" />} />
                   <span>{UNIT_INFO[u].name}</span>
                 </button>
               ))}
             </div>
+            <button className="adm-gold-btn" disabled={game.treasury < RANK_INFO.explorer.cost} onClick={() => commission('explorer')}>Make explorer, with {UNIT_INFO[unit].name.toLowerCase()}</button>
           </div>
           <div className="commission">
             <div className="c-head"><Icon name="commerce" size={22} tone="ink" /><b>Merchant</b><span className="cost-tag">{fmt(RANK_INFO.merchant.cost)} · 1 season</span></div>
             <div className="muted small">Leads trade fleets and runs trade routes on their own.</div>
-            <button className="adm-gold-btn" disabled={game.treasury < RANK_INFO.merchant.cost} onClick={() => void run({ kind: 'promote', person: p.id, rank: 'merchant' })}>Make merchant</button>
+            <button className="adm-gold-btn" disabled={game.treasury < RANK_INFO.merchant.cost} onClick={() => commission('merchant')}>Make merchant</button>
           </div>
           <div className="commission">
             <div className="c-head"><Icon name="construction" size={22} tone="ink" /><b>Governor</b><span className="cost-tag">free · at once</span></div>
@@ -168,13 +233,24 @@ function PersonActions({ p }: { p: Person }) {
           </div>
         </>
       )}
+      {(p.rank === 'explorer' || p.rank === 'merchant') && atHome && p.ready > 0 && (
+        <div className="commission">
+          <div className="c-head"><Icon name="fleets" size={22} tone="ink" /><b>Command when ready</b><span className="muted small">in {p.ready} season{p.ready > 1 ? 's' : ''}</span></div>
+          <div className="row">
+            {p.posted != null && game.fleets.some((f) => f.id === p.posted)
+              ? <><span>Promised {game.fleets.find((f) => f.id === p.posted)!.name}.</span><button className="small-btn" onClick={() => void run({ kind: 'post', person: p.id, fleet: null })}>Take it back</button></>
+              : fleetsHere.length ? fleetsHere.map((f) => <button key={f.id} className="adm-gold-btn" onClick={() => void run({ kind: 'post', person: p.id, fleet: f.id })}>{f.name}</button>)
+              : <span className="muted small">No fleet without a leader is in port.</span>}
+          </div>
+        </div>
+      )}
       {(p.rank === 'explorer' || p.rank === 'merchant') && atHome && p.ready === 0 && (
         <div className="commission">
           <div className="c-head"><Icon name="fleets" size={22} tone="ink" /><b>Give command</b><span className="muted small">in {portById(world, p.city!)?.name}</span></div>
           <div className="row">
             {fleetsHere.length ? fleetsHere.map((f) => (
               <button key={f.id} className="adm-gold-btn" onClick={async () => {
-                if (await run({ kind: 'assignLeader', person: p.id, fleet: f.id })) { selectFleet(f.id); set({ drawer: 'fleets' }); }
+                if (await run({ kind: 'assignLeader', person: p.id, fleet: f.id })) { selectFleet(f.id); set({ drawer: null, windows: [] }); setTimeout(() => getView()?.focusHex(f.map, f.hex), 0); }
               }}>{f.name}</button>
             )) : <span className="muted small">No fleet without a leader is in port. Merge or build one.</span>}
           </div>
@@ -226,47 +302,14 @@ function Petitioners() {
 
 export function Research() {
   const game = useStore((s) => s.game)!;
-  const run = useStore((s) => s.run);
   const r = game.research;
-  const cur = r.current ? techById(r.current) : null;
-  const learned = game.people.filter((p) => p.alive && p.trait === 'learned' && p.fleet == null).length;
+  const tab = useStore((s) => s.researchTab);
+  const set = useStore((s) => s.set);
   return (
     <div className="research">
-      <div className="research-now">
-        {cur ? (
-          <>
-            <div>Studying <b>{cur.name}</b>: {Math.floor(r.progress)} of {cur.cost}</div>
-            <div className="bar"><div style={{ width: `${Math.min(100, (r.progress / cur.cost) * 100)}%` }} /></div>
-          </>
-        ) : <div>The scholars are idle. Choose a subject below.</div>}
-        <div className="muted small">
-          The court yields {basePoints(game) + learned} points a season{learned ? ` (${learned} from learned courtiers)` : ''}. New coasts, peoples and lands charted by your explorers add more.
-        </div>
-      </div>
-      <div className="tech-columns">
-      {(['navigation', 'commerce', 'state'] as Branch[]).map((b) => (
-        <section key={b}>
-          <h3><Icon name={b === 'navigation' ? 'navigation' : b === 'commerce' ? 'commerce' : 'court'} size={22} tone="ink" />{BRANCH_NAMES[b]}</h3>
-          <div className="techs">
-            {TECHS.filter((t) => t.branch === b).map((t) => {
-              const known = has(game, t.id);
-              const open = techAvailable(game, t.id);
-              const now = r.current === t.id;
-              return (
-                <div key={t.id} className={`tech ${known ? 'known' : open ? 'open' : 'locked'} ${now ? 'now' : ''}`}>
-                  <div className="tech-head"><b>{t.name}</b><span className="muted small">{known ? 'known' : `${t.cost} points`}</span></div>
-                  <div className="small">{t.effect}</div>
-                  <div className="muted small"><i>{t.blurb}</i></div>
-                  {!known && t.requires.length > 0 && <div className="muted small">Needs {t.requires.map((x) => techById(x).name).join(' and ')}.</div>}
-                  {!known && open && !now && <button onClick={() => void run({ kind: 'research', tech: t.id })}>Study this</button>}
-                  {now && <div className="small"><b>Being studied</b></div>}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-      </div>
+      <Tabs value={tab} onChange={(t) => set({ researchTab: t })} tabs={[['subjects', `Subjects (${r.known.length} of ${TECHS.length})`], ['laws', `Laws (${game.laws.length})`], ['expedition', `Expedition${game.expedition ? ' (in the field)' : ''}`]]} />
+      {tab !== 'subjects' && <LawsAndExpedition show={tab} />}
+      {tab === 'subjects' && <TechTree />}
     </div>
   );
 }
@@ -276,6 +319,7 @@ export function Chronicle() {
   let lastTurn = -1;
   return (
     <div className="entries">
+      <ReignHistory />
       {[...game.chronicle].reverse().map((c, i) => {
         const head = c.turn !== lastTurn;
         lastTurn = c.turn;
@@ -319,6 +363,10 @@ function Peoples() {
                 <span className="person-status small">
                   About {populationOf(n, st)} people, {st.warriors} warriors · {villages} village{villages === 1 ? '' : 's'}{st.epidemic ? ' · struck by sickness' : ''}
                   {st.post ? ' · trading post' : ''}{st.mission ? ` · mission (${Math.round(st.converted * 100)}% won over)` : ''}
+                  {(() => { const foe = st.feud ? allNations(world).find((x) => x.id === st.feud!.with) : undefined; return foe ? ` · at war with the ${foe.people}` : ''; })()}
+                  {(() => { const f = friendOf(st); return f ? ` · friends of ${rivalSpec(f).name}` : ''; })()}
+                  {(() => { const a = st.pact ? allNations(world).find((x) => x.id === st.pact) : undefined; return a ? ` · sworn to the ${a.people}` : ''; })()}
+                  {(Object.entries(st.crowns) as [typeof game.crown, number][]).filter(([, a]) => a <= RIVAL_ECON.peopleAngry).map(([c]) => ` · angry with ${rivalSpec(c).name}`).join('')}
                 </span>
               </div>
               <div className="person-actions">
@@ -382,6 +430,7 @@ function Crowns() {
           ))}
         </tbody>
       </table>
+      <Races />
       <ul className="realm-cards">
         {rivalsOf(game.crown).map((r) => {
           const st = game.rivals[r.id];
@@ -398,7 +447,10 @@ function Crowns() {
               </div>
               <div className="person-actions">
                 <div className="muted small">
-                  {war ? 'Their privateers hunt your ships and they raid colonies near theirs. A party beside one of their colonies can storm it.' : 'Settling close to their colonies sours relations; below −50 they may declare war.'}
+                  <b>{rivalDoing(game, r.id)}.</b> {st.built} ship{st.built === 1 ? '' : 's'}, {st.hulls} in port · treasury {st.treasury < 200 ? 'thin' : st.treasury < 1200 ? 'sound' : 'full'}
+                  {st.wars.length ? ` · at war with ${st.wars.map((c) => rivalSpec(c).name).join(' and ')}` : ''}
+                  {st.volta ? ' · their pilots know the ocean crossing' : ' · their pilots are still learning the ocean crossing'}.{' '}
+                  {war ? 'Their privateers hunt your ships, and their soldiers sail from their colonies to land at yours: watch for their ships. A party beside one of their colonies can storm it.' : 'Settling close to their colonies sours relations; below −50 they may declare war.'}
                   {r.id === 'portugal' && game.turn > 6 ? ' Under the Treaty of Tordesillas, they resent colonies on the African coast.' : ''}
                 </div>
                 <div className="row">

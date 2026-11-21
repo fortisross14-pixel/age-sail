@@ -39,6 +39,25 @@ export const SHIPS: Record<ShipType, ShipSpec> = {
   },
 };
 
+/**
+ * The crossing once the ocean winds are understood (before that the open ocean has its own, far
+ * worse, rules). A quick passage is not a safe one: a storm on the way damages a ship, and a ship
+ * never mended sinks in the end; a good navigator reads the sky; and a crew will not leave land
+ * behind with thin stores.
+ */
+export const CROSSING = {
+  /** chance of a storm on one crossing */
+  storm: 0.12,
+  /** each point of the leader's navigation takes this share off it */
+  pilot: 0.12,
+  /** summer and autumn below 30 degrees: the hurricane months */
+  hurricane: 2,
+  /** with fewer seasons of stores than this aboard, the crew may refuse to sail */
+  thinStores: 3,
+  /** chance that they do; each point of the leader's navigation and military skill takes 0.05 off */
+  mutiny: 0.5,
+};
+
 export const SHIP_NAMES = [
   'Santa María', 'San Gabriel', 'La Niña', 'Pinta', 'San Juan', 'Trinidad', 'Concepción', 'Victoria',
   'San Antonio', 'Santiago', 'La Gallega', 'San Cristóbal', 'Santa Clara', 'Espíritu Santo', 'San Pedro',

@@ -1,5 +1,7 @@
 /** Colonies: founding them, working the land around them, feeding and clothing the settlers, growing. */
 import { GOODS, GOOD_INFO, NEEDS, LUXURIES, LUXURY_NEED, type GoodId } from '../data/goods';
+import { SLAVERY } from '../data/slavery';
+import { knowledgeMods } from './dynasty';
 import { cityById } from '../data/europe';
 import { RESOURCE_IDS } from '../data/city';
 import { T, isWater } from '../data/terrain';
@@ -9,6 +11,7 @@ import { personById, skill } from './court';
 import { emptyAccount, type Colony, type ColonyLevel, type Fleet, type GameState, type MapId, type Party, type PortDef, type World } from './types';
 import * as Nat from './natives';
 import { DEMOGRAPHY, SEASONING, GARRISON_FOOD, NATIVE } from '../data/colony';
+import { PRESTIGE, VICTORY, SCORE } from '../data/scenarios';
 import { TOOL_WEAR } from '../data/trade';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -90,8 +93,10 @@ export function workPlan(world: World, s: GameState, c: Colony) {
   let food = 2; // the colony's own fields
   const used = new Set<number>();
   // feed everyone first: settlers, newcomers, and the soldiers and friars of the garrison
-  const mouths = (c.pop + c.newcomers) * NEEDS.food + s.units.filter((u) => u.colony === c.id).length * GARRISON_FOOD;
-  while (worked.length < c.pop && food < mouths) {
+  const held = c.enslaved ?? 0;
+  const hands = c.pop + held;
+  const mouths = (c.pop + c.newcomers) * NEEDS.food + held * NEEDS.food * SLAVERY.food + s.units.filter((u) => u.colony === c.id).length * GARRISON_FOOD;
+  while (worked.length < hands && food < mouths) {
     let best: { h: number; amount: number } | null = null;
     for (const t of tiles) {
       if (used.has(t.h)) continue;
@@ -105,7 +110,7 @@ export function workPlan(world: World, s: GameState, c: Colony) {
   }
   // then for the most valuable goods; building materials count double while the colony needs them
   const next = LEVELS[c.level].next ? LEVELS[c.level].needs : {};
-  while (worked.length < c.pop) {
+  while (worked.length < hands) {
     let best: { h: number; good: GoodId; amount: number; v: number } | null = null;
     for (const t of tiles) {
       if (used.has(t.h)) continue;
@@ -171,6 +176,12 @@ export function colonySeason(world: World, s: GameState, c: Colony, log: (text: 
     s.units = s.units.filter((u) => u !== gone);
     log(`There is no bread for the garrison of ${c.name}. A ${gone.type === 'infantry' ? 'company of soldiers' : 'friar'} gives up and leaves.`, 'peril');
   }
+  // the enslaved are fed after the garrison and before nobody: when there is no food, they die or run first
+  const held = c.enslaved ?? 0;
+  if (held && !take('food', held * NEEDS.food * SLAVERY.food)) {
+    c.enslaved = held - 1;
+    log(`There is no food for the enslaved of ${c.name}. One dies; the others will not last.`, 'peril');
+  }
   const fed = take('food', c.pop * NEEDS.food);
   const clothed = take('cloth', c.pop * NEEDS.cloth);
   const drink = take('wine', c.pop * NEEDS.wine);
@@ -193,7 +204,7 @@ export function colonySeason(world: World, s: GameState, c: Colony, log: (text: 
     else log(`${c.name} is starving. Send food, or the outpost will not last.`, 'peril');
     c.growth = Math.min(0, c.growth);
   }
-  c.growth += c.pop * (births - deaths) / 4;
+  c.growth += c.pop * (births * knowledgeMods(s).growth - deaths) / 4;
   const cap = LEVELS[c.level].cap;
   if (c.growth >= 1) {
     if (c.pop < cap) {
@@ -274,7 +285,7 @@ export function foundColony(world: World, s: GameState, p: Party): Result & { co
   // the founder stays aboard the fleet if it has no leader; otherwise in the colony as its first governor (for the record)
   if (leader && f.leader == null) { f.leader = leader.id; leader.fleet = f.id; }
   s.parties = s.parties.filter((x) => x !== p);
-  s.prestige += 15;
+  s.prestige += PRESTIGE.colonyFounded;
   return { ok: true, colony: c, message: `${c.name} is founded with ${c.pop} colonist${c.pop > 1 ? 's' : ''}.` };
 }
 
@@ -286,7 +297,7 @@ export function upgradeColony(s: GameState, c: Colony): Result {
   for (const [g, n] of Object.entries(L.needs)) if ((c.stock[g as GoodId] ?? 0) < n!) return fail(`${c.name} needs ${n} ${GOOD_INFO[g as GoodId].name.toLowerCase()} in its warehouse.`);
   for (const [g, n] of Object.entries(L.needs)) c.stock[g as GoodId] = (c.stock[g as GoodId] ?? 0) - n!;
   c.level = L.next;
-  s.prestige += 10;
+  s.prestige += PRESTIGE.colonyRaised;
   return { ok: true, message: `${c.name} is now a ${LEVELS[c.level].name.toLowerCase()}.` };
 }
 
@@ -327,6 +338,6 @@ export function score(s: GameState, w?: World) {
   // the lands of peoples who are subjects of the Crown count too
   if (w) for (const n of [...w.old.nations, ...w.new.nations]) if (s.natives[n.id]?.relation === 'subject') for (const h of Nat.territory(n)) hexes.add(`${n.map}:${h}`);
   const territory = hexes.size;
-  const commerce = Math.floor(s.revenue / 200);
-  return { pop, territory, commerce, total: pop * 10 + territory * 2 + commerce };
+  const commerce = Math.floor(s.revenue * VICTORY.salesAsProfit / SCORE.sales);
+  return { pop, territory, commerce, total: pop * SCORE.colonist + territory * SCORE.territory + commerce };
 }

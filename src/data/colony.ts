@@ -6,7 +6,7 @@
 /** Births and deaths, as shares of the colony a year. Natural growth is slow: settlers come from home. */
 export const DEMOGRAPHY = {
   /** births among fed settlers */
-  births: 0.035,
+  births: 0.05,
   /** more when the harvest leaves half a ration spare for everyone */
   plentyBirths: 0.015,
   /** sugar, tobacco or cacao on the table */
@@ -38,8 +38,12 @@ export const NATIVE = {
   /** food a friendly (allied) people trades to each colony near them each season */
   friendFood: 1,
   allyFood: 2,
+  /** what settlers on a people's land cost in their regard each season: allied, with a post or mission, otherwise */
+  crowding: [0.5, 1, 1.6] as [number, number, number],
+  /** chance a season that a hostile people raids each colony within reach */
+  raidChance: 0.12,
   /** chance a season that a furious people lays siege to the weakest colony near them */
-  siegeChance: 0.25,
+  siegeChance: 0.12,
   /** warriors it takes */
   siegeWarriors: 6,
   /** seasons before the besiegers go home for their own harvest */
@@ -52,3 +56,23 @@ export const NATIVE = {
 
 /** A colony's defence: soldiers count four, settlers a little, walls by level. */
 export const DEFENCE = { soldier: 4, settler: 0.6, base: 1, town: 2, city: 4 };
+
+/** Wars between peoples who are rivals, without anyone inciting them. Provisional numbers. */
+export const NATIVE_FEUD = {
+  /** chance each spring that a people goes to war with one of its rivals */
+  chance: 0.06,
+  /** chance a season that each side loses a warrior in skirmishes */
+  skirmish: 0.3,
+  /** chance a season of the battle that ends it; it ends anyway after `longest` seasons */
+  battle: 0.1,
+  longest: 12,
+  /** the loser keeps this share of its warriors */
+  defeat: 0.75,
+  /** chance each spring that two peoples with a common enemy make a pact; an ally's warriors count for this share */
+  pact: 0.05,
+  allyShare: 0.5,
+  /** a loser with fewer than this share of its first strength abandons a village */
+  flee: 0.5,
+  /** a furious people with fewer warriors than this gives ground to settlers instead of fighting */
+  crowded: 4,
+};
