@@ -31,7 +31,9 @@ export type EraGoal = { kind: 'revenue' | 'colonists' | 'prestige' | 'territory'
 
 /**
  * A path for an era: a lasting advantage while the era lasts, and a goal. Each new era offers
- * three. Meeting the goal by the end of the era pays `ERA_REWARD` prestige. Provisional numbers.
+ * three. Meeting the goal by the end of the era pays `ERA_REWARD` prestige. The goals are
+ * totals since the start of the game, set in the balance pass a little above what the harness's bot
+ * has when each era ends, so that a promise is kept by intent and not by default.
  */
 export interface EraPath {
   id: string;
@@ -46,23 +48,23 @@ export const ERA_REWARD = 30;
 
 export const ERA_PATHS: Record<string, EraPath[]> = {
   conquest: [
-    { id: 'sword', name: 'The sword', blurb: 'Soldiers are the cheapest way to an empire. Your captains are promised land and titles.', mod: { upkeep: 0.8 }, goal: { kind: 'prestige', need: 40 } },
-    { id: 'cross', name: 'The cross', blurb: 'The friars go first, and the settlers follow them. Colonies that hear Mass stay loyal.', mod: { loyalty: 6 }, goal: { kind: 'colonists', need: 10 } },
-    { id: 'ledger', name: 'The ledger', blurb: 'Let others take cities. You will take their trade, and tax it.', mod: { taxes: 1.1 }, goal: { kind: 'revenue', need: 15000 } },
+    { id: 'sword', name: 'The sword', blurb: 'Soldiers are the cheapest way to an empire. Your captains are promised land and titles.', mod: { upkeep: 0.8 }, goal: { kind: 'prestige', need: 180 } },
+    { id: 'cross', name: 'The cross', blurb: 'The friars go first, and the settlers follow them. Colonies that hear Mass stay loyal.', mod: { loyalty: 6 }, goal: { kind: 'colonists', need: 50 } },
+    { id: 'ledger', name: 'The ledger', blurb: 'Let others take cities. You will take their trade, and tax it.', mod: { taxes: 1.1 }, goal: { kind: 'revenue', need: 600000 } },
   ],
   plantations: [
-    { id: 'estates', name: 'Great estates', blurb: 'Grant the land in great parcels to those who will make it pay.', mod: { taxes: 1.12 }, goal: { kind: 'revenue', need: 30000 } },
-    { id: 'towns', name: 'Free towns', blurb: 'Councils, markets and schools: settlers who feel at home do not dream of leaving you.', mod: { loyalty: 8 }, goal: { kind: 'colonists', need: 25 } },
-    { id: 'fleets', name: 'Royal fleets', blurb: 'Convoys under your flag, and yards that never stand idle.', mod: { upkeep: 0.8 }, goal: { kind: 'territory', need: 30 } },
+    { id: 'estates', name: 'Great estates', blurb: 'Grant the land in great parcels to those who will make it pay.', mod: { taxes: 1.12 }, goal: { kind: 'revenue', need: 1200000 } },
+    { id: 'towns', name: 'Free towns', blurb: 'Councils, markets and schools: settlers who feel at home do not dream of leaving you.', mod: { loyalty: 8 }, goal: { kind: 'colonists', need: 80 } },
+    { id: 'fleets', name: 'Royal fleets', blurb: 'Convoys under your flag, and yards that never stand idle.', mod: { upkeep: 0.8 }, goal: { kind: 'territory', need: 120 } },
   ],
   trade: [
-    { id: 'companies', name: 'Chartered companies', blurb: 'Merchants who share the risk, and the Crown that shares the profit.', mod: { taxes: 1.15 }, goal: { kind: 'revenue', need: 60000 } },
-    { id: 'academies', name: 'Academies', blurb: 'Astronomers, botanists and engineers at your expense, and in your service.', mod: { research: 3 }, goal: { kind: 'prestige', need: 60 } },
-    { id: 'forts', name: 'Convoys and forts', blurb: 'What is yours will be held, on every coast.', mod: { upkeep: 0.8 }, goal: { kind: 'territory', need: 40 } },
+    { id: 'companies', name: 'Chartered companies', blurb: 'Merchants who share the risk, and the Crown that shares the profit.', mod: { taxes: 1.15 }, goal: { kind: 'revenue', need: 2000000 } },
+    { id: 'academies', name: 'Academies', blurb: 'Astronomers, botanists and engineers at your expense, and in your service.', mod: { research: 3 }, goal: { kind: 'prestige', need: 400 } },
+    { id: 'forts', name: 'Convoys and forts', blurb: 'What is yours will be held, on every coast.', mod: { upkeep: 0.8 }, goal: { kind: 'territory', need: 160 } },
   ],
   empire: [
-    { id: 'reform', name: 'Reform', blurb: 'Lighter hands, fairer courts, and seats for the colonists at your table.', mod: { loyalty: 10 }, goal: { kind: 'colonists', need: 40 } },
-    { id: 'mercantile', name: 'The mercantile laws', blurb: 'The colonies exist to enrich the mother country, and the law will say so.', mod: { taxes: 1.18, loyalty: -5 }, goal: { kind: 'revenue', need: 100000 } },
-    { id: 'army', name: 'A standing army', blurb: 'Regiments in every colony, paid for by the colonies.', mod: { upkeep: 0.75 }, goal: { kind: 'prestige', need: 80 } },
+    { id: 'reform', name: 'Reform', blurb: 'Lighter hands, fairer courts, and seats for the colonists at your table.', mod: { loyalty: 10 }, goal: { kind: 'colonists', need: 130 } },
+    { id: 'mercantile', name: 'The mercantile laws', blurb: 'The colonies exist to enrich the mother country, and the law will say so.', mod: { taxes: 1.18, loyalty: -5 }, goal: { kind: 'revenue', need: 3000000 } },
+    { id: 'army', name: 'A standing army', blurb: 'Regiments in every colony, paid for by the colonies.', mod: { upkeep: 0.75 }, goal: { kind: 'prestige', need: 550 } },
   ],
 };

@@ -20,7 +20,7 @@ export function races(w: World, s: GameState) {
   const mine = score(s, w);
   const empire = (pop: number, land: number) => Math.min(pop / (VICTORY.empire.colonists * k), land / (VICTORY.empire.territory * k));
   const row = (kind: VictoryKind) => {
-    const me = kind === 'trade' ? s.revenue / (VICTORY.trade * k) : kind === 'empire' ? empire(mine.pop, mine.territory) : s.prestige / VICTORY.prestige;
+    const me = kind === 'trade' ? s.revenue * VICTORY.salesAsProfit / (VICTORY.trade * k) : kind === 'empire' ? empire(mine.pop, mine.territory) : s.prestige / (VICTORY.prestige * (0.5 + 0.5 * k));
     const others = kind === 'prestige' ? [] : rivalsOf(s.crown).map((r) => {
       const sc = rivalScore(s, r.id);
       return { crown: r.id, share: kind === 'trade' ? s.rivals[r.id].revenue / (VICTORY.trade * k) : empire(sc.pop, sc.territory) };

@@ -57,7 +57,7 @@ export function Hud() {
       </div>
       <span className="hud-sep" />
       <button className="stat plain" onClick={() => goTo({ drawer: 'court', courtTab: 'crowns' })}
-        title={`Score: ${sc.pop} colonists ×10, ${sc.territory} hexes of territory ×2, ${sc.commerce} from ${fmt(game.revenue)} ducats of sales`}>
+        title={`Score: ${sc.pop} colonists ×10, ${sc.territory} hexes of territory ×2, ${sc.commerce} from ${fmt(game.revenue)} ducats of sales (a fifth of them reckoned as profit, 1 point for every 200)`}>
         <Medal name="court" size={44} fallback={<Icon name="court" size={30} />} />
         <div><div className="stat-value">{fmt(sc.total)}</div><div className="stat-label">score ({ORDINAL[rank - 1]} of 5)</div></div>
       </button>

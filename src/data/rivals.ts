@@ -62,13 +62,13 @@ export const CROWNS: RivalSpec[] = [
   },
   {
     id: 'england', name: 'England', people: 'the English', home: 'london', volta: 32, pace: 11, start: 10,
-    prefer: { old: [5, 20], new: [33, 55] }, trade: 0.2, war: 1.3,
+    prefer: { old: [5, 20], new: [30, 55] }, trade: 0.2, war: 1.3,
     blurb: 'Late to the sea, but their colonies grow fast once planted.',
     edge: { label: 'Ships fight with half as many guns again at sea.', guns: 1.5 },
   },
   {
-    id: 'france', name: 'France', people: 'the French', home: 'larochelle', volta: 36, pace: 13, start: 14,
-    prefer: { old: [5, 20], new: [40, 55] }, trade: 0.6, war: 1,
+    id: 'france', name: 'France', people: 'the French', home: 'larochelle', volta: 34, pace: 12, start: 12,
+    prefer: { old: [5, 20], new: [26, 55] }, trade: 0.6, war: 1,
     blurb: 'The most populous kingdom in Europe, with a large court and a talent for alliances.',
     edge: { label: 'Two more courtiers, and gifts to native peoples count half as much again.', court: 2, gifts: 1.5 },
   },
@@ -114,14 +114,18 @@ export const RIVAL_ECON = {
   supplyFull: 16,
   supplyLow: 5,
   /** a supplied colony's growth a season (a convoy also lands a settler); an unsupplied one shrinks */
-  births: 0.05,
+  births: 0.015,
+  /** a convoy lands a settler only while the colony is smaller than this: after that it grows by its own births */
+  convoySettlers: 10,
+  /** chance a season that a full, supplied colony is raised to the next level (it was 0.25: every rival colony was a full city by 1600) */
+  raise: 0.05,
   want: 0.08,
   /** share of its produce an unsupplied colony still grows */
   wantWork: 0.4,
   /** chance a season that the last settler of an unsupplied colony gives up */
   abandon: 0.1,
   /** what is left of a cargo's sale after the voyage is paid for: their profit, and their commerce score */
-  margin: 0.2,
+  margin: 0.17,
   /** chance a season that a ship at sea is lost (twice that across the ocean) */
   wreck: 0.008,
   /** ducats a season a crown pays its pilots to study the ocean crossing; it is learned after `volta` seasons of study */

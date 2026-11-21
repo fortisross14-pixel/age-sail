@@ -6,7 +6,7 @@
 /** Births and deaths, as shares of the colony a year. Natural growth is slow: settlers come from home. */
 export const DEMOGRAPHY = {
   /** births among fed settlers */
-  births: 0.035,
+  births: 0.05,
   /** more when the harvest leaves half a ration spare for everyone */
   plentyBirths: 0.015,
   /** sugar, tobacco or cacao on the table */
@@ -38,8 +38,12 @@ export const NATIVE = {
   /** food a friendly (allied) people trades to each colony near them each season */
   friendFood: 1,
   allyFood: 2,
+  /** what settlers on a people's land cost in their regard each season: allied, with a post or mission, otherwise */
+  crowding: [0.5, 1, 1.6] as [number, number, number],
+  /** chance a season that a hostile people raids each colony within reach */
+  raidChance: 0.12,
   /** chance a season that a furious people lays siege to the weakest colony near them */
-  siegeChance: 0.25,
+  siegeChance: 0.12,
   /** warriors it takes */
   siegeWarriors: 6,
   /** seasons before the besiegers go home for their own harvest */

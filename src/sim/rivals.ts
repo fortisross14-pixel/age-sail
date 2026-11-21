@@ -5,6 +5,7 @@
  * what the ships bring. The crowns also quarrel among themselves, and the peoples judge each of them.
  * They still learn the ocean crossing on a schedule (`volta`).
  */
+import { SCORE } from '../data/scenarios';
 import { CROWNS, RIVAL_ECON, SHIP_NAMES_BY_CROWN, rivalSpec, rivalsOf, type CrownId, type RivalSpec } from '../data/rivals';
 import { RIVAL_TRADE } from '../data/trade';
 import type { GoodId } from '../data/goods';
@@ -164,7 +165,7 @@ function reachHome(s: GameState, ship: RivalShip) {
   const here = m ? Math.max(0, Math.min(qty, Math.round(m.ref * RIVAL_TRADE.fill - m.stock))) : 0;
   let value = m ? sellValue(m, here, 0.1) + (qty - here) * m.base * 0.6 : qty * 40;
   if (m) m.stock += here;
-  value = Math.round(value * E.margin);
+  value = Math.round(value * E.margin * difficultySpec(s.difficulty).rivalGrowth);
   r.treasury += value;
   r.revenue += value;
 }
@@ -362,7 +363,11 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
       }
       // ships in your own home ports are safe under the harbour guns
       const safe = prey.at != null && !!s.cities[prey.at];
-      if (g.distance(prey.hex, ship.hex) <= 1 && !safe) seaBattle(s, prey, ship, rng, log, ev, onFleetLost);
+      if (g.distance(prey.hex, ship.hex) <= 1 && !safe) {
+        seaBattle(s, prey, ship, rng, log, ev, onFleetLost);
+        // a fight is a cruise: with a prize or a beating, she makes for home
+        if (s.rivalShips.includes(ship)) turnHome(w, s, ship);
+      }
       continue;
     }
     if (ship.kind === 'army') {
@@ -406,7 +411,7 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
       const c = s.rivalColonies.find((x) => x.crown === ship.crown && x.map === ship.map && x.hex === ship.target);
       if (c) {
         c.supply = E.supplyFull;
-        if (c.pop < LEVELS[c.level].cap) c.pop++;
+        if (c.pop < Math.min(LEVELS[c.level].cap, E.convoySettlers)) c.pop++;
         // the colony's produce goes home in the same ship
         const qty = Math.round(c.stock);
         if (qty > 0) { ship.cargo = { good: colonyGood(c), qty }; c.stock -= qty; }
@@ -424,7 +429,7 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
     c.supply = Math.max(0, c.supply - 1);
     const supplied = c.supply > 0;
     c.stock += c.pop * RIVAL_TRADE.perSettler * (supplied ? 1 : E.wantWork);
-    c.growth += supplied ? E.births : -E.want;
+    c.growth += supplied ? E.births * difficultySpec(s.difficulty).rivalGrowth : -E.want;
     if (c.growth >= 1) { c.growth = c.pop < LEVELS[c.level].cap ? c.growth - 1 : 1; if (c.pop < LEVELS[c.level].cap) c.pop++; }
     if (c.growth <= -1) { c.growth += 1; if (c.pop > 1) c.pop--; }
     if (!supplied && c.pop <= 1 && rng() < E.abandon) {
@@ -432,7 +437,7 @@ export function rivalsSeason(w: World, s: GameState, log: Log, ev: Ev, onFleetLo
       if (c.seen) log('discovery', `${c.name}, the colony of ${spec.name}, lies abandoned: no ship came, and the last settlers are gone.`);
       continue;
     }
-    if (c.pop >= LEVELS[c.level].cap && LEVELS[c.level].next && supplied && rng() < 0.25) { c.level = LEVELS[c.level].next!; c.garrison++; }
+    if (c.pop >= LEVELS[c.level].cap && LEVELS[c.level].next && supplied && rng() < E.raise * difficultySpec(s.difficulty).rivalGrowth) { c.level = LEVELS[c.level].next!; c.garrison++; }
     if (!c.seen && seen(s, c.map, c.hex)) {
       c.seen = true;
       log('discovery', `Your sailors sight ${c.name}, a colony of ${spec.name}${c.map === 'new' ? ' across the ocean' : ' on the African coast'}.`);
@@ -493,8 +498,8 @@ export function intercept(w: World, s: GameState, f: Fleet, shipId: number, rng:
     message = report.escaped ? 'Beaten off: the fleet gets away, battered.' : 'The fight goes against you.';
   }
   if (report.attackerWon) for (const x of f.ships) x.hull = Math.max(10, x.hull - int(rng, 3, 18));
-  log('peril', text);
-  ev({ kind: 'battle', title: report.attackerWon ? 'Victory at sea' : 'Beaten at sea', map: ship.map, hex: ship.hex, text, sea: report });
+  if (text) log('peril', text);
+  ev({ kind: 'battle', title: report.attackerWon ? 'Victory at sea' : 'Beaten at sea', map: ship.map, hex: ship.hex, text: text || `The ${ship.name} of ${spec.name} takes ${f.name}: the last of her ships strikes her colours.`, sea: report });
   return { ok: true, message };
 }
 
@@ -671,7 +676,7 @@ function fleetBeaten(f: Fleet, escaped: boolean, rng: Rng, onFleetLost: (f: Flee
   const lost = f.ships[int(rng, 0, f.ships.length - 1)];
   f.ships = f.ships.filter((x) => x !== lost);
   for (const k of Object.keys(f.cargo) as (keyof Fleet['cargo'])[]) f.cargo[k] = Math.floor((f.cargo[k] ?? 0) / 2);
-  if (!f.ships.length) { onFleetLost(f, `${Cap(by)} takes the ${lost.name}, the last ship of ${f.name}.`); return `${Cap(by)} takes the ${lost.name}, the last ship of ${f.name}.`; }
+  if (!f.ships.length) { onFleetLost(f, `${Cap(by)} takes the ${lost.name}, the last ship of ${f.name}.`); return ''; }
   f.crew = Math.max(1, f.crew - SHIPS[lost.type].crew);
   return `${Cap(by)} takes the ${lost.name} from ${f.name}, with half the cargo.`;
 }
@@ -690,8 +695,8 @@ function seaBattle(s: GameState, f: Fleet, ship: RivalShip, rng: Rng, log: Log, 
     }
     for (const x of f.ships) x.hull = Math.max(10, x.hull - int(rng, 5, 25));
   } else text = fleetBeaten(f, report.escaped, rng, onFleetLost, `a ${spec.name} privateer`);
-  log('peril', text);
-  ev({ kind: 'battle', title: report.attackerWon ? 'Beaten at sea' : 'A privateer beaten', map: ship.map, hex: ship.hex, text, sea: report });
+  if (text) log('peril', text);
+  ev({ kind: 'battle', title: report.attackerWon ? 'Beaten at sea' : 'A privateer beaten', map: ship.map, hex: ship.hex, text: text || `A ${spec.name} privateer takes ${f.name}: the last of her ships strikes her colours.`, sea: report });
 }
 
 // ---------- commands ----------
@@ -782,8 +787,8 @@ export function rivalScore(s: GameState, crown: CrownId) {
   const cols = s.rivalColonies.filter((c) => c.crown === crown);
   const pop = cols.reduce((t, c) => t + c.pop, 0);
   const territory = new Set(cols.flatMap((c) => GRIDS[c.map].within(c.hex, LEVELS[c.level].radius).map((h) => `${c.map}:${h}`))).size;
-  const commerce = Math.floor(s.rivals[crown].revenue / 200);
-  return { pop, territory, commerce, total: pop * 10 + territory * 2 + commerce, colonies: cols.length };
+  const commerce = Math.floor(s.rivals[crown].revenue / SCORE.sales);
+  return { pop, territory, commerce, total: pop * SCORE.colonist + territory * SCORE.territory + commerce, colonies: cols.length };
 }
 
 export { type Grid };

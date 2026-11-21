@@ -11,6 +11,7 @@ import { mulberry32, hashSeed, int, pick, type Rng } from './rng';
 import { personById, skill } from './court';
 import type { Colony, Fleet, GameEvent, GameState, NationDef, NativeState, Party, World, MapId, Person, Stance, Unit } from './types';
 import { NATIVE, NATIVE_FEUD } from '../data/colony';
+import { PRESTIGE } from '../data/scenarios';
 import { takeCaptives } from './slavery';
 import { seasonOf } from './types';
 import { COMBAT } from '../data/army';
@@ -242,7 +243,7 @@ export function tradingPost(w: World, s: GameState, f: Fleet): Result {
   for (const [g, q] of needs) { f.cargo[g] = (f.cargo[g] ?? 0) - q; if (!f.cargo[g]) delete f.cargo[g]; }
   st.post = true;
   remember(s, st, 'The trading post', 10);
-  s.prestige += 5;
+  s.prestige += PRESTIGE.tradingPost;
   return { ok: true, message: `A trading post rises beside the ground of ${nameOf(n)}. Trade will grow.` };
 }
 
@@ -451,7 +452,7 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
     // colonies on their land wear them down; friends trade them food
     const near = s.colonies.filter((c) => c.map === n.map && g.within(c.hex, 2).some((h) => land.has(h)));
     for (const c of near) {
-      const k = st.relation === 'allied' ? 0.5 : st.post || st.mission ? 1 : 2.5;
+      const k = st.relation === 'allied' ? NATIVE.crowding[0] : st.post || st.mission ? NATIVE.crowding[1] : NATIVE.crowding[2];
       if (st.relation !== 'subject') remember(s, st, `Settlers at ${c.name} on their land`, -k);
       const friendly = st.relation === 'allied' || st.relation === 'subject' || (st.relation === 'peace' && st.attitude >= NATIVE.friendly);
       if (friendly && !st.siege) c.stock.food = (c.stock.food ?? 0) + (st.relation === 'peace' ? NATIVE.friendFood : NATIVE.allyFood);
@@ -495,7 +496,7 @@ export function nativesSeason(w: World, s: GameState, log: Log, _ev: Ev) {
     }
     // otherwise they raid colonies near their land
     for (const c of reach) {
-      if (rng() > 0.3) continue;
+      if (rng() > NATIVE.raidChance) continue;
       const r = assaultColony(s, c, nativeForce(n, st, 0.5), w[c.map].terrain[c.hex], rng);
       st.warriors = Math.max(1, Math.round(st.warriors - st.warriors * 0.5 * r.lost));
       if (r.win) {

@@ -1,4 +1,5 @@
 /** Parties ashore: landing, walking, surveying for resources, following rumours, and boarding again. */
+import { PRESTIGE } from '../data/scenarios';
 import { T, isWater } from '../data/terrain';
 import { UNIT_INFO } from '../data/court';
 import { UNIT_SPECS, RESOURCES, RESOURCE_IDS } from '../data/city';
@@ -88,7 +89,7 @@ export function surveyAround(world: World, s: GameState, p: Party, log: (kind: '
     if (!r) continue;
     const id = RESOURCE_IDS[r - 1];
     s.finds.push({ map: p.map, hex: h, resource: id, turn: s.turn, by: who });
-    s.prestige += id === 'gold' || id === 'silver' ? 5 : 2;
+    s.prestige += id === 'gold' || id === 'silver' ? PRESTIGE.find[0] : PRESTIGE.find[1];
     addResearch(1);
     if (leader) leader.discoveries += 3;
     found.push(RESOURCES[id].name.toLowerCase());

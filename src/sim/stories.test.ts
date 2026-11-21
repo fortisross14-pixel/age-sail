@@ -263,7 +263,7 @@ describe('Phase 3: the age, the land and the record', () => {
     expect(state.eraPath?.path).toBe(ERA_PATHS.conquest[0].id);
     expect(realmMods(state).upkeep).toBeCloseTo(0.8);
     expect(eraProgress(world, state)?.need).toBe(ERA_PATHS.conquest[0].goal.need);
-    state.prestige += 100;
+    state.prestige += ERA_PATHS.conquest[0].goal.need;
     state.turn = (1570 - 1492) * 4 - 1;
     const before = state.prestige;
     seasonTick(world, state);

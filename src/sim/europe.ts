@@ -169,7 +169,7 @@ function corsairs(w: World, s: GameState, rng: Rng, log: Log, onFleetLost: (f: F
         f.ships = f.ships.filter((x) => x !== lost);
         for (const k of Object.keys(f.cargo) as (keyof Fleet['cargo'])[]) f.cargo[k] = Math.floor((f.cargo[k] ?? 0) / 2);
         log('peril', `Corsairs of ${name(realm)} take the ${lost.name} from ${f.name}, with half the cargo. Tribute or a treaty would stop them.`);
-      } else if (rng() < 0.4) onFleetLost(f, `Corsairs of ${name(realm)} take ${f.name}, ship, cargo and crew.`);
+      } else if (rng() < D.corsairTakes) onFleetLost(f, `Corsairs of ${name(realm)} take ${f.name}, ship, cargo and crew.`);
       else {
         for (const k of Object.keys(f.cargo) as (keyof Fleet['cargo'])[]) f.cargo[k] = 0;
         for (const x of f.ships) x.hull = Math.max(10, x.hull - 25);

@@ -149,9 +149,20 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
 
 - Tuning numbers belong in `src/data/` (goods, ships, tech, city, rivals, eras), not inline in
   `src/sim/`. When you touch an inline number, move it out.
-- Check balance headlessly with the scripts in `tools/` (`rivals.ts`, `voyage.ts`, `colony.ts`,
-  `crossing.ts`, `seed-sweep.ts`, `audit-perf.ts`), run with `npx vite-node tools/<file>.ts`.
-  Report numbers before and after a change.
+- **The harness** is `npx vite-node tools/autoplay.ts [seeds] [until] [crowns] [strategies] [difficulty]`:
+  the bot of `tools/bot.ts` plays whole games by the same commands the interface sends (three
+  ways: `trader`, `settler`, `balanced`; `none` leaves the rivals alone) and prints treasury,
+  sales, colonies, scores, races and losses by year. `tools/trace.ts` plays one game and tallies
+  what went wrong and which goods paid; `tools/rivalsizes.ts` shows rival colonies by year. A change
+  to a number that matters is measured before and after, on at least two crowns and two seeds.
+  The bot never tires and has no ideas: at trade it is closer to a ceiling than a floor, at
+  colonies and diplomacy a floor. On Captain it should end just behind the rivals.
+- **Crowns are compared on one scale.** A rival's `revenue` is its profit on a cargo; yours is the
+  whole sale, reckoned at `VICTORY.salesAsProfit` wherever crowns are compared (`score`, `races`).
+  Never compare `s.revenue` with a rival's directly. Score weights are `SCORE`, prestige for deeds
+  `PRESTIGE` (both in `src/data/scenarios.ts`).
+- The smaller scripts (`rivals.ts`, `voyage.ts`, `colony.ts`, `crossing.ts`, `seed-sweep.ts`,
+  `audit-perf.ts`) still answer narrow questions; run with `npx vite-node tools/<file>.ts`.
 
 ## Verify loop
 

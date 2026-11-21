@@ -7,7 +7,7 @@ export const GLOSSARY: Record<string, string> = {
   'stores': 'Food and water aboard, counted in seasons. Only one of your own ports fills them; foreign ports, native traders and a season at anchor off a green coast fill them to half. With none left, scurvy takes the crew.',
   'scurvy': 'What kills a crew when the stores run out: a share of the sailors die each season until the fleet is resupplied or lost.',
   'open ocean': 'Deep water far from any coast. Until your scholars master the Volta do mar, stores spoil twice as fast there and storms are fiercer.',
-  'Volta do mar': 'Long-distance navigation: sailing wide into the open ocean to find the winds home. The subject in Research that makes the crossing possible.',
+  'Volta do mar': 'Long-distance navigation: sailing wide into the open ocean to find the winds home. The subject in Research that makes the crossing possible. A crossing is still a risk: about one in eight meets a storm (fewer with a good navigator, more in the hurricane months), and a crew may refuse to sail with fewer than three seasons of stores.',
   'explorer': 'A courtier commissioned to lead expeditions. Only a fleet led by an explorer may enter uncharted water.',
   'merchant': 'A courtier commissioned to lead trade fleets. A merchant can run a trade route by itself.',
   'trade route': 'A list of ports with what to sell and buy at each. A fleet led by a merchant sails it round and round without orders.',

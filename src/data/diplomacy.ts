@@ -52,7 +52,9 @@ export const DIPLOMACY = {
   /** corsairs: tribute a season, how near their ports they hunt, how often, and how strong */
   tribute: 100,
   corsairReach: 7,
-  corsairChance: 0.12,
+  corsairChance: 0.07,
+  /** beaten by corsairs with one ship: the chance she is taken outright instead of plundered and let go */
+  corsairTakes: 0.2,
   corsairStrength: [3, 7] as [number, number],
   /** the Levant trade: how fast Venice and Genoa fill Italy's spice markets, and how fast they empty in an Ottoman war */
   levantFlow: 0.03,

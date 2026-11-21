@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.20
+## Now playing: v0.21
 
-Phase 5, interface depth (second part): words in the guide, goals and stories open for their meaning, and those meanings open in turn; markets show where a cargo sells best and a trade route what it earns; the map can show finds, peoples' regard or colonial loyalty; every city and colony in one sortable table; `Z` takes back your last order; three places to save, the last five turns kept, and saving to a file; fleets that explore, go home or patrol by themselves; research drawn as a tree with a queue; keys you can change; and a size setting for text and panels.
+Phase 6, balance: a bot now plays whole games headlessly (`npx vite-node tools/autoplay.ts`) and the numbers were tuned against it. Prestige is earned over a reign, not in one summer of charting; your sales and the rivals' are reckoned on the same scale, so the score and the trade race are fair; the African trade pays about a third of what it did; rival colonies grow at a pace a player can match; the five crowns are evenly matched as rivals; difficulty changes the whole game, not only its start; privateers go home after a fight; and a crossing can meet a storm or a crew that refuses.
+
+From v0.20: Phase 5, interface depth (second part): words in the guide, goals and stories open for their meaning, and those meanings open in turn; markets show where a cargo sells best and a trade route what it earns; the map can show finds, peoples' regard or colonial loyalty; every city and colony in one sortable table; `Z` takes back your last order; three places to save, the last five turns kept, and saving to a file; fleets that explore, go home or patrol by themselves; research drawn as a tree with a queue; keys you can change; and a size setting for text and panels.
 
 From v0.19, interface depth (first part): keyboard handling rebuilt on one table, so keys act on what is in front of you and never behind it; a Realm tab beside the map listing every fleet, party, colony and threat; a ledger that accounts for every ducat of the turn; one card for the turn's news; a Diplomacy screen for peoples, rival crowns and Europe; and a hover line that says what a foreign ship or army is and where it is going.
 

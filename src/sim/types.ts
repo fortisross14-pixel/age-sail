@@ -90,6 +90,8 @@ export interface MarketGood {
   history: number[];
   /** what this region will pay over (or under) the usual, with any shock under way: multiplies the price */
   demand?: number;
+  /** the most that ever waits here, as a multiple of `ref` (5 when not set): a people's ground keeps a small pile */
+  pile?: number;
 }
 
 export interface Ship {

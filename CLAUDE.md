@@ -7,8 +7,9 @@ Turn-based colonisation game: Vite, React, TypeScript, PixiJS 8, rules in a Web 
   status): `docs/ROADMAP.md`. Why each item exists: `docs/PRODUCTION-AUDIT.md`. Engineering audit:
   `docs/AUDIT.md`.
 - Work the phases in order. When an item lands, set its status in the roadmap and update the phase
-  count. Balance (Phase 6) and technical and visual polish (Phase 7) are parked until the end: keep
-  new numbers provisional in `src/data/`, and don't spend time tuning or polishing before then.
+  count. Balance (Phase 6) has had its first pass, against the harness (`tools/autoplay.ts`): a change
+  to a number that matters is measured there before and after. Technical and visual polish (Phase 7)
+  is parked until the owner says.
 - Verify with `npm test`, `npm run build` and `npx vite-node tools/seed-sweep.ts 100`.
 
 ## Art and style direction (from the owner)

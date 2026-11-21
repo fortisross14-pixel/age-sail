@@ -1,6 +1,6 @@
 import { DEFAULT_UNTIL } from '../data/eras';
 import { GOODS, GOOD_INFO, type GoodId } from '../data/goods';
-import { SHIPS, SHIP_NAMES, type ShipType } from '../data/ships';
+import { SHIPS, SHIP_NAMES, CROSSING, type ShipType } from '../data/ships';
 import { BUILDINGS, BUILDING_ORDER, BUILDING_FX, CITY_SIZE, REALM_TAX_TARGET, REALM_TAX_RANGE, UNIT_SPECS, type BuildingId } from '../data/city';
 import * as Land from './land';
 import * as Col from './colony';
@@ -14,9 +14,10 @@ import * as Dyn from './dynasty';
 import * as Eur from './europe';
 import * as Slv from './slavery';
 import * as Vic from './victory';
-import { CRISIS, scenarioById, type FavourId, type ScenarioId } from '../data/scenarios';
+import { CRISIS, PRESTIGE, scenarioById, type FavourId, type ScenarioId } from '../data/scenarios';
 import { VOYAGE } from '../data/objectives';
 import { SLAVERY } from '../data/slavery';
+import { NATIVE_TRADE, MARKET } from '../data/trade';
 import { TREATY_INFO, type Treaty } from '../data/diplomacy';
 import { courtYear, onPromotion } from './court';
 import { DEFAULT_DIFFICULTY, difficultySpec, type Difficulty } from '../data/difficulty';
@@ -161,11 +162,11 @@ const deepStorms = (s: GameState, f: Fleet) => 3 - 0.3 * skill(leaderOf(s, f), '
 /** The haggling margin on each trade: the Crown's bookkeeping and the fleet leader's skills narrow it. */
 export function spreadFor(s: GameState, f?: Fleet, native = false): number {
   const l = f ? leaderOf(s, f) : undefined;
-  let sp = (has(s, 'bookkeeping') ? 0.06 : 0.1) - skill(l, 'commerce') * 0.01 - (crownSpec(s.crown).edge.spread ?? 0) - Dyn.knowledgeMods(s).spread - Eur.treatySpread(s, f?.at);
+  let sp = (has(s, 'bookkeeping') ? MARKET.spreadBooks : MARKET.spread) - skill(l, 'commerce') * 0.01 - (crownSpec(s.crown).edge.spread ?? 0) - Dyn.knowledgeMods(s).spread - Eur.treatySpread(s, f?.at);
   const city = f?.at ? s.cities[f.at] : undefined;
   if (city) sp -= city.buildings.market * 0.02;
   if (native) sp -= skill(l, 'diplomacy') * 0.01;
-  return Math.max(0.01, sp);
+  return Math.max(MARKET.spreadFloor, sp);
 }
 
 // ---------- helpers ----------
@@ -255,25 +256,28 @@ function event(s: GameState, e: GameEvent) {
 function nativeMarket(world: World, port: PortDef, rng: Rng): MarketBook {
   const g = GRIDS[port.map];
   const lat = g.lat(port.hex);
-  const book: MarketBook = { tools: makeMarket(55, 20, 6, 0, int(rng, 2, 8)), cloth: makeMarket(45, 20, 5, 0, int(rng, 2, 8)) };
+  const N = NATIVE_TRADE;
+  const book: MarketBook = { tools: makeMarket(N.toolPrice, 20, N.tools, 0, int(rng, 2, 8)), cloth: makeMarket(N.clothPrice, 20, N.cloth, 0, int(rng, 2, 8)) };
   const add = (good: GoodId, base: number, prod: number) => {
-    book[good] = makeMarket(base, prod * 2.5, prod * 0.6, prod, prod * 2.5);
+    prod = Math.round(prod * N.yield * 10) / 10;
+    book[good] = { ...makeMarket(base, prod * 2.5, prod * 0.6, prod, prod * 2.5), pile: N.pile };
   };
   const t = world[port.map].terrain;
   const nearHills = g.within(port.hex, 3).some((h) => t[h] === T.Hills || t[h] === T.Mountains);
+  const gold = (base: number, ref: number, prod: number, stock: number): MarketBook['gold'] => ({ ...makeMarket(base, ref, 1, prod, stock), pile: N.pile });
   if (port.map === 'old') {
     // the coast of Guinea: gold from the interior, pepper, dyes
-    if (lat >= 17) { add('dyes', 26, 7); if (rng() < 0.6) book.gold = makeMarket(80, 10, 1, 3, 8); }
+    if (lat >= 17) { add('dyes', 26, 7); if (rng() < 0.6) book.gold = gold(80, 10, 1 + N.gold, 8); }
     else if (lat >= 7) { add('spices', 28, 12); if (rng() < 0.5) add('dyes', 24, 8); }
-    else { book.gold = makeMarket(65, 14, 1, 4, 12); add('spices', 30, 8); }
-    if (nearHills && !book.gold) book.gold = makeMarket(75, 10, 1, 3, 8);
+    else { book.gold = gold(65, 14, 1.5 + N.gold, 12); add('spices', 30, 8); }
+    if (nearHills && !book.gold) book.gold = gold(75, 10, 1 + N.gold, 8);
     return book;
   }
   if (lat >= 42) add('furs', 22, 14);
   else if (lat >= 30) { add('furs', 26, 6); add('tobacco', 14, 12); }
   else if (lat >= 18) { add('tobacco', 12, 14); add('dyes', 24, 8); }
   else { add('cacao', 16, 14); add('dyes', 22, 10); }
-  if (nearHills || (lat < 25 && rng() < 0.3)) book.gold = makeMarket(70, 10, 1, 3, 8);
+  if (nearHills || (lat < 25 && rng() < 0.3)) book.gold = gold(70, 10, 1 + N.gold, 8);
   return book;
 }
 
@@ -1216,6 +1220,17 @@ export function crossOcean(world: World, s: GameState, fleetId: number): Command
   if (f.moves <= 0) return fail('The fleet has no movement left this season.');
   const from = GRIDS[f.map], to: MapId = f.map === 'old' ? 'new' : 'old';
   const lat = from.lat(f.hex);
+  const trained = has(s, 'volta');
+  const hazard = mulberry32(hashSeed(s.seed, s.turn, f.id, 733));
+  const lead = leaderOf(s, f);
+  if (trained && f.supplies < CROSSING.thinStores && hazard() < CROSSING.mutiny - 0.05 * (skill(lead, 'navigation') + skill(lead, 'military'))) {
+    f.moves = 0;
+    f.movedThisTurn = true;
+    const text = `The crews of ${f.name} will not leave land behind with ${f.supplies} season${f.supplies === 1 ? '' : 's'} of stores in the hold. They wait a season at the edge of the chart.`;
+    log(s, 'peril', text);
+    event(s, { kind: 'lost', title: 'The crew refuses', map: f.map, hex: f.hex, text: `${text} Fill the stores before a crossing: with ${CROSSING.thinStores} seasons or more aboard, no crew refuses.` });
+    return fail('The crew refuses to cross with stores so thin.');
+  }
   const target = world[to].portals.reduce((best, h) => (Math.abs(GRIDS[to].lat(h) - lat) < Math.abs(GRIDS[to].lat(best) - lat) ? h : best));
   f.map = to;
   f.hex = target;
@@ -1229,6 +1244,15 @@ export function crossOcean(world: World, s: GameState, fleetId: number): Command
   log(s, 'voyage', to === 'new'
     ? `${f.name} leaves the last known waters behind and sails west into the Mar Océano.`
     : `${f.name} sights the coasts of Europe again.`);
+  if (trained) {
+    const season = seasonOf(s.turn);
+    const risk = CROSSING.storm * Math.max(0.2, 1 - CROSSING.pilot * skill(lead, 'navigation')) * (lat < 30 && (season === 1 || season === 2) ? CROSSING.hurricane : 1)
+      * difficultySpec(s.difficulty).storms * Dyn.knowledgeMods(s).storms;
+    if (hazard() < risk) {
+      storm(s, f, hazard);
+      if (!s.fleets.includes(f)) return { ok: true, message: 'Lost in a storm on the crossing.' };
+    }
+  }
   return { ok: true, message: to === 'new' ? 'Into the Mar Océano.' : 'Back in European waters.' };
 }
 
@@ -1253,7 +1277,7 @@ function reveal(world: World, s: GameState, f: Fleet) {
     }
   }
   if (newLand) {
-    s.prestige += newLand * 0.25;
+    s.prestige += newLand * PRESTIGE.landSeen;
     discover(s, newLand * 0.1);
     if (explorer) explorer.discoveries += newLand;
   }
@@ -1261,7 +1285,7 @@ function reveal(world: World, s: GameState, f: Fleet) {
   if (newLand && f.map === 'new') {
     if (!s.newWorldFound) {
       s.newWorldFound = true;
-      s.prestige += 30;
+      s.prestige += PRESTIGE.newWorld;
       discover(s, 10);
       const where = mainland ? 'a long coast with no end in sight' : 'an island, unknown to any chart';
       log(s, 'discovery', `¡Tierra! ${who} sight ${where}, far to the west across the Mar Océano.`);
@@ -1272,7 +1296,7 @@ function reveal(world: World, s: GameState, f: Fleet) {
     }
     if (mainland && !s.chronicle.some((c) => c.text.includes('coast that runs north and south'))) {
       if (s.chronicle.some((c) => c.text.startsWith('¡Tierra!') && c.text.includes('island'))) {
-        s.prestige += 20;
+        s.prestige += PRESTIGE.continent;
         log(s, 'discovery', `${who} reach a coast that runs north and south beyond sight. This is no island: it is a continent.`);
       } else {
         log(s, 'discovery', 'The coast that runs north and south beyond sight is surely a continent.');
@@ -1282,7 +1306,7 @@ function reveal(world: World, s: GameState, f: Fleet) {
   for (const p of m.ports) {
     if (p.kind !== 'native' || s.discovered.includes(p.id) || fog[p.hex] !== Fog.Explored) continue;
     s.discovered.push(p.id);
-    s.prestige += 15;
+    s.prestige += PRESTIGE.peopleMet;
     discover(s, 4);
     if (explorer) explorer.discoveries += 10;
     const goods = Object.keys(s.markets[p.id] ?? {}).filter((g) => g !== 'tools' && g !== 'cloth').map((g) => GOOD_INFO[g as GoodId].name.toLowerCase());

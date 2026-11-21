@@ -98,6 +98,31 @@ other. Later: wars with rival crowns for space, and independence wars against in
   hexes (rivals reach about 0.4 to 0.7 of that by 1650). Whether a player's sales are on the same scale as a
   rival's is not known: for P6-09. Slavery's prices and death rates are first numbers. A season costs about 6 ms.
 
+- Phase 6 (v0.21), measured with `tools/autoplay.ts` (the bot of `tools/bot.ts`; medians over 2 or 3 seeds,
+  Captain, standard game unless said). The bot never tires and has no ideas: at trade it is nearer a ceiling
+  than a floor, at colonies and diplomacy a floor.
+  - **Before.** Prestige passed 280 by 1495 (a quarter point for every hex of land seen) and the prestige race
+    was won by 1513. Trading by hand won the trade race by 1520 to 1545 and banked 440,000 to 1,270,000 ducats
+    by 1650. One privateer per sea hunted the nearest fleet every season of a war and never went home: 20 to 50
+    fleets lost a game. A colony beside a people was raided about twice a year for ever. Every rival colony was
+    a city of 24 by 1600, and rivals ended on 5,000 to 6,500 points with France near 3,000.
+  - **The cause under the score.** A rival's revenue was its profit on a cargo; the player's was the whole
+    sale. The same hold of pepper counted five times more for the player, in the score and in the trade race.
+  - **After.** With nobody playing, the rivals end on 2,300 to 4,000 points: Castile 2,800 to 3,300, Portugal
+    3,400 to 3,900, England 2,300 to 3,500, France 2,800 to 3,500, the Netherlands 3,400 to 4,000. The bot ends
+    on 2,000 to 2,800 playing both trade and colonies, 1,400 to 2,900 settling first, about 1,500 to 1,700
+    trading only: 4th or 5th on Captain, 2nd or 3rd on Squire, last on Admiral. The trade race is decided
+    between 1591 and 1640, by the bot in 7 games of 15 and by a rival in 8 (the Netherlands in 7 of those 8, and
+    in 12 of 15 when nobody plays: for a later pass). Nobody reaches the prestige race without meaning to (the
+    bot ends on 120 to 460 of 650), nor the empire race (the bot peaks near 75 to 95 colonists of 170). Fleets
+    lost: 0 to 12 a game. A short game's races are scaled to 0.45 of a standard one and fall between 1540 and 1548 (at 0.3 the
+    empire race was won by 1527 to 1535; in a short game the bot ends 1st or 2nd, because rivals start late); a full game's trade race falls between 1657 and 1691.
+  - **Still to do.** Money has too little to buy late on: the bot ends with 45,000 to 390,000 ducats unspent,
+    and has 45,000 to 60,000 by 1510 when it works the African coast with two ships. The settle-first opening is
+    poor for decades. Both want new things to spend on more than new numbers, and a person's games (P1-20)
+    before another pass. The spice race asks 60,000 ducats of sales (30,000) and the era promises ask totals
+    near what the bot has when each era ends.
+
 ## Milestones
 
 | # | Milestone | Status |
@@ -122,7 +147,7 @@ other. Later: wars with rival crowns for space, and independence wars against in
 | Phase 3 | **Stories and dynasty** (v0.16): 114 stories as data with chains, written for any crown; a ruling house with heirs, regencies, successions and royal marriages; courtiers who remember, want and can be lost to a rival; three historical set pieces per crown; eras that open with a choice of path; the land and colonies named by the player; the reign told back. Items P3-01 to P3-14 below | done |
 | Phase 4 | **Depth** (v0.18): a research tree of 32 subjects, ten laws, scientific expeditions; European diplomacy, wars to join, corsairs and the Levant trade; slavery, with what it costs and a law that ends it; three races to win beside the score; four scenarios, one of which begins in 1690; uses for prestige; fights at sea in three rounds; five more buildings; free states to recognise or retake, and ambitions for the later ages. Items P4-01 to P4-20 below | done |
 | Phase 5 | **Interface depth** (v0.20): keys on one table, and changeable; a Realm tab listing everything you own; the ledger; one card for the turn's news; a Diplomacy screen; nested tooltips; trade help; map modes; a comparison table; undo; saved voyages; standing fleet orders; research drawn as a tree with a queue; report cards; a size setting. Items P5-01 to P5-20 below | done |
-| Phase 6 | Balance (was Pass 3): numbers in one place, autoplay harness, retune the five crowns. Deliberately late | next, when the owner says |
+| Phase 6 | **Balance** (v0.21): a bot that plays whole games, and a first pass of tuning against it: prestige, the score and the races, African trade, rival growth, the five crowns, difficulty, privateers and corsairs, the crossing. Items P6-01 to P6-10 below | first pass done |
 | Phase 7 | Technical and visual polish: music, portraits, event paintings, a living map, the open engineering items. Deliberately last | deferred |
 
 The phases come from the production audit ([PRODUCTION-AUDIT.md](PRODUCTION-AUDIT.md)) and replace
@@ -195,9 +220,9 @@ Where the game goes from v0.13, as action items. The reasoning behind each is th
 here and update the count in the milestones table. New ideas get the next free number in their
 phase; nothing is renumbered.
 
-**Order.** Phases 1 to 5 are worked in order. Balance (Phase 6) and technical and visual polish
-(Phase 7) come last by the owner's decision: until then, new numbers are provisional and go in
-`src/data/`, and new looks use what the theme already has.
+**Order.** Phases 1 to 5 were worked in order, then balance (Phase 6). Technical and visual polish
+(Phase 7) comes last by the owner's decision: until then new looks use what the theme already has.
+A number that matters is changed against the harness (`tools/autoplay.ts`), before and after.
 
 | Phase | Theme | Items | Done |
 |---|---|---|---|
@@ -206,7 +231,7 @@ phase; nothing is renumbered.
 | 3 | Stories and dynasty | 14 | 14 |
 | 4 | Depth | 20 | 20 |
 | 5 | Interface depth | 20 | 20 |
-| 6 | Balance (deferred) | 10 | 0 |
+| 6 | Balance | 10 | 8 |
 | 7 | Technical and visual polish (deferred) | 14 | 0 |
 
 ### Phase 1: The first hour
@@ -341,23 +366,23 @@ Function only: looks are Phase 7.
 | P5-19 | Keys can be changed on the guide's Controls page, each row at a time, with a refusal when another key in the same place already does that; the choice is kept with the player's other preferences | U6 | done |
 | P5-20 | First-time hints at the top of Diplomacy, Dynasty, Laws and the Expedition, each closed once and for all | G3 | done |
 
-### Phase 6: Balance (deferred)
+### Phase 6: Balance
 
 Parked until the systems above exist. Until then, record observations under "Balance notes" and
 keep new numbers in `src/data/`.
 
 | Id | Action item | Answers | Status |
 |---|---|---|---|
-| P6-01 | Collect the inline tuning numbers of `src/sim/` (about 430) into `src/data/` (AUDIT.md finding 6) | D6 | deferred |
-| P6-02 | Autoplay harness: a simple bot plays N seeds headlessly and reports score curves, bankruptcies, colony growth and game length | D6 | deferred |
-| P6-03 | Retune the five crowns as AI rivals: today Castile reaches 15–17 colonies by 1542 and France and the Netherlands 1–4 | D4 | deferred |
-| P6-04 | Tune the difficulty levers of P1-11 with the harness | D1 | deferred |
-| P6-05 | Tune objective rewards so the first voyage helps without funding the game | G1 | deferred |
-| P6-06 | The crossing after *Volta do mar*: every test crossing succeeds today; add storms, mutiny and the leader's skill | G4 | deferred |
-| P6-07 | Story frequency and cooldowns against the story count of P3-03 | N1 | deferred |
-| P6-08 | Pace of a standard game: time per turn and decisions per turn across the eras | G5 | deferred |
-| P6-09 | Score weights (colonists ×10, territory ×2, sales ÷200) against the victory paths of P4-07 | D7 | deferred |
-| P6-10 | Colony growth and needs once rivals and natives press (the M5 note: "deliberately modest") | - | deferred |
+| P6-01 | Collect the inline tuning numbers of `src/sim/` (about 430) into `src/data/` (AUDIT.md finding 6). Every number this pass touched now lives in data: `PRESTIGE`, `SCORE` and `VICTORY.salesAsProfit` (`scenarios.ts`), `NATIVE_TRADE` and `MARKET` (`trade.ts`), `CROSSING` (`ships.ts`), raid, siege and crowding numbers (`colony.ts`), corsairs (`diplomacy.ts`), rival growth (`rivals.ts`). The rest are still inline | D6 | open (part done) |
+| P6-02 | Autoplay harness: `tools/autoplay.ts` runs the bot of `tools/bot.ts` over seeds, crowns, three ways of playing and a difficulty, and reports treasury, sales, colonies, scores, races, losses, debt, stories and pace by year; `tools/trace.ts` tallies one game's losses and its trade by good; `tools/rivalsizes.ts` shows rival colonies by year | D6 | done |
+| P6-03 | Retune the five crowns as AI rivals: with nobody playing they now end a standard game between about 2,300 and 4,000 points (France was near 3,000 against 6,000; it settles from latitude 26 and starts a little sooner; England from 30) | D4 | done |
+| P6-04 | Tune the difficulty levers of P1-11 with the harness: a fifth lever, `rivalGrowth`, scales how fast rival colonies grow and what their trade earns, because the others only moved the start. The bot ends 2nd or 3rd on Squire, 4th or 5th on Captain, last and well behind on Admiral | D1 | done |
+| P6-05 | Objective rewards against the first voyage: measured, not changed. The first-voyage chain pays 1,600 ducats on a start of 5,000, and a bot that takes all of it and settles first still has under 5,000 in 1500 | G1 | done |
+| P6-06 | The crossing after *Volta do mar* (`CROSSING`): about one crossing in eight meets a storm, fewer with a good navigator and twice as many in the hurricane months; a ship never mended sinks in the end; with fewer than three seasons of stores the crew may refuse to sail | G4 | done |
+| P6-07 | Story frequency against the story count: measured, not changed. A standard game tells about 120 stories, about 80 of them different, at one every other turn early and three in five turns later | N1 | done |
+| P6-08 | Pace of a standard game: 216 turns; 0.75 cards a turn in the half-year era and 1.2 to 1.4 after; the bot gives 15 to 20 orders a turn early and about 35 late. Minutes per turn for a person need people (with P1-20) | G5 | open (bot measured) |
+| P6-09 | Score weights against the victory paths: a rival's books record its profit on a cargo (a fifth of the sale) and yours recorded the whole sale, so your commerce counted five times theirs. Sales are now reckoned at the same share wherever crowns are compared; the races are set from measured curves (trade 340,000 of profit, empire 170 colonists and 270 hexes, prestige 650, each scaled by the game's length) | D7 | done |
+| P6-10 | Colony growth under pressure: births 5% a year (3.5%); settlers on a people's land cost less of their regard, raids and sieges are rarer; rival colonies no longer all reach 24 by 1600 (a convoy lands settlers only in a small colony, births and raising are slower) | - | done |
 
 ### Phase 7: Technical and visual polish (deferred)
 

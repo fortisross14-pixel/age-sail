@@ -96,7 +96,7 @@ const GUIDE: { id: string; name: string; items: [string, string][] }[] = [
   { id: 'sea', name: 'At sea', items: [
     ['Mind wind and food.', 'Trade winds blow west in the south, westerlies blow east in the north (V shows them). Ships carry food for about 8 seasons; then scurvy kills the crew. Away from home, stores refill only to half: in foreign ports, from native traders, or by anchoring a whole season off a green coast.'],
     ['Find, meet, trade.', 'Only a fleet led by an explorer may enter uncharted waters. Trade tools with the peoples you meet for furs, tobacco, cacao, dyes and gold, and sell them in Europe while they are rare.'],
-    ['The open ocean.', 'Before your scholars master the Volta do mar (Research), the darker open sea spoils food twice as fast. You can try the western crossing, but few come back.'],
+    ['The open ocean.', 'Before your scholars master the Volta do mar (Research), the darker open sea spoils food twice as fast. You can try the western crossing, but few come back. Once it is mastered, a crossing still meets a storm now and then: mend your hulls in a European port, and never cross with fewer than three seasons of stores, or the crew may refuse.'],
   ] },
   { id: 'colonies', name: 'Colonies', items: [
     ['Found colonies.', 'Train colonists in your cities and take them over with timber and tools in the hold. Land them on surveyed coast and choose Found colony.'],

@@ -67,3 +67,22 @@ export const RIVAL_TRADE = { perSettler: 0.35, fill: 1.1, buys: { tools: 0.06, c
 
 /** Colonial demand: tools wear out; each working settler uses this much a season, and works at `without` without them. */
 export const TOOL_WEAR = { perWorker: 0.05, without: 0.85 };
+
+/**
+ * Trade at a people's ground: how many tools and how much cloth they take a season, and how much
+ * gold comes down from the interior a season beyond the ounce they keep. Cut to about a third in the
+ * balance pass: at 6, 5 and 2 to 3, and with ten years of pepper piled up at every ground, two ships
+ * on the Guinea coast banked 90,000 ducats by 1510.
+ */
+export const NATIVE_TRADE = { tools: 2, cloth: 2, gold: 0.35,
+  /** what they pay for a tool and a bolt of cloth when they have their usual stock (it was 55 and 45) */
+  toolPrice: 42, clothPrice: 34, /** share of what a ground used to offer of its own produce each season */ yield: 0.4,
+  /** the most that waits at a ground between visits, as a multiple of its usual stock: about four seasons of produce, not a decade's */
+  pile: 1.6 };
+
+/**
+ * What a merchant loses between buying and selling (each way), before skill, buildings, treaties
+ * and bookkeeping take their share off, and the least it can ever be. And how fast other traders
+ * bring a market back to normal each season: slower means a port you have flooded stays flooded.
+ */
+export const MARKET = { spread: 0.14, spreadBooks: 0.1, spreadFloor: 0.04, recovery: 0.045 };

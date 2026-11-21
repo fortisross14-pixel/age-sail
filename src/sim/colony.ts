@@ -11,6 +11,7 @@ import { personById, skill } from './court';
 import { emptyAccount, type Colony, type ColonyLevel, type Fleet, type GameState, type MapId, type Party, type PortDef, type World } from './types';
 import * as Nat from './natives';
 import { DEMOGRAPHY, SEASONING, GARRISON_FOOD, NATIVE } from '../data/colony';
+import { PRESTIGE, VICTORY, SCORE } from '../data/scenarios';
 import { TOOL_WEAR } from '../data/trade';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -284,7 +285,7 @@ export function foundColony(world: World, s: GameState, p: Party): Result & { co
   // the founder stays aboard the fleet if it has no leader; otherwise in the colony as its first governor (for the record)
   if (leader && f.leader == null) { f.leader = leader.id; leader.fleet = f.id; }
   s.parties = s.parties.filter((x) => x !== p);
-  s.prestige += 15;
+  s.prestige += PRESTIGE.colonyFounded;
   return { ok: true, colony: c, message: `${c.name} is founded with ${c.pop} colonist${c.pop > 1 ? 's' : ''}.` };
 }
 
@@ -296,7 +297,7 @@ export function upgradeColony(s: GameState, c: Colony): Result {
   for (const [g, n] of Object.entries(L.needs)) if ((c.stock[g as GoodId] ?? 0) < n!) return fail(`${c.name} needs ${n} ${GOOD_INFO[g as GoodId].name.toLowerCase()} in its warehouse.`);
   for (const [g, n] of Object.entries(L.needs)) c.stock[g as GoodId] = (c.stock[g as GoodId] ?? 0) - n!;
   c.level = L.next;
-  s.prestige += 10;
+  s.prestige += PRESTIGE.colonyRaised;
   return { ok: true, message: `${c.name} is now a ${LEVELS[c.level].name.toLowerCase()}.` };
 }
 
@@ -337,6 +338,6 @@ export function score(s: GameState, w?: World) {
   // the lands of peoples who are subjects of the Crown count too
   if (w) for (const n of [...w.old.nations, ...w.new.nations]) if (s.natives[n.id]?.relation === 'subject') for (const h of Nat.territory(n)) hexes.add(`${n.map}:${h}`);
   const territory = hexes.size;
-  const commerce = Math.floor(s.revenue / 200);
-  return { pop, territory, commerce, total: pop * 10 + territory * 2 + commerce };
+  const commerce = Math.floor(s.revenue * VICTORY.salesAsProfit / SCORE.sales);
+  return { pop, territory, commerce, total: pop * SCORE.colonist + territory * SCORE.territory + commerce };
 }
