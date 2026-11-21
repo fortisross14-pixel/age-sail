@@ -6,6 +6,7 @@ import { turnLabel } from '../sim/types';
 import type { GameState } from '../sim/types';
 import { realmSpec } from '../data/realms';
 import { Frame } from './theme/Frame';
+import { PortScreen } from './PortScreen';
 import { Medal, CrestArt } from './theme/Art';
 import { Icon, type IconName } from './theme/icons';
 import { sfx } from './sound';
@@ -19,7 +20,7 @@ import { Fleets } from './FleetsDrawer';
 import { Cities } from './CityScreen';
 import { Court, Research, Chronicle } from './CourtDrawer';
 
-const HEADS: Record<Exclude<DrawerId, 'cities'>, { title: string; icon: IconName; sub: (g: GameState) => string }> = {
+const HEADS: Record<Exclude<DrawerId, 'cities' | 'port'>, { title: string; icon: IconName; sub: (g: GameState) => string }> = {
   markets: { title: 'Markets', icon: 'markets', sub: () => 'Prices in every port you know' },
   fleets: { title: 'Fleets', icon: 'fleets', sub: (g) => `${g.fleets.length} fleet${g.fleets.length === 1 ? '' : 's'} · ${g.parties.length} part${g.parties.length === 1 ? 'y' : 'ies'} ashore` },
   court: { title: 'Court', icon: 'court', sub: (g) => `${g.people.filter((p) => p.alive).length} courtiers · ${g.petitioners.length} petitioner${g.petitioners.length === 1 ? '' : 's'} waiting` },
@@ -52,7 +53,7 @@ export function Drawer() {
     }
   }, [drawer]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!shown) return null;
-  const head = shown === 'cities' ? null : HEADS[shown];
+  const head = shown === 'cities' || shown === 'port' ? null : HEADS[shown];
   return (
     <>
     <div className={`screen-back ${leaving ? 'leave' : ''}`} onClick={() => set({ drawer: null })} aria-hidden />
@@ -68,6 +69,7 @@ export function Drawer() {
         {shown === 'fleets' && <Fleets />}
         {shown === 'markets' && <Markets />}
         {shown === 'cities' && <Cities />}
+        {shown === 'port' && <PortScreen />}
         {shown === 'court' && <Court />}
         {shown === 'research' && <Research />}
         {shown === 'chronicle' && <Chronicle />}
@@ -142,7 +144,7 @@ function Markets() {
 
 const hexColor = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
-function PortMarket({ portId }: { portId: string }) {
+export function PortMarket({ portId, bare = false }: { portId: string; bare?: boolean }) {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const selected = useStore((s) => s.selectedFleet);
@@ -159,8 +161,8 @@ function PortMarket({ portId }: { portId: string }) {
   const sub = port.kind === 'native' ? `Trading ground of the ${port.people}` : port.kind === 'home' ? 'Your city' : `Foreign market · ${port.nation}`;
   return (
     <div className="port-market">
-      <h3>{port.name}</h3>
-      <div className="muted small">{sub}. {port.blurb}</div>
+      {!bare && <><h3>{port.name}</h3>
+      <div className="muted small">{sub}. {port.blurb}</div></>}
       {fleet ? (
         <div className="row">
           <span className="small">Trading with <b>{fleet.name}</b> · {free} hold free</span>

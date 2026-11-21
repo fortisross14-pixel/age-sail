@@ -14,7 +14,7 @@ const sim = Comlink.wrap<SimApi>(new Worker(new URL('./sim/worker.ts', import.me
 
 export interface Preview extends MovePreview { fleet: number; dest: number; map: MapId; party?: number }
 
-export type DrawerId = 'cities' | 'markets' | 'fleets' | 'court' | 'research' | 'chronicle';
+export type DrawerId = 'cities' | 'port' | 'markets' | 'fleets' | 'court' | 'research' | 'chronicle';
 
 /** A chronicle entry's identity, stable across saves. */
 export const newsKey = (c: ChronicleEntry) => `${c.turn}|${c.text}`;
@@ -34,6 +34,8 @@ interface Store {
   /** how your armies attack: hard, or holding back */
   stance: Stance;
   selectedPort: string | null;
+  /** the tab a city screen opens on, when something asks for one (the market, say) */
+  cityTab: 'overview' | 'buildings' | 'economy' | 'recruit' | 'market' | null;
   selectedColony: string | null;
   preview: Preview | null;
   hover: { map: MapId; hex: number } | null;
@@ -123,7 +125,7 @@ export const useStore = create<Store>((set, get) => {
     set({ phase: 'menu', world: null, game: null, saveProblem: 'The voyage could not be started. Try again, or try another world seed.' });
   };
   return {
-    phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, stance: 'assault', selectedPort: null, selectedColony: null, preview: null,
+    phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, stance: 'assault', selectedPort: null, cityTab: null, selectedColony: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false, showSettings: false,
     drawer: null, courtTab: 'people', dismissed: [], toast: null, busy: false,
 

@@ -17,6 +17,7 @@ import { CROWN } from '../render/palette';
 import { fmt } from './format';
 import { Tabs } from './Drawers';
 import { ColonyCard, TaxRate } from './CitiesDrawer';
+import { PortMarket } from './Drawers';
 import { Art, Medal, CrestArt, buildingSlot, cityViewSlot } from './theme/Art';
 import { Frame } from './theme/Frame';
 import { Icon, Crest, type IconName } from './theme/icons';
@@ -38,7 +39,7 @@ const buildingArt = (b: BuildingId, lv = 1) => {
 const unitArt = (u: UnitType) => <Art slot={`unit/${u}`} fallback={<img src={spriteUrl(UNIT_INFO[u].sprite)} alt="" />} />;
 const shipArt = (t: ShipType) => <Art slot={`ship/${t}`} fallback={<img src={spriteUrl(`ships/${t}`)} alt="" />} />;
 
-type CityTab = 'overview' | 'buildings' | 'economy' | 'recruit';
+type CityTab = 'overview' | 'buildings' | 'economy' | 'recruit' | 'market';
 
 /** The Cities panel: one of your cities at a time, or the list of all of them and your colonies. */
 export function Cities() {
@@ -59,8 +60,11 @@ function CityScreen({ cityId, onList }: { cityId: string; onList: () => void }) 
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const set = useStore((s) => s.set);
-  const [tab, setTab] = useState<CityTab>('buildings');
+  const asked = useStore((s) => s.cityTab);
   const city = game.cities[cityId];
+  const docked = game.fleets.some((f) => f.at === cityId);
+  const [tab, setTab] = useState<CityTab>(() => asked ?? (docked && !city.inland ? 'market' : 'buildings'));
+  useEffect(() => { if (asked) { setTab(asked); set({ cityTab: null }); } }, [asked]); // eslint-disable-line react-hooks/exhaustive-deps
   const port = portById(world, cityId)!;
   const all = ordered(game.cities, mainPort(game));
   const k = all.findIndex((c) => c.id === cityId);
@@ -82,12 +86,13 @@ function CityScreen({ cityId, onList }: { cityId: string; onList: () => void }) 
           </div>
         </div>
       </header>
-      <Tabs value={tab} onChange={setTab} tabs={[['overview', 'Overview'], ['buildings', 'Buildings'], ['economy', 'Economy'], ['recruit', 'Recruitment']]} />
+      <Tabs value={tab} onChange={setTab} tabs={[['overview', 'Overview'], ['buildings', 'Buildings'], ['economy', 'Economy'], ['recruit', 'Recruitment'], ...(city.inland ? [] : [['market', 'Market'] as [CityTab, string]])]} />
       <div className="tab-pane" key={tab}>
         {tab === 'overview' && <Overview city={city} />}
         {tab === 'buildings' && <Buildings city={city} />}
         {tab === 'economy' && <Economy city={city} />}
         {tab === 'recruit' && <Recruitment city={city} />}
+        {tab === 'market' && <PortMarket portId={city.id} bare />}
       </div>
     </>
   );
@@ -276,7 +281,7 @@ function Economy({ city }: { city: City }) {
         <div className="line total"><span /><span>Total</span><span className="amount plus">+{base + dues} ducats</span></div>
       </div>
       {book && <>
-        <div className="sec">Prices here <button className="link" style={{ marginLeft: 'auto' }} onClick={() => set({ drawer: 'markets', selectedPort: city.id })}>open the market</button></div>
+        <div className="sec">Prices here <button className="link" style={{ marginLeft: 'auto' }} onClick={() => set({ cityTab: 'market' })}>open the market</button></div>
         <div className="ledger">
           {GOODS.filter((g) => book[g]).slice(0, 10).map((g) => {
             const m = book[g]!; const p = unitPrice(m);

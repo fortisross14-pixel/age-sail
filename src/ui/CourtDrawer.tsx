@@ -13,7 +13,8 @@ import { Art, CrestArt } from './theme/Art';
 import { Portrait } from './theme/Portrait';
 import { sfx } from './sound';
 import { getView } from './MapCanvas';
-import { allNations, moodOf, envoy } from '../sim/natives';
+import { allNations, moodOf, envoy, populationOf } from '../sim/natives';
+import { Standing } from './Standing';
 import { rivalsOf, crownSpec } from '../data/rivals';
 import { rivalScore } from '../sim/rivals';
 import { score } from '../sim/colony';
@@ -314,9 +315,9 @@ function Peoples() {
                 <span className={`rank-badge mood-${mood.split(' ')[0]}`}>{mood}</span>
                 <span className="person-name">The {n.people}{n.empire ? <span className="muted small"> · an empire</span> : ''}</span>
                 <span className="muted small">{n.map === 'old' ? 'African coast' : 'New World'}</span>
-                <div className="attitude" title={`Attitude ${Math.round(st.attitude)}`}><div className="att-mid" /><div className="att-dot" style={{ left: `${(st.attitude + 100) / 2}%` }} /></div>
+                <Standing st={st} />
                 <span className="person-status small">
-                  About {st.warriors} warriors · {villages} village{villages === 1 ? '' : 's'}{st.epidemic ? ' · struck by sickness' : ''}
+                  About {populationOf(n, st)} people, {st.warriors} warriors · {villages} village{villages === 1 ? '' : 's'}{st.epidemic ? ' · struck by sickness' : ''}
                   {st.post ? ' · trading post' : ''}{st.mission ? ` · mission (${Math.round(st.converted * 100)}% won over)` : ''}
                 </span>
               </div>

@@ -60,6 +60,28 @@ export function moodOf(st: NativeState): string {
   return 'friendly';
 }
 
+/**
+ * How a people stands with you, from −3 to +3: −3 will attack (siege), −2 aggressive (raids), −1 wary,
+ * 0 passive, +1 cordial, +2 friendly (they trade food and help settlers), +3 very friendly (may join you).
+ */
+export function standing(st: NativeState): number {
+  if (st.relation === 'war' || st.siege) return -3;
+  if (st.relation === 'subject' || st.relation === 'allied') return 3;
+  const a = st.attitude;
+  return a <= -60 ? -3 : a <= -40 ? -2 : a < -10 ? -1 : a < 15 ? 0 : a < 40 ? 1 : a < 70 ? 2 : 3;
+}
+export const STANDING: Record<number, { name: string; blurb: string }> = {
+  [-3]: { name: 'Very aggressive', blurb: 'They will attack: raids, ambushes, and sieges that can burn a colony.' },
+  [-2]: { name: 'Aggressive', blurb: 'They raid colonies and ambush parties near their land.' },
+  [-1]: { name: 'Wary', blurb: 'They keep away and trust nothing you say. Settlers on their land make it worse.' },
+  [0]: { name: 'Passive', blurb: 'Neither friend nor foe, for now.' },
+  [1]: { name: 'Cordial', blurb: 'They trade gladly and listen to your envoys.' },
+  [2]: { name: 'Friendly', blurb: 'They bring food to your colonies nearby and help the settlers prosper.' },
+  [3]: { name: 'Very friendly', blurb: 'Close friends: they may agree to an alliance, or to join your realm.' },
+};
+/** Roughly how many people: warriors are about one in five. */
+export const populationOf = (n: NationDef, st: NativeState) => Math.max(10, Math.round((st.warriors * 5 + (n.villages.length - st.lost.length) * 10) / 10) * 10);
+
 /** Your envoy: the best diplomat at court (not at sea or ashore). */
 export function envoy(s: GameState): Person | undefined {
   return s.people.filter((p) => p.alive && p.fleet == null && !s.parties.some((x) => x.leader === p.id))
@@ -84,9 +106,9 @@ export function remember(s: GameState, st: NativeState, why: string, delta: numb
   if (st.memory.length > 8) st.memory.length = 8;
 }
 
-/** The peoples whose land lies within two hexes of a colony. */
-export function neighbours(w: World, s: GameState, c: Colony): { n: NationDef; st: NativeState }[] {
-  const near = new Set(GRIDS[c.map].within(c.hex, 2));
+/** The peoples whose land lies within two hexes of a colony (four: near enough to raid it). */
+export function neighbours(w: World, s: GameState, c: Colony, radius = 2): { n: NationDef; st: NativeState }[] {
+  const near = new Set(GRIDS[c.map].within(c.hex, radius));
   return w[c.map].nations.filter((n) => s.natives[n.id] && territory(n).some((h) => near.has(h))).map((n) => ({ n, st: s.natives[n.id] }));
 }
 
@@ -219,7 +241,8 @@ export function makePeace(w: World, s: GameState, id: string): Result {
 export function incorporate(w: World, s: GameState, id: string, log: Log, ev: Ev): Result {
   const x = requireMet(s, w, id);
   if (!x) return fail('You have not met that people.');
-  if (x.st.converted < 1) return fail('The mission has not yet won them over.');
+  const close = standing(x.st) >= 3 && x.st.relation === 'peace' || x.st.relation === 'allied';
+  if (x.st.converted < 1 && !(close && x.st.attitude >= 70)) return fail('They must be very friendly (+3), or won over by a mission, to join your realm.');
   if (x.st.attitude < 40) return fail(`${nameOf(x.n)} are not friendly enough to join your realm.`);
   x.st.relation = 'subject';
   log('discovery', `${nameOf(x.n)} choose to live under your rule. Their lands are part of your realm now.`);
@@ -323,6 +346,74 @@ export function attack(w: World, s: GameState, p: Party, hex: number, rng: Rng, 
   log('peril', text);
   ev({ kind: 'battle', title, text, map: n.map, hex, battle: out.report });
   return { ok: true };
+}
+
+// ---------- from a colony ----------
+
+/** How far around a colony its people count as neighbours: near enough to raid it. */
+export const NEAR = 4;
+/** A neighbouring people of the colony, checked. */
+function neighbourOf(w: World, s: GameState, c: Colony | undefined, id: string) {
+  if (!c) return undefined;
+  const x = neighbours(w, s, c, NEAR).find((y) => y.n.id === id);
+  return x && x.st.met ? x : undefined;
+}
+
+/** Give goods from the colony's warehouse: cloth or tools are the gifts they value most. */
+export function colonyGift(w: World, s: GameState, c: Colony | undefined, id: string, good: GoodId): Result {
+  const x = neighbourOf(w, s, c, id);
+  if (!x || !c) return fail('That people are not neighbours of the colony.');
+  if (x.st.relation === 'war') return fail(`${cap(nameOf(x.n))} will not take gifts while at war. Make peace first.`);
+  const n = 10;
+  if ((c.stock[good] ?? 0) < n) return fail(`${c.name} needs ${n} ${GOOD_INFO[good].name.toLowerCase()} in its warehouse.`);
+  c.stock[good] = (c.stock[good] ?? 0) - n;
+  const value = good === 'tools' ? 9 : good === 'cloth' ? 8 : good === 'wine' ? 5 : 4;
+  remember(s, x.st, `Gifts from ${c.name}`, value);
+  return { ok: true, message: `${c.name} sends ${n} ${GOOD_INFO[good].name.toLowerCase()} to ${nameOf(x.n)}. They are ${STANDING[standing(x.st)].name.toLowerCase()} now.` };
+}
+
+/** Build a trading post at their ground with timber and tools from the colony. */
+export function colonyPost(w: World, s: GameState, c: Colony | undefined, id: string): Result {
+  const x = neighbourOf(w, s, c, id);
+  if (!x || !c) return fail('That people are not neighbours of the colony.');
+  if (x.st.post) return fail('There is already a trading post among them.');
+  if (x.st.relation === 'war' || x.st.attitude < 0) return fail(`${cap(nameOf(x.n))} are too wary to allow it. Gifts will help.`);
+  if ((c.stock.timber ?? 0) < 20 || (c.stock.tools ?? 0) < 10) return fail(`A trading post needs 20 timber and 10 tools in ${c.name}'s warehouse.`);
+  c.stock.timber = (c.stock.timber ?? 0) - 20; c.stock.tools = (c.stock.tools ?? 0) - 10;
+  x.st.post = true;
+  remember(s, x.st, 'The trading post', 10);
+  return { ok: true, message: `Settlers from ${c.name} raise a trading post among ${nameOf(x.n)}.` };
+}
+
+/** Send a friar living in the colony to found a mission among them. */
+export function colonyMission(w: World, s: GameState, c: Colony | undefined, id: string): Result {
+  const x = neighbourOf(w, s, c, id);
+  if (!x || !c) return fail('That people are not neighbours of the colony.');
+  if (x.st.mission) return fail('There is already a mission among them.');
+  if (x.st.relation === 'war' || x.st.attitude < -10) return fail(`${cap(nameOf(x.n))} will not let friars live among them now.`);
+  const friar = s.units.find((u) => u.colony === c.id && u.type === 'missionary');
+  if (!friar) return fail(`${c.name} has no friar. Train a missionary at home and bring him over.`);
+  s.units = s.units.filter((u) => u !== friar);
+  x.st.mission = true;
+  return { ok: true, message: `A friar leaves ${c.name} to live among ${nameOf(x.n)}.` };
+}
+
+/** Parade the garrison and demand tribute: food and furs if they are afraid, lasting anger either way. */
+export function showOfForce(w: World, s: GameState, c: Colony | undefined, id: string, rng: Rng): Result {
+  const x = neighbourOf(w, s, c, id);
+  if (!x || !c) return fail('That people are not neighbours of the colony.');
+  if (x.st.relation !== 'peace') return fail('Only a people at peace can be cowed.');
+  const soldiers = s.units.filter((u) => u.colony === c.id && COMBAT[u.type].shock >= 1 && u.type !== 'colonist').length;
+  if (!soldiers) return fail(`${c.name} has no soldiers to parade.`);
+  const fear = soldiers * 4 / (soldiers * 4 + x.st.warriors);
+  if (rng() < fear) {
+    c.stock.food = (c.stock.food ?? 0) + 15;
+    c.stock.furs = (c.stock.furs ?? 0) + 5;
+    remember(s, x.st, `Threats from ${c.name}`, -12);
+    return { ok: true, message: `${cap(nameOf(x.n))} hand over food and furs rather than fight. They will not forget it.` };
+  }
+  remember(s, x.st, `Threats from ${c.name}`, -20);
+  return { ok: true, message: `${cap(nameOf(x.n))} laugh at the parade and send your envoys back empty-handed. They are angrier now.` };
 }
 
 // ---------- sieges ----------

@@ -73,7 +73,7 @@ export function MapCanvas() {
             if (fleet && fleet.hex !== hex) {
               if (again) void s.confirmPreview();
               else { s.set({ selectedPort: port.id }); void s.planTo(hex); }
-            } else s.set({ selectedPort: port.id, preview: null, drawer: (port.kind === 'home' || port.kind === 'colony') && !fleet ? 'cities' : 'markets', ...(port.kind === 'colony' ? { selectedColony: port.id } : {}) });
+            } else s.set({ selectedPort: port.id, preview: null, drawer: port.kind === 'home' || port.kind === 'colony' ? 'cities' : 'port', ...(port.kind === 'colony' ? { selectedColony: port.id } : {}) });
             return;
           }
           const known = g.fog[map][hex] >= Fog.Charted;

@@ -702,3 +702,28 @@ b.bad { color: var(--oxblood-hi); }
 .wagon img { width: 100%; height: 100%; object-fit: cover; }
 .battle-sides .vs { width: 70px; }
 .battle-sides .vs img { width: 70px; border-radius: 8px; }
+
+/* standing of a people, −3 to +3 */
+.standing { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.standing .scale { display: inline-grid; grid-template-columns: repeat(7, 12px); gap: 2px; }
+.standing .scale i { height: 8px; border-radius: 2px; background: rgba(107, 70, 20, .15); }
+.standing .scale i:nth-child(1) { background: rgba(163, 35, 26, .25); } .standing .scale i:nth-child(2) { background: rgba(194, 65, 47, .22); }
+.standing .scale i:nth-child(3) { background: rgba(176, 122, 42, .22); } .standing .scale i:nth-child(5) { background: rgba(120, 150, 80, .22); }
+.standing .scale i:nth-child(6) { background: rgba(80, 130, 70, .25); } .standing .scale i:nth-child(7) { background: rgba(61, 107, 56, .3); }
+.standing .scale i.on { outline: 2px solid var(--ink); background: var(--gold); height: 10px; margin-top: -1px; }
+.standing b { font-variant-numeric: tabular-nums; min-width: 20px; }
+.standing.s-3 b, .standing.s-2 b { color: var(--bad); }
+.standing.s2 b, .standing.s3 b { color: var(--good); }
+.standing .name { color: var(--ink-2); font-style: italic; }
+.neighbours { display: grid; gap: 6px; margin-bottom: 8px; }
+.neighbour { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: rgba(255, 249, 232, .7); }
+.nb-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.native-mark { font-size: 40px; color: var(--ink-3); }
+
+/* screens sized for a laptop: a smaller frame and denser content */
+.drawer.adm-frame { width: min(1040px, calc(100vw - 140px)); height: min(760px, calc(100vh - 110px)); }
+.drawer.adm-frame.drawer-court, .drawer.adm-frame.drawer-fleets, .drawer.adm-frame.drawer-research, .drawer.adm-frame.drawer-chronicle { width: min(960px, calc(100vw - 140px)); }
+.drawer.adm-frame > .adm-frame-inner { zoom: .88; }
+@media (max-height: 820px), (max-width: 1300px) { .drawer.adm-frame > .adm-frame-inner { zoom: .8; } }
+.drawer-head { min-height: 80px; padding-top: 12px; padding-bottom: 6px; }
+.drawer-head h2 { font-size: 32px; }

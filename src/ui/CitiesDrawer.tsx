@@ -5,7 +5,8 @@ import { GoodIcon } from './Icon';
 import { GOODS, GOOD_INFO, NEEDS, LUXURIES, LUXURY_NEED, type GoodId } from '../data/goods';
 import { LEVELS, territoryOf } from '../sim/colony';
 import { GARRISON_FOOD } from '../data/colony';
-import { moodOf, nationById, neighbours } from '../sim/natives';
+import { nationById, neighbours, NEAR, populationOf, standing } from '../sim/natives';
+import { Standing } from './Standing';
 import { loyaltyFactors, loyaltyTarget, colonyTaxes, TAX } from '../sim/empire';
 import { cargoUsed, cargoCapacity } from '../sim/game';
 import { getView } from './MapCanvas';
@@ -67,9 +68,39 @@ export function ColonyCard({ colonyId }: { colonyId: string }) {
           </div>
           <div className="bar"><div className={c.growth < 0 ? 'bad' : ''} style={{ width: `${Math.min(100, Math.abs(c.growth) * 100)}%` }} /></div>
           <div className="small muted">Natural growth is slow. Settlers from home grow a colony faster: ship them over, and they work after a season ashore.</div>
+          <h4>Peoples around {c.name}</h4>
           {(() => {
-            const near = neighbours(world, game, c).filter((x) => x.st.met);
-            return near.length > 0 && <div className="small">Neighbours: {near.map((x) => `the ${x.n.people} (${moodOf(x.st)})`).join(', ')}. Friendly peoples trade food and help the colony grow; hostile ones raid it, and furious ones besiege it.</div>;
+            const near = neighbours(world, game, c, NEAR).filter((x) => x.st.met);
+            if (!near.length) return <div className="small muted">No people known within a few days' march.</div>;
+            const friar = garrison.some((u) => u.type === 'missionary');
+            const soldiers = garrison.some((u) => u.type !== 'missionary' && u.type !== 'colonist');
+            return (
+              <div className="neighbours">
+                {near.map(({ n, st }) => {
+                  const act = (a: 'gift-cloth' | 'gift-tools' | 'post' | 'mission' | 'force') => void run({ kind: 'colonyNative', colony: c.id, nation: n.id, act: a });
+                  const peace = st.relation !== 'war';
+                  return (
+                    <div key={n.id} className="neighbour">
+                      <div className="nb-head">
+                        <b>The {n.people}</b>
+                        <span className="muted small">about {populationOf(n, st)} people · {st.warriors} warriors{st.post ? ' · trading post' : ''}{st.mission ? ' · mission' : ''}</span>
+                        <Standing st={st} />
+                      </div>
+                      {st.relation !== 'subject' && (
+                        <div className="row small">
+                          <button disabled={!peace || (c.stock.cloth ?? 0) < 10} title="10 cloth from the warehouse: a gift they value" onClick={() => act('gift-cloth')}>Gift cloth · 10</button>
+                          <button disabled={!peace || (c.stock.tools ?? 0) < 10} title="10 tools from the warehouse: the gift they value most" onClick={() => act('gift-tools')}>Gift tools · 10</button>
+                          {!st.post && <button disabled={!peace || st.attitude < 0 || (c.stock.timber ?? 0) < 20 || (c.stock.tools ?? 0) < 10} title="20 timber and 10 tools: more trade and steady goodwill. They must not be wary." onClick={() => act('post')}>Trading post</button>}
+                          {!st.mission && <button disabled={!peace || !friar || st.attitude < -10} title={friar ? 'A friar from the colony goes to live among them: goodwill, and in time they may join you' : 'Needs a missionary stationed in the colony'} onClick={() => act('mission')}>Send a friar</button>}
+                          <button className="danger" disabled={st.relation !== 'peace' || !soldiers} title="Parade the garrison and demand food and furs. They will resent it, and may refuse." onClick={() => act('force')}>Show of force</button>
+                          {standing(st) >= 3 && st.relation === 'peace' && <button className="primary" onClick={() => void run({ kind: 'incorporate', nation: n.id })}>Invite them to join</button>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
           })()}
 
           <h4>Needs each season</h4>

@@ -5,7 +5,7 @@ import {
   provision, provisionCost, splitShip, mergeFleets, setResearch, has, promote, assignLeader, recall, hire, setTradeRoute,
   slotsUsed, slotsMax, unitsAboard, leaderOf, embark, projectCost, landParty, moveParty, boardParty, citySlots, slotsUsedIn,
   foundColony, upgradeColony, colonyTransfer, allyNation, incorporateNation, attackVillage, tradingPost, declareWar, rivalPeace, stormColony,
-  grantCharter, setTaxRate, chooseStory, buildWalls, openFactory, factoryOrder,
+  grantCharter, setTaxRate, chooseStory, buildWalls, openFactory, factoryOrder, colonyNative,
 } from './game';
 import { demandFactor, rivalMerchants } from './trade';
 import { battleOdds, type Force } from './battle';
@@ -16,7 +16,7 @@ import { planRoute } from './sailing';
 import { OLD, NEW } from './hex';
 import { FIXED_SOUTH } from '../data/europe';
 import { canFound, score } from './colony';
-import { gift, odds } from './natives';
+import { gift, odds, standing } from './natives';
 import { rivalScore } from './rivals';
 import { colonyTaxes, loyaltyTarget } from './empire';
 import { Fog, emptyAccount, turnLabel, turnStride } from './types';
@@ -902,5 +902,26 @@ describe('M13 a living market', () => {
     const sugar = home.sugar!.stock;
     rivalMerchants(world, state);
     expect(home.sugar!.stock).toBeGreaterThan(sugar);
+  });
+});
+
+describe('neighbours of a colony', () => {
+  it('a people stands from −3 to +3, and gifts from the colony warehouse raise it', () => {
+    const { world, state } = newGame(1492);
+    const n = world.old.nations.find((x) => !x.empire)!;
+    const st = state.natives[n.id];
+    st.met = true; st.attitude = -50;
+    expect(standing(st)).toBe(-2);
+    st.siege = { colony: 'x', since: 0 };
+    expect(standing(st)).toBe(-3);
+    st.siege = null; st.attitude = 75;
+    expect(standing(st)).toBe(3);
+    st.attitude = 0;
+    const hex = OLD.neighbors(n.siteHex).find((h) => world.old.terrain[h] > 1)!;
+    state.colonies.push({ id: 'col-g', name: 'Gift', map: 'old', hex, founded: 0, pop: 4, level: 'outpost', stock: { tools: 20 }, growth: 0, loyalty: 80,
+      charter: false, unrest: false, newcomers: 0, walls: 0, last: emptyAccount() });
+    expect(colonyNative(world, state, 'col-g', n.id, 'gift-tools').ok).toBe(true);
+    expect(st.attitude).toBeGreaterThan(0);
+    expect(state.colonies[0].stock.tools).toBe(10);
   });
 });

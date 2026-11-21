@@ -12,11 +12,15 @@ import { rivalForce } from '../sim/rivals';
 import { freeForce } from '../sim/empire';
 import { battleOdds, partyForce } from '../sim/battle';
 import { ArmyRow } from './Battle';
+import { turnBreaks, turnStride } from '../sim/types';
 import { Art } from './theme/Art';
 import { isMilitary } from '../data/army';
 import { CROWN } from '../render/palette';
 import { GOOD_INFO, type GoodId } from '../data/goods';
 import { ShipIcon } from './Icon';
+
+/** Player turns a planned route takes. */
+const turnsFor = (p: { turnEnds: number[] }, turn: number) => turnBreaks(p.turnEnds, turnStride(turn)).length + 1;
 
 /** A compact card for the selected fleet: what it has, and what it can do next. */
 export function SelectionCard() {
@@ -60,9 +64,9 @@ export function SelectionCard() {
           <div className="sel-plan"><b>Choose the shore</b> highlighted beside the fleet. Esc cancels.</div>
         ) : preview && preview.fleet === fleet.id ? (
           <div className="sel-plan">
-            <b>{preview.turns > 1 ? `${preview.turns} seasons` : 'This season'}</b>{preview.cross ? ', then across the ocean' : ''}
+            <b>{turnsFor(preview, game.turn) > 1 ? `${turnsFor(preview, game.turn)} turns` : 'This turn'}</b>{preview.cross ? ', then across the ocean' : ''}
             <span className="muted"> · storm risk {Math.round(preview.risk * 100)}%{preview.provision ? ` · provisions ${fmt(preview.provision)}` : ''}</span>
-            {preview.turns > fleet.supplies && !fleet.at && <span className="bad"> · food runs out on the way</span>}
+            {preview.turns > fleet.supplies && !fleet.at && <span className="bad"> · food runs out on the way ({fleet.supplies} seasons of stores, {preview.turns} seasons at sea)</span>}
             {preview.crossBlocked && <span className="bad"> · needs an explorer in command</span>}
             {preview.deep > 0 && <span className="bad"> · open ocean: stores spoil twice as fast and storms are fiercer</span>}
           </div>
@@ -85,7 +89,7 @@ export function SelectionCard() {
             {fleet.map === 'old' ? 'Cross ⟵' : 'To Europe ⟶'}
           </button>
         )}
-        {port && !preview && <button onClick={() => set(port.kind === 'colony' ? { drawer: 'cities', selectedColony: port.id } : { drawer: 'markets', selectedPort: port.id })}>{port.kind === 'colony' ? 'Colony' : 'Trade'}</button>}
+        {port && !preview && <button onClick={() => set(port.kind === 'colony' ? { drawer: 'cities', selectedColony: port.id } : port.kind === 'home' ? { drawer: 'cities', selectedPort: port.id, cityTab: 'market' } : { drawer: 'port', selectedPort: port.id })}>{port.kind === 'colony' ? 'Colony' : 'Trade'}</button>}
         {port && !preview && provisionCost(world, fleet, game) > 0 && (
           <button onClick={() => void run({ kind: 'provision', fleet: fleet.id })}>Provision · {fmt(provisionCost(world, fleet, game))}</button>
         )}
@@ -155,7 +159,7 @@ function PartyCard({ partyId }: { partyId: number }) {
         </div>
         <ArmyRow units={units} />
         {preview && preview.party === p.id ? (
-          <div className="sel-plan"><b>{preview.turns > 1 ? `${preview.turns} seasons` : 'This season'}</b> on foot</div>
+          <div className="sel-plan"><b>{turnsFor(preview, game.turn) > 1 ? `${turnsFor(preview, game.turn)} turns` : 'This turn'}</b> on foot</div>
         ) : p.order ? (
           <div className="sel-plan muted">Marching: {p.order.length - 1} hexes to go.</div>
         ) : (

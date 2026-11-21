@@ -611,6 +611,13 @@ export function giftNation(world: World, s: GameState, id: string, ducats: numbe
 export function allyNation(world: World, s: GameState, id: string): CommandResult { return Nat.proposeAlliance(world, s, id, natRng(s, 1)); }
 export function inciteNation(world: World, s: GameState, id: string, target: string): CommandResult { return Nat.incite(world, s, id, target, natRng(s, 2), (k, t) => log(s, k, t)); }
 export function peaceNation(world: World, s: GameState, id: string): CommandResult { return Nat.makePeace(world, s, id); }
+export function colonyNative(world: World, s: GameState, colonyId: string, nation: string, act: 'gift-cloth' | 'gift-tools' | 'post' | 'mission' | 'force'): CommandResult {
+  const c = Col.colonyById(s, colonyId);
+  if (act === 'gift-cloth' || act === 'gift-tools') return Nat.colonyGift(world, s, c, nation, act === 'gift-cloth' ? 'cloth' : 'tools');
+  if (act === 'post') return Nat.colonyPost(world, s, c, nation);
+  if (act === 'mission') return Nat.colonyMission(world, s, c, nation);
+  return Nat.showOfForce(world, s, c, nation, natRng(s, 7));
+}
 export function incorporateNation(world: World, s: GameState, id: string): CommandResult { return Nat.incorporate(world, s, id, (k, t) => log(s, k, t), (e) => event(s, e)); }
 
 export function tradingPost(world: World, s: GameState, fleetId: number): CommandResult {

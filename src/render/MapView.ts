@@ -4,7 +4,7 @@ import { SHIPS } from '../data/ships';
 import { SEA_LABELS } from '../data/europe';
 import { isWater } from '../data/terrain';
 import { HEX_R, HEX_W, GRIDS, type Grid, type MapId } from '../sim/hex';
-import { Fog, seasonOf, type GameState, type World, type Fleet, type MapData, type PortDef } from '../sim/types';
+import { Fog, seasonOf, turnBreaks, turnStride, type GameState, type World, type Fleet, type MapData, type PortDef } from '../sim/types';
 import { realmSpec, realmAt } from '../data/realms';
 import { crownSpec } from '../data/rivals';
 import type { Assets } from './assets';
@@ -41,6 +41,8 @@ export interface MapCallbacks {
 const MARGIN = 220;
 const INK_HEX = 0x4a321e;
 const ROUTE = 0x8b2a1a;
+/** the part of a planned route the fleet or party covers this turn */
+const REACH = 0x2e7d32;
 
 function canvasTexture(cv: HTMLCanvasElement, mip = false): Texture {
   return new Texture({ source: new CanvasSource({ resource: cv, autoGenerateMipmaps: mip, scaleMode: 'linear' }) });
@@ -823,28 +825,42 @@ class Scene {
     const p = ui.preview;
     this.previewLabel.visible = !!p && ui.map === g.id;
     if (p && ui.map === g.id && p.path.length > 0) {
-      const pts = chaikin(p.path.flatMap((h) => [g.cx(h), g.cy(h)]));
+      const breaks = turnBreaks(p.turnEnds, turnStride(state.turn));
+      const reach = breaks.length ? breaks[0] : p.path.length - 1;
       if (p.path.length > 1) {
-        dashed(r, pts, 8, 6);
-        r.stroke({ width: 2.6, color: ROUTE, alpha: 0.95 });
+        // this turn: a solid green line, over a pale halo so it reads on any ground
+        const now = chaikin(p.path.slice(0, reach + 1).flatMap((h) => [g.cx(h), g.cy(h)]));
+        if (reach > 0) {
+          r.moveTo(now[0], now[1]); for (let k = 2; k < now.length; k += 2) r.lineTo(now[k], now[k + 1]);
+          r.stroke({ width: 6, color: 0xf8efd8, alpha: 0.85, cap: 'round', join: 'round' });
+          r.moveTo(now[0], now[1]); for (let k = 2; k < now.length; k += 2) r.lineTo(now[k], now[k + 1]);
+          r.stroke({ width: 3.2, color: REACH, alpha: 0.95, cap: 'round', join: 'round' });
+        }
+        // later turns: dotted
+        if (reach < p.path.length - 1) {
+          dashed(r, chaikin(p.path.slice(reach).flatMap((h) => [g.cx(h), g.cy(h)])), 6, 6);
+          r.stroke({ width: 2.4, color: ROUTE, alpha: 0.85 });
+        }
       }
       const end = p.path[p.path.length - 1];
       const x = g.cx(end), y = g.cy(end);
+      const endColour = breaks.length ? ROUTE : REACH;
       r.moveTo(x - 7, y - 7).lineTo(x + 7, y + 7).moveTo(x + 7, y - 7).lineTo(x - 7, y + 7);
-      r.stroke({ width: 3, color: ROUTE });
-      // where each season's sailing runs out, like the turn markers on a pilot's chart
-      p.turnEnds.forEach((k, n) => {
+      r.stroke({ width: 3, color: endColour });
+      // where each turn's travel runs out, like the turn markers on a pilot's chart
+      breaks.forEach((k, n) => {
         const h = p.path[k];
         const mark = new Container();
-        mark.addChild(new Graphics().circle(0, 0, 9).fill({ color: 0xf8efd8 }).stroke({ width: 1.6, color: ROUTE }));
-        const t = label(String(n + 1), 12, { color: '#7a2416' });
+        mark.addChild(new Graphics().circle(0, 0, 10).fill({ color: n === 0 ? REACH : 0xf8efd8 }).stroke({ width: 1.6, color: n === 0 ? 0xf8efd8 : ROUTE }));
+        const t = label(String(n + 1), 12, { color: n === 0 ? '#f8efd8' : '#7a2416' });
         t.style.fontFamily = 'system-ui, sans-serif';
         t.style.fontWeight = 'bold';
         mark.addChild(t);
         mark.position.set(g.cx(h), g.cy(h));
         this.turnMarks.addChild(mark);
       });
-      const when = p.turns > 1 ? `arrives in ${p.turns} seasons` : 'arrives this season';
+      const turns = breaks.length + 1;
+      const when = turns > 1 ? `arrives in ${turns} turns` : 'arrives this turn';
       this.previewLabel.text = ui.selectedParty != null ? `on foot · ${when}` : `${when}${p.cross ? ', then crosses the ocean' : ''} · storm risk ${Math.round(p.risk * 100)}%`;
       // keep the label inside the board
       const half = this.previewLabel.width / 2 + 10;

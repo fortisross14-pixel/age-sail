@@ -480,6 +480,16 @@ export const nextTurnStart = (turn: number) => { const k = turnStride(turn); ret
 export const prevTurnStart = (turn: number) => Math.max(0, turn - turnStride(Math.max(0, turn - 1)));
 /** How a player's turn is named: "Spring 1492" and "Autumn 1492" in the half-year era, then "1551". */
 export const turnLabel = (turn: number) => (turnStride(turn) === 2 ? `${seasonOf(turn) < 2 ? 'Spring' : 'Autumn'} ${yearOf(turn)}` : `${yearOf(turn)}`);
+/**
+ * Where a planned route runs out each player turn, from the season legs a plan reports. Orders carry
+ * on through every season of the turn and into the first of the next before you see the map again,
+ * so the first turn covers stride + 1 legs and each later one stride.
+ */
+export function turnBreaks(turnEnds: number[], stride: number): number[] {
+  const out: number[] = [];
+  for (let k = stride; k < turnEnds.length; k += stride) out.push(turnEnds[k]);
+  return out;
+}
 /** Player turns from the start of the game to a season. */
 export const turnsBetween = (from: number, to: number) => { let n = 0; for (let t = from; t < to; t = nextTurnStart(t)) n++; return n; };
 
