@@ -146,6 +146,12 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
   `src/ui/prefs.ts` (localStorage), never in `GameState`.
 - Screens (the `Drawer`) open centred over everything, HUD included, on a dimmed backdrop; a
   click outside or Escape closes them. Nothing on the map moves when one opens.
+- Screens are lists; a thing (fleet, person, city, colony) opens in its own window
+  (`src/ui/Windows.tsx`, `openWindow(ref, over)`), over the screen or the map. `over` keeps the
+  window underneath for Back; Escape closes the top window. Never show a thing's detail inside a
+  list screen, and link names (a fleet's leader, a city's governor) to their windows.
+- Goods you buy go to the port's stores (`storesAt`: a colony's stock, a factor's, or
+  `GameState.stores` in your cities), never into a ship the UI picked; fleets move them with `stow`.
 - Overlays opened from inside a screen must portal to `.game`: the panel's transform traps
   `position: fixed`.
 

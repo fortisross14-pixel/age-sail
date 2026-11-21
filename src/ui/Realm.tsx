@@ -45,7 +45,7 @@ function rows(game: GameState, world: World) {
   const cities: Row[] = Object.values(game.cities).filter((c) => c.project || c.buildings.docks > 0 || c.buildings.barracks > 0).map((c) => {
     const p = c.project;
     const what = !p ? 'nothing in hand' : p.kind === 'ship' ? `building a ${SHIPS[p.ship].name.toLowerCase()}` : p.kind === 'unit' ? `training ${UNIT_INFO[p.unit].name.toLowerCase()}` : `building ${BUILDINGS[p.building].name.toLowerCase()}`;
-    return { key: c.id, name: portById(world, c.id)?.name ?? c.id, go: { drawer: 'cities' }, state: p ? `${what} · ${p.turnsLeft} season${p.turnsLeft > 1 ? 's' : ''}` : what, tone: p ? undefined : 'idle' };
+    return { key: c.id, name: portById(world, c.id)?.name ?? c.id, go: { city: c.id }, state: p ? `${what} · ${p.turnsLeft} season${p.turnsLeft > 1 ? 's' : ''}` : what, tone: p ? undefined : 'idle' };
   });
   const threats: Row[] = [
     ...game.rebels.map((r) => ({ key: `r${r.id}`, name: r.name, go: { drawer: 'cities' as const, colony: game.colonies.find((c) => c.hex === r.target && c.map === r.map)?.id }, state: `marching on ${game.colonies.find((c) => c.hex === r.target && c.map === r.map)?.name ?? 'a colony'}`, tone: 'bad' as const })),

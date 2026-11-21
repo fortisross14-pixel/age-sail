@@ -81,15 +81,17 @@ function SkillBars({ p }: { p: Person }) {
   );
 }
 
-function CourtierCard({ p, selected, onPick, note }: { p: Person; selected: boolean; onPick: () => void; note?: string }) {
+function CourtierCard({ p, onPick, note, selected }: { p: Person; onPick: () => void; note?: string; selected?: boolean }) {
   const game = useStore((s) => s.game)!;
+  const world = useStore((s) => s.world)!;
   return (
-    <button className={`courtier tone-${RANK_TONE[p.rank]} ${selected ? 'selected' : ''} ${p.alive ? '' : 'dead'}`} onClick={() => { sfx('select'); onPick(); }} aria-pressed={selected}>
+    <button className={`courtier tone-${RANK_TONE[p.rank]} ${selected ? 'selected' : ''} ${p.alive ? '' : 'dead'}`} onClick={() => { sfx('select'); onPick(); }} aria-pressed={selected} title={selected == null ? `Open ${p.name}’s window` : undefined}>
       <span className="rank-ribbon">{note ?? RANK_INFO[p.rank].name}</span>
       <Portrait p={p} turn={game.turn} />
       <b>{p.name.replace(/ (de|van) /, ' $1\u00a0')}</b>
       <span className="meta">{p.alive ? `${ageOf(p, game.turn)} · ${TRAIT_INFO[p.trait].name}` : `died ${p.died != null ? yearOf(p.died) : ''}`}</span>
       <span className="top-skills">{topSkills(p).map((k) => <span key={k} title={SKILL_INFO[k].name}><Icon name={k} size={16} tone="ink" />{p.skills[k]}</span>)}</span>
+      {p.alive && selected == null && <span className="doing">{status(game, world, p)}</span>}
     </button>
   );
 }
@@ -107,39 +109,62 @@ function status(game: ReturnType<typeof useStore.getState>['game'], world: Retur
   return `Ready in ${where}, waiting for a fleet`;
 }
 
+/** Everyone at court, grouped by what they do; each opens their own window. */
 function People() {
   const game = useStore((s) => s.game)!;
-  const order = { explorer: 0, merchant: 1, governor: 2, courtier: 3 };
-  const people = [...game.people].sort((a, b) => Number(b.alive) - Number(a.alive) || order[a.rank] - order[b.rank]);
-  const [sel, setSel] = useState<number | null>(people[0]?.id ?? null);
-  const p = people.find((x) => x.id === sel) ?? people[0];
+  const openWindow = useStore((s) => s.openWindow);
+  const alive = game.people.filter((p) => p.alive);
+  const groups: [string, Person[]][] = [
+    ['Explorers', alive.filter((p) => p.rank === 'explorer')],
+    ['Merchants', alive.filter((p) => p.rank === 'merchant')],
+    ['Governors', alive.filter((p) => p.rank === 'governor')],
+    ['Courtiers, free to commission', alive.filter((p) => p.rank === 'courtier')],
+    ['The dead', game.people.filter((p) => !p.alive)],
+  ];
   return (
-    <div className="court-split">
-      <div className="courtiers">{people.map((x) => <CourtierCard key={x.id} p={x} selected={x.id === p?.id} onPick={() => setSel(x.id)} />)}</div>
-      {p && <PersonDetail key={p.id} p={p} />}
+    <div className="people-index">
+      {groups.filter(([, ps]) => ps.length).map(([title, ps]) => (
+        <section key={title}>
+          <div className="sec">{title} <span className="count">{ps.length}</span></div>
+          <div className="courtiers">{ps.map((x) => <CourtierCard key={x.id} p={x} onPick={() => openWindow({ kind: 'person', id: x.id }, true)} />)}</div>
+        </section>
+      ))}
     </div>
   );
 }
 
-function PersonDetail({ p }: { p: Person }) {
+/** A person's own window: who they are, what they do now, and what you can make of them. */
+export function PersonWindow({ p }: { p: Person }) {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
+  const openWindow = useStore((s) => s.openWindow);
+  const fleet = p.fleet != null ? game.fleets.find((f) => f.id === p.fleet) : undefined;
+  const governs = p.rank === 'governor' && p.city ? p.city : undefined;
   return (
-    <aside className="courtier-detail detail-card">
+    <div className="person-window courtier-detail">
       <div className="who">
         <Portrait p={p} turn={game.turn} size="large" />
         <div>
           <span className={`rank-ribbon tone-${RANK_TONE[p.rank]}`}>{RANK_INFO[p.rank].name}</span>
-          <h3>{p.name}</h3>
+          <h2>{p.name}</h2>
           <div className="muted">{p.alive ? `${ageOf(p, game.turn)} years · ${TRAIT_INFO[p.trait].name} · ${Math.round(salary(p))} a season` : ''}</div>
-          <div className="status">{status(game, world, p)}{p.unitType && p.alive ? ` · with a ${UNIT_INFO[p.unitType].name.toLowerCase()}` : ''}</div>
+          <div className="status">
+            {fleet ? <>Leading <button className="link" onClick={() => openWindow({ kind: 'fleet', id: fleet.id }, true)}>{fleet.name}</button></>
+              : governs ? <>Governor of <button className="link" onClick={() => openWindow({ kind: 'city', id: governs }, true)}>{portById(world, governs)?.name}</button></>
+              : status(game, world, p)}
+            {p.unitType && p.alive ? ` · with a ${UNIT_INFO[p.unitType].name.toLowerCase()}` : ''}
+          </div>
         </div>
       </div>
-      <SkillBars p={p} />
-      <p className="trait"><b>{TRAIT_INFO[p.trait].name}.</b> {TRAIT_INFO[p.trait].blurb}</p>
-      <CourtierStanding p={p} />
-      {p.alive && <PersonActions p={p} />}
-    </aside>
+      <div className="person-cols">
+        <div>
+          <SkillBars p={p} />
+          <p className="trait"><b>{TRAIT_INFO[p.trait].name}.</b> {TRAIT_INFO[p.trait].blurb}</p>
+          <CourtierStanding p={p} />
+        </div>
+        {p.alive && <PersonActions p={p} />}
+      </div>
+    </div>
   );
 }
 
@@ -159,7 +184,7 @@ function PersonActions({ p }: { p: Person }) {
   // commissioned for a fleet: back to that fleet, where the promise shows
   const commission = async (rank: 'explorer' | 'merchant') => {
     const fleet = post && fleetsHere.some((f) => String(f.id) === post) ? Number(post) : undefined;
-    if (await run({ kind: 'promote', person: p.id, rank, ...(rank === 'explorer' ? { unit } : {}), ...(fleet != null ? { fleet } : {}) }) && fleet != null) { selectFleet(fleet); set({ drawer: 'fleets', fleetOpen: fleet }); }
+    if (await run({ kind: 'promote', person: p.id, rank, ...(rank === 'explorer' ? { unit } : {}), ...(fleet != null ? { fleet } : {}) }) && fleet != null) { selectFleet(fleet); useStore.getState().openWindow({ kind: 'fleet', id: fleet }, true); }
   };
   return (
     <div className="commissions">
@@ -224,7 +249,7 @@ function PersonActions({ p }: { p: Person }) {
           <div className="row">
             {fleetsHere.length ? fleetsHere.map((f) => (
               <button key={f.id} className="adm-gold-btn" onClick={async () => {
-                if (await run({ kind: 'assignLeader', person: p.id, fleet: f.id })) { selectFleet(f.id); set({ drawer: null }); setTimeout(() => getView()?.focusHex(f.map, f.hex), 0); }
+                if (await run({ kind: 'assignLeader', person: p.id, fleet: f.id })) { selectFleet(f.id); set({ drawer: null, windows: [] }); setTimeout(() => getView()?.focusHex(f.map, f.hex), 0); }
               }}>{f.name}</button>
             )) : <span className="muted small">No fleet without a leader is in port. Merge or build one.</span>}
           </div>

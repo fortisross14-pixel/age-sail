@@ -1,4 +1,4 @@
-/** Colonies overseas and the colonial tax rate, shown in the Cities panel's list. */
+/** A colony's own window, and the colonial tax rate shown in the Cities screen. */
 import { useStore } from '../store';
 import { Enslaved } from './Late';
 import { fmt } from './format';
@@ -13,16 +13,16 @@ import { getView } from './MapCanvas';
 import { turnLabel } from '../sim/types';
 import { ArmyRow } from './Battle';
 import { Art } from './theme/Art';
+import { spriteUrl } from '../render/assets';
+import { colonyKind } from '../render/colonyKind';
 import { WALLS } from '../data/army';
 
-export function ColonyCard({ colonyId }: { colonyId: string }) {
+export function ColonyWindow({ colonyId }: { colonyId: string }) {
   const game = useStore((s) => s.game)!;
-  const world = useStore((s) => s.world)!;
-  const selected = useStore((s) => s.selectedColony);
   const run = useStore((s) => s.run);
   const set = useStore((s) => s.set);
+  const openWindow = useStore((s) => s.openWindow);
   const c = game.colonies.find((x) => x.id === colonyId)!;
-  const open = selected === c.id || game.colonies.length === 1;
   const L = LEVELS[c.level];
   const next = L.next ? LEVELS[L.next] : null;
   const docked = game.fleets.filter((f) => f.at === c.id);
@@ -39,18 +39,20 @@ export function ColonyCard({ colonyId }: { colonyId: string }) {
   const net = c.last.births - c.last.deaths;
   const perYear = Math.round(c.pop * net * 100) / 100;
   const siege = Object.entries(game.natives).find(([, st]) => st.siege?.colony === c.id);
+  const world = useStore((s) => s.world)!;
   const besiegers = siege ? nationById(world, siege[0]) : undefined;
   return (
-    <section className={`city-card colony ${open ? 'open' : ''}`}>
-      <button className="city-head" onClick={() => { set({ selectedColony: open ? null : c.id }); if (!open) setTimeout(() => getView()?.focusHex(c.map, c.hex), 0); }} aria-expanded={open}>
-        <span className="city-name">{c.name}</span>
-        <span className="muted small">{L.name} · {c.pop}/{L.cap} colonists · {territoryOf(c).length} hexes{c.last.hungry ? ' · hungry' : c.last.discontent ? ' · discontent' : ''}</span>
-        <span aria-hidden>{open ? '▾' : '▸'}</span>
-      </button>
-      {open && (
+    <section className="colony-window">
+      <header className="drawer-head window-head">
+        <span className="ship-art"><img src={spriteUrl(`colonies/${colonyKind(game, c)}-${c.level}`)} alt="" height={64} /></span>
+        <div>
+          <h2>{c.name} <button className="link small" onClick={() => { const n = prompt('A new name for the colony', c.name); if (n && n.trim() !== c.name) void run({ kind: 'renameColony', colony: c.id, name: n }); }}>rename</button></h2>
+          <div className="sub">{L.name} · {c.pop}/{L.cap} colonists · {territoryOf(c).length} hexes{c.last.hungry ? ' · hungry' : c.last.discontent ? ' · discontent' : ''}
+            {' · '}<button className="link" onClick={() => { set({ drawer: null, windows: [] }); setTimeout(() => getView()?.focusHex(c.map, c.hex), 0); }}>show on the map</button></div>
+        </div>
+      </header>
         <div className="city-body">
           <Enslaved colony={c} />
-          <button className="link" onClick={() => { const n = prompt('A new name for the colony', c.name); if (n && n.trim() !== c.name) void run({ kind: 'renameColony', colony: c.id, name: n }); }}>rename</button>
           <div className="loyalty" title={loyaltyFactors(game, c).map((f) => `${f.label}: ${f.value > 0 ? '+' : ''}${f.value}`).join('\n')}>
             <span className="small">Loyalty <b>{Math.round(c.loyalty)}</b> → {Math.round(loyaltyTarget(game, c))}{c.unrest ? ' · unrest: work slows' : ''}{c.loyalty < 15 && c.pop >= 6 ? ' · talk of independence' : ''}</span>
             <div className="bar"><div className={c.loyalty < 30 ? 'bad' : ''} style={{ width: `${c.loyalty}%` }} /></div>
@@ -128,35 +130,22 @@ export function ColonyCard({ colonyId }: { colonyId: string }) {
             </>
           )}
 
-          {docked.map((f) => {
-            const free = cargoCapacity(f) - cargoUsed(f);
-            const goods = GOODS.filter((g) => (f.cargo[g] ?? 0) > 0 || (c.stock[g] ?? 0) >= 1);
-            const colonists = game.units.filter((u) => u.fleet === f.id && u.type === 'colonist').length;
-            return (
-              <div key={f.id} className="dock">
-                <h4>{f.name} in port <span className="muted small">· hold {cargoUsed(f)}/{cargoCapacity(f)}</span></h4>
-                {colonists > 0 && <button className="primary" onClick={() => void run({ kind: 'settle', fleet: f.id })}>Settle {colonists} colonist{colonists > 1 ? 's' : ''} here</button>}
-                <table className="market">
-                  <thead><tr><th>Good</th><th>Colony</th><th>Ship</th><th /></tr></thead>
-                  <tbody>
-                    {goods.map((g) => (
-                      <tr key={g}>
-                        <td className="good"><GoodIcon good={g} />{GOOD_INFO[g].name}</td>
-                        <td className="num">{Math.floor(c.stock[g] ?? 0)}</td>
-                        <td className="num">{f.cargo[g] ?? '–'}</td>
-                        <td className="trade">
-                          <button disabled={!f.cargo[g]} onClick={() => void run({ kind: 'colonyTransfer', fleet: f.id, good: g, qty: -(f.cargo[g] ?? 0) })}>Unload all</button>
-                          <button disabled={free <= 0 || (c.stock[g] ?? 0) < 1} onClick={() => void run({ kind: 'colonyTransfer', fleet: f.id, good: g, qty: Math.floor(c.stock[g] ?? 0) })}>Load all</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })}
+          <h4>Ships in port</h4>
+          {docked.length ? (
+            <ul className="fleet-list lines">
+              {docked.map((f) => (
+                <li key={f.id}>
+                  <button className="fleet-line bare" onClick={() => openWindow({ kind: 'fleet', id: f.id, tab: 'cargo' }, true)}>
+                    <span className="fl-name"><b>{f.name}</b><span className="muted small">{f.ships.length} ship{f.ships.length > 1 ? 's' : ''} · {game.units.filter((u) => u.fleet === f.id).length} aboard</span></span>
+                    <span className="fl-cell"><b>{cargoUsed(f)}/{cargoCapacity(f)}</b><span className="muted small">hold</span></span>
+                    <span className="fl-where"><b>Load and unload</b><span className="muted small">opens her cargo</span></span>
+                    <span className="fl-go" aria-hidden>›</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="muted small">No ship lies here. Ships bring food, cloth, wine and settlers from home.</p>}
         </div>
-      )}
     </section>
   );
 }

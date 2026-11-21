@@ -16,6 +16,9 @@ import type { GameState, World, ProjectKind, Rank, UnitType, TradeRoute, Stance 
 export type Command =
   | { kind: 'buy'; fleet: number; good: GoodId; qty: number }
   | { kind: 'sell'; fleet: number; good: GoodId; qty: number }
+  | { kind: 'storeBuy'; port: string; good: GoodId; qty: number }
+  | { kind: 'storeSell'; port: string; good: GoodId; qty: number }
+  | { kind: 'stow'; fleet: number; good: GoodId; qty: number }
   | { kind: 'provision'; fleet: number }
   | { kind: 'repair'; fleet: number }
   | { kind: 'move'; fleet: number; hex: number }
@@ -125,6 +128,9 @@ const api = {
     switch (c.kind) {
       case 'buy': result = G.buy(world, state, c.fleet, c.good, c.qty); break;
       case 'sell': result = G.sell(world, state, c.fleet, c.good, c.qty); break;
+      case 'storeBuy': result = G.storeBuy(world, state, c.port, c.good, c.qty); break;
+      case 'storeSell': result = G.storeSell(world, state, c.port, c.good, c.qty); break;
+      case 'stow': result = G.stow(state, c.fleet, c.good, c.qty); break;
       case 'provision': result = G.provision(world, state, c.fleet); break;
       case 'repair': result = G.repair(world, state, c.fleet); break;
       case 'move': result = G.moveFleet(world, state, c.fleet, c.hex); break;

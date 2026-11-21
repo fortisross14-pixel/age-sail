@@ -11,7 +11,7 @@ import { Icon, type IconName } from './theme/icons';
 import { sfx } from './sound';
 import { GOOD_INFO, GOODS, type GoodId } from '../data/goods';
 import { unitPrice, buyCost, sellValue } from '../sim/market';
-import { cargoUsed, cargoCapacity, portById, allPorts, spreadFor } from '../sim/game';
+import { cargoUsed, cargoCapacity, portById, allPorts, spreadFor, storesAt, storesTrade } from '../sim/game';
 import { fmt } from './format';
 import { GoodIcon } from './Icon';
 import { Sparkline } from './Sparkline';
@@ -45,8 +45,6 @@ export function Drawer() {
   const [entering, setEntering] = useState(true);
   useStore((s) => `${s.courtTab}|${s.researchTab}`); // the hint follows the tab
   // the keyboard goes with the screen: focus moves into it when it opens
-  // the Fleets screen opens on its list unless a fleet was asked for
-  useEffect(() => { if (drawer !== 'fleets' && useStore.getState().fleetOpen != null) set({ fleetOpen: null }); }, [drawer, set]);
   useEffect(() => { if (drawer) setTimeout(() => document.querySelector<HTMLElement>('.drawer .adm-close')?.focus({ preventScroll: true }), 80); }, [drawer]);
   useEffect(() => {
     if (drawer && drawer !== shown) {
@@ -139,7 +137,7 @@ function Markets() {
                         <button className={`fleet-row ${p.id === current?.id ? 'sel' : ''}`} onClick={() => { sfx('select'); set({ selectedPort: p.id }); }}>
                           {p.realm ? <CrestArt realm={p.realm} size={34} fallback={<span className="crown-flag" style={{ background: hexColor(realmSpec(p.realm).color), borderColor: '#2a1806' }} aria-hidden />} /> : <span className="crown-flag native" aria-hidden />}
                           <span className="fleet-name">{p.name}<span className="muted small">{p.kind === 'native' ? ` · the ${p.people}` : p.kind === 'foreign' ? ` · ${p.nation}` : ''}</span></span>
-                          <span className="fleet-where">{factoryAt(game, p.id) ? <span className="chip">factory</span> : null}{docked ? `${docked} fleet${docked > 1 ? 's' : ''} in port` : ''}</span>
+                          <span className="fleet-where">{factoryAt(game, p.id) ? <span className="chip">factory</span> : null}{(() => { const st = storesAt(game, p.id); const n = st ? Object.values(st).reduce((t, v) => t + Math.floor(v ?? 0), 0) : 0; return n > 0 ? <span className="chip" title="Goods in your stores here">{n} kept</span> : null; })()}{docked ? `${docked} fleet${docked > 1 ? 's' : ''} in port` : ''}</span>
                         </button>
                       </li>
                     );
@@ -173,27 +171,45 @@ function PortMarket({ portId }: { portId: string }) {
   const world = useStore((s) => s.world)!;
   const selected = useStore((s) => s.selectedFleet);
   const run = useStore((s) => s.run);
+  const openWindow = useStore((s) => s.openWindow);
   const [qty, setQty] = useState(10);
   const port = portById(world, portId);
+  const docked = game.fleets.filter((f) => f.at === portId);
+  const hasStores = storesTrade(game, portId);
+  // what you trade from here is always shown and always yours to choose: your stores if you keep any,
+  // otherwise the ship you have selected, or the only one in port
+  const [from, setFrom] = useState<'stores' | number | null>(() => hasStores ? 'stores' : docked.find((f) => f.id === selected)?.id ?? (docked.length === 1 ? docked[0].id : null));
   if (!port) return null;
   const book = game.markets[port.id] ?? {};
-  const fleet = game.fleets.find((f) => f.id === selected && f.at === port.id) ?? game.fleets.find((f) => f.at === port.id);
-  const free = fleet ? cargoCapacity(fleet) - cargoUsed(fleet) : 0;
-  const sp = spreadFor(game, fleet, port.kind === 'native');
+  const fleet = typeof from === 'number' ? docked.find((f) => f.id === from) : undefined;
+  const stores = from === 'stores' && hasStores ? storesAt(game, port.id) ?? {} : null;
+  const trading = !!fleet || !!stores;
+  const free = fleet ? cargoCapacity(fleet) - cargoUsed(fleet) : stores ? Infinity : 0;
+  const sp = stores ? spreadFor(game, undefined, false, port.id) + (port.kind === 'foreign' ? FACTORY.foreignDues : 0) : spreadFor(game, fleet, port.kind === 'native');
   const factory = factoryAt(game, port.id);
   const pacePreview = book.sugar ? factoryPace(book.sugar) : FACTORY.minPace;
   const sub = port.kind === 'native' ? `Trading ground of the ${port.people}` : port.kind === 'home' ? 'Your city' : `Foreign market · ${port.nation}`;
+  const where = factory ? 'your factor’s warehouse' : `your stores in ${port.name}`;
   return (
     <div className="port-market">
       <h3>{port.name}</h3>
       <div className="muted small">{sub}. {port.blurb}</div>
-      {fleet ? (
-        <div className="row">
-          <span className="small">Trading with <b>{fleet.name}</b> · {free} hold free</span>
+      {(hasStores || docked.length > 0) ? (
+        <div className="trade-from">
+          <span className="small"><b>Trading from</b></span>
+          <span className="stance" role="radiogroup" aria-label="Trade from">
+            {hasStores && <button role="radio" aria-checked={from === 'stores'} className={from === 'stores' ? 'on' : ''} title={`Buy into ${where}; sell what is kept there`} onClick={() => setFrom('stores')}>{factory ? 'Factor’s warehouse' : 'Your stores'}</button>}
+            {docked.map((f) => <button key={f.id} role="radio" aria-checked={from === f.id} className={from === f.id ? 'on' : ''} title={`Buy into ${f.name}’s hold; sell from it`} onClick={() => setFrom(f.id)}>{f.name}</button>)}
+          </span>
           <span className="spacer" />
           <label className="qty">Lot {[1, 10, 50].map((q) => <button key={q} className={qty === q ? 'on' : ''} onClick={() => setQty(q)}>{q}</button>)}</label>
+          <div className="muted small from-note">
+            {stores ? <>What you buy waits in {where} until a fleet loads it: open the ship and choose <b>Load and unload</b>.{docked.length > 0 && <> {docked.map((f, i) => <span key={f.id}>{i ? ', ' : ''}<button className="link" onClick={() => openWindow({ kind: 'fleet', id: f.id, tab: 'cargo' }, true)}>{f.name}</button></span>)} {docked.length > 1 ? 'lie' : 'lies'} here.</>}</>
+              : fleet ? <>Straight in and out of <b>{fleet.name}</b>’s hold · {free} free.{hasStores ? ' Your stores here are kept apart.' : ''}</>
+              : <>Choose what trades: {docked.length} ships lie here.</>}
+          </div>
         </div>
-      ) : <div className="muted small notice">Prices this season. Bring a fleet into port to trade.</div>}
+      ) : <div className="muted small notice">Prices this season. You keep no stores here: bring a fleet into port to trade from her hold{port.map === 'old' && port.kind !== 'native' ? ', or open a factory' : ''}.</div>}
       {shocksIn(game, port.realm).map((x) => (
         <div key={x.kind} className="notice shock"><b>{shockTitle(x.kind, x.region)}</b> · {x.spec.text.replace('{region}', REGION_NAME[x.region as Region])} <span className="muted">Until {turnLabel(x.until)}.</span></div>
       ))}
@@ -209,12 +225,14 @@ function PortMarket({ portId }: { portId: string }) {
           <span className="muted small">A factor and a warehouse here: they sell what you leave a little at a time, so the price holds, and buy what you need when it is cheap.</span>
         </div>
       ))}
-      <CaptivesRow port={port} fleet={fleet} free={free} />
+      <CaptivesRow port={port} fleet={fleet} free={fleet ? free : 0} />
       <div className="goods-list">
         {GOODS.filter((g) => book[g]).map((good) => {
           const m = book[good]!;
-          const have = fleet?.cargo[good] ?? 0;
+          const have = Math.floor((stores ? stores[good] : fleet?.cargo[good]) ?? 0);
           const buyQ = Math.max(1, Math.min(qty, Math.floor(m.stock), free));
+          const buy = () => void run(stores ? { kind: 'storeBuy', port: port.id, good, qty } : { kind: 'buy', fleet: fleet!.id, good, qty });
+          const sell = (n: number) => void run(stores ? { kind: 'storeSell', port: port.id, good, qty: n } : { kind: 'sell', fleet: fleet!.id, good, qty: n });
           const sellQ = Math.max(1, Math.min(qty, have));
           const hist = m.history;
           const best = have > 0 ? bestPort(game, world, good, port.map) : null;
@@ -231,12 +249,12 @@ function PortMarket({ portId }: { portId: string }) {
               <span className="g-price"><b>{fmt(unitPrice(m) * (1 - sp))}</b><span>sell</span></span>
               <span className="g-price buy"><b>{fmt(unitPrice(m) * (1 + sp))}</b><span>buy</span></span>
               <span className={`g-trend ${falling ? 'down' : 'up'}`}><Sparkline values={hist} /></span>
-              {fleet && (
+              {trading && (
                 <span className="g-trade">
-                  {have > 0 && <span className="hold">{have} aboard</span>}
-                  <button disabled={free <= 0 || m.stock < 1} title={`Buy ${buyQ} for ${fmt(buyCost(m, buyQ, sp))}`} onClick={() => void run({ kind: 'buy', fleet: fleet.id, good, qty })}>Buy {buyQ}</button>
-                  <button disabled={!have} title={have ? `Sell ${sellQ} for ${fmt(sellValue(m, sellQ, sp))}` : ''} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty })}>Sell {sellQ}</button>
-                  <button disabled={!have} onClick={() => void run({ kind: 'sell', fleet: fleet.id, good, qty: have })}>All</button>
+                  <span className={`hold ${have ? '' : 'none'}`} title={stores ? `In ${where}` : `Aboard ${fleet!.name}`}>{have} {stores ? 'kept' : 'aboard'}</span>
+                  <button disabled={free <= 0 || m.stock < 1} title={`Buy ${buyQ} for ${fmt(buyCost(m, buyQ, sp))}`} onClick={buy}>Buy {buyQ}</button>
+                  <button disabled={!have} title={have ? `Sell ${sellQ} for ${fmt(sellValue(m, sellQ, sp))}` : ''} onClick={() => sell(qty)}>Sell {sellQ}</button>
+                  <button disabled={!have} onClick={() => sell(have)}>All</button>
                 </span>
               )}
               {factory && (
@@ -245,8 +263,6 @@ function PortMarket({ portId }: { portId: string }) {
                   <span className="stance mini" role="radiogroup" aria-label={`Factor orders for ${GOOD_INFO[good].name}`}>
                     {(['hold', 'sell', 'buy'] as const).map((k) => <button key={k} role="radio" aria-checked={mode === k} className={mode === k ? 'on' : ''} onClick={() => void run({ kind: 'factoryOrder', city: port.id, good, mode: k })}>{k === 'hold' ? 'Hold' : k === 'sell' ? 'Sell' : 'Buy'}</button>)}
                   </span>
-                  {fleet && have > 0 && <button title="Leave it all with the factor" onClick={() => void run({ kind: 'factoryTransfer', fleet: fleet.id, good, qty: have })}>Leave {have}</button>}
-                  {fleet && fstock > 0 && <button disabled={free <= 0} onClick={() => void run({ kind: 'factoryTransfer', fleet: fleet.id, good, qty: -fstock })}>Take</button>}
                 </span>
               )}
             </div>

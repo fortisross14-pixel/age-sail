@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { useStore } from '../store';
+import { useStore, type FleetTab } from '../store';
 import { SHIPS } from '../data/ships';
 import { GOOD_INFO, GOODS, type GoodId } from '../data/goods';
 import { RANK_INFO, UNIT_INFO, SKILL_INFO } from '../data/court';
 import {
   cargoUsed, cargoCapacity, crewNeeded, provisionCost, repairCost, portById, provisionsMax, maxMoves, leaderOf, isPortal, canCross,
-  slotsMax, slotsUsed, unitsAboard, allPorts, mainPort, routeEstimate,
+  slotsMax, slotsUsed, unitsAboard, allPorts, mainPort, routeEstimate, storesAt, storesTrade,
 } from '../sim/game';
+import { colonyById } from '../sim/colony';
+import { StepHint } from './Guidance';
 import { SKILLS, type Fleet, type GameState, type Person, type TradeRoute, type TradeStop, type UnitType, type World } from '../sim/types';
 import { fmt } from './format';
 import { GoodIcon, ShipIcon } from './Icon';
@@ -16,20 +18,16 @@ import { Pips, Tabs } from './Drawers';
 import { Portrait } from './theme/Portrait';
 import { Art } from './theme/Art';
 
-type FleetTab = 'command' | 'ships' | 'route';
-
-const whereIs = (world: World, game: GameState, f: Fleet) => (f.at ? portById(world, f.at, game)?.name ?? 'in port' : f.map === 'new' ? 'the Mar Océano' : 'at sea');
-const doing = (f: Fleet) => (f.route?.active ? 'on a trade route' : f.standing ? (f.standing.mode === 'explore' ? 'exploring' : f.standing.mode === 'home' ? 'going home' : 'on patrol') : f.order ? 'under sail' : f.at ? 'in port' : f.moves > 0 ? 'waiting for orders' : 'at sea');
+export const whereIs = (world: World, game: GameState, f: Fleet) => (f.at ? portById(world, f.at, game)?.name ?? 'in port' : f.map === 'new' ? 'the Mar Océano' : 'at sea');
+export const doing = (f: Fleet) => (f.route?.active ? 'on a trade route' : f.standing ? (f.standing.mode === 'explore' ? 'exploring' : f.standing.mode === 'home' ? 'going home' : 'on patrol') : f.order ? 'under sail' : f.at ? 'in port' : f.moves > 0 ? 'waiting for orders' : 'at sea');
 
 /** The fleets as a list; choosing one opens its own page. */
 export function Fleets() {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
-  const open = useStore((s) => s.fleetOpen);
   const set = useStore((s) => s.set);
   const selectFleet = useStore((s) => s.selectFleet);
-  const fleet = game.fleets.find((f) => f.id === open);
-  if (fleet) return <FleetPage key={fleet.id} fleet={fleet} />;
+  const openWindow = useStore((s) => s.openWindow);
   const groups: [string, Fleet[], string][] = [
     ['Expeditions', game.fleets.filter((f) => leaderOf(game, f)?.rank === 'explorer'), 'None yet. Open a fleet below and choose an explorer to lead it.'],
     ['Trade', game.fleets.filter((f) => leaderOf(game, f)?.rank === 'merchant'), 'None yet. Open a fleet and choose a merchant to lead it.'],
@@ -48,7 +46,7 @@ export function Fleets() {
                 const waiting = game.people.find((p) => p.alive && p.posted === f.id);
                 return (
                   <li key={f.id}>
-                    <button className="fleet-line" onClick={() => { selectFleet(f.id); set({ fleetOpen: f.id }); }}>
+                    <button className="fleet-line" onClick={() => { selectFleet(f.id); openWindow({ kind: 'fleet', id: f.id }); }}>
                       <span className="ship-art"><Art slot={`ship/${f.ships[0].type}`} fallback={<ShipIcon type={f.ships[0].type} size={46} />} /></span>
                       <span className="fl-name"><b>{f.name}</b><span className="muted small">{l ? `${l.name}, ${l.rank}` : waiting ? `${waiting.name} takes command when ready` : 'no one in command'}</span></span>
                       <span className="fl-cell"><b>{f.ships.length}</b><span className="muted small">ship{f.ships.length > 1 ? 's' : ''}</span></span>
@@ -85,21 +83,21 @@ export function Fleets() {
   );
 }
 
-/** One fleet: what she is doing at the top, then command, ships and trade route each on its own tab. */
-function FleetPage({ fleet }: { fleet: Fleet }) {
+/** A fleet's own window: what she is doing at the top, then command, cargo, ships and trade route on tabs. */
+export function FleetWindow({ fleet, tab: first }: { fleet: Fleet; tab?: FleetTab }) {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const run = useStore((s) => s.run);
   const set = useStore((s) => s.set);
+  const openWindow = useStore((s) => s.openWindow);
   const [renaming, setRenaming] = useState<string | null>(null);
   const leader = leaderOf(game, fleet);
-  const [tab, setTab] = useState<FleetTab>('command');
+  const [tab, setTab] = useState<FleetTab>(first ?? 'command');
   const port = fleet.at ? portById(world, fleet.at, game) : undefined;
   const here = game.fleets.filter((f) => f !== fleet && f.map === fleet.map && f.hex === fleet.hex);
   return (
     <div className="fleet-page">
-      <div className="fleet-page-head">
-        <button className="back" onClick={() => set({ fleetOpen: null })}>‹ All fleets</button>
+      <header className="drawer-head window-head">
         <span className="ship-art"><Art slot={`ship/${fleet.ships[0].type}`} fallback={<ShipIcon type={fleet.ships[0].type} size={54} />} /></span>
         {renaming != null ? (
           <form className="row" onSubmit={(e) => { e.preventDefault(); void run({ kind: 'rename', fleet: fleet.id, name: renaming }); setRenaming(null); }}>
@@ -108,14 +106,18 @@ function FleetPage({ fleet }: { fleet: Fleet }) {
             <button type="button" onClick={() => setRenaming(null)}>Cancel</button>
           </form>
         ) : (
-          <div className="fp-title">
-            <h3>{fleet.name} <button className="link" onClick={() => setRenaming(fleet.name)}>rename</button></h3>
-            <div className="muted">{leader ? `${leader.name}, ${leader.rank}` : 'No one in command'} · {whereIs(world, game, fleet)} · {doing(fleet)}</div>
+          <div>
+            <h2>{fleet.name} <button className="link small" onClick={() => setRenaming(fleet.name)}>rename</button></h2>
+            <div className="sub">
+              {leader ? <button className="link" title="Open their window" onClick={() => openWindow({ kind: 'person', id: leader.id }, true)}>{leader.name}, {leader.rank}</button> : 'No one in command'}
+              {' · '}{port && (port.kind === 'home' || port.kind === 'colony')
+                ? <button className="link" onClick={() => openWindow(port.kind === 'colony' ? { kind: 'colony', id: port.id } : { kind: 'city', id: port.id }, true)}>{port.name}</button>
+                : whereIs(world, game, fleet)} · {doing(fleet)}
+            </div>
           </div>
         )}
-        <span className="spacer" />
-        <button onClick={() => { set({ drawer: null }); setTimeout(() => getView()?.focusHex(fleet.map, fleet.hex), 0); }}>Show on the map</button>
-      </div>
+      </header>
+      <StepHint screen="fleets" />
 
       <dl className="facts wide">
         <dt>Moves</dt><dd>{fleet.moves} / {maxMoves(fleet, game)}</dd>
@@ -123,11 +125,6 @@ function FleetPage({ fleet }: { fleet: Fleet }) {
         <dt>Crew</dt><dd className={fleet.crew < crewNeeded(fleet) * 0.6 ? 'bad' : ''}>{fleet.crew} / {crewNeeded(fleet)}</dd>
         <dt>Hold</dt><dd>{cargoUsed(fleet)} / {cargoCapacity(fleet)}</dd>
       </dl>
-      {cargoUsed(fleet) > 0 && (
-        <div className="cargo">
-          {GOODS.filter((g) => fleet.cargo[g]).map((g) => <span key={g} className="chip" title={GOOD_INFO[g].name}><GoodIcon good={g} size={20} />{fleet.cargo[g]}</span>)}
-        </div>
-      )}
       <div className="row">
         {isPortal(world, fleet) && (
           <button className="primary" disabled={fleet.moves <= 0 || !canCross(game, fleet)} onClick={() => void run({ kind: 'cross', fleet: fleet.id })}>
@@ -137,20 +134,89 @@ function FleetPage({ fleet }: { fleet: Fleet }) {
         {fleet.order && <button onClick={() => void run({ kind: 'cancelOrder', fleet: fleet.id })}>Cancel orders</button>}
         {fleet.at && provisionCost(world, fleet, game) > 0 && <button onClick={() => void run({ kind: 'provision', fleet: fleet.id })}>Provision · {fmt(provisionCost(world, fleet, game))}</button>}
         {fleet.at && port?.kind !== 'native' && repairCost(world, fleet) > 0 && <button onClick={() => void run({ kind: 'repair', fleet: fleet.id })}>Repair · {fmt(repairCost(world, fleet))}</button>}
-        {port && port.kind !== 'colony' && <button onClick={() => set({ drawer: 'markets', selectedPort: port.id })}>Trade in {port.name}</button>}
-        {port?.kind === 'colony' && <button onClick={() => set({ drawer: 'cities', selectedColony: port.id })}>Open {port.name}</button>}
+        <span className="spacer" />
+        <button onClick={() => { set({ drawer: null, windows: [] }); setTimeout(() => getView()?.focusHex(fleet.map, fleet.hex), 0); }}>Show on the map</button>
       </div>
 
       <Tabs value={tab} onChange={setTab} tabs={[
         ['command', leader ? 'Command and people' : 'Choose a leader'],
+        ['cargo', `Cargo · ${cargoUsed(fleet)}/${cargoCapacity(fleet)}`],
         ['ships', `Ships (${fleet.ships.length})${here.length ? ` · ${here.length} more here` : ''}`],
         ['route', `Trade route${fleet.route?.active ? ' · running' : ''}`],
       ]} />
       {tab === 'command' && <CommandTab fleet={fleet} />}
+      {tab === 'cargo' && <CargoTab fleet={fleet} />}
       {tab === 'ships' && <ShipsTab fleet={fleet} here={here} />}
       {tab === 'route' && (leader?.rank === 'merchant'
         ? <RouteEditor fleet={fleet} />
         : <p className="muted">Only a fleet led by a merchant can run a trade route by itself. {leader ? `${leader.name} is an explorer.` : 'Choose a merchant to lead this fleet on the first tab.'}</p>)}
+    </div>
+  );
+}
+
+/**
+ * The hold beside your stores in this port: load what you bought, unload what you brought. In a port
+ * where you keep nothing, the hold trades straight at the market.
+ */
+function CargoTab({ fleet }: { fleet: Fleet }) {
+  const game = useStore((s) => s.game)!;
+  const world = useStore((s) => s.world)!;
+  const run = useStore((s) => s.run);
+  const set = useStore((s) => s.set);
+  const selectFleet = useStore((s) => s.selectFleet);
+  const [lot, setLot] = useState(10);
+  const port = fleet.at ? portById(world, fleet.at, game) : undefined;
+  const stores = fleet.at ? storesAt(game, fleet.at) : null;
+  const colony = fleet.at ? colonyById(game, fleet.at) : undefined;
+  const free = cargoCapacity(fleet) - cargoUsed(fleet);
+  const whose = colony ? `${colony.name}’s warehouse` : game.factories.some((f) => f.city === fleet.at) ? 'your factor’s warehouse' : `your stores in ${port?.name}`;
+  const goods = GOODS.filter((g) => (fleet.cargo[g] ?? 0) > 0 || (stores && (stores[g] ?? 0) >= 1));
+  const toMarket = () => { selectFleet(fleet.id); set({ drawer: 'markets', selectedPort: port!.id, windows: [] }); };
+  return (
+    <div className="cargo-tab">
+      <div className="hold-bar" title={`${cargoUsed(fleet)} of ${cargoCapacity(fleet)} in the hold`}>
+        <span><b>Hold</b> {cargoUsed(fleet)} / {cargoCapacity(fleet)}{free > 0 ? ` · ${free} free` : ' · full'}</span>
+        <div className="bar"><div style={{ width: `${(100 * cargoUsed(fleet)) / Math.max(1, cargoCapacity(fleet))}%` }} /></div>
+      </div>
+      {!fleet.at && <p className="muted">At sea. Goods are loaded and unloaded in port: in your cities, your colonies, or where you keep a factor.</p>}
+      {fleet.at && !stores && (
+        <p className="notice">You keep no stores in {port?.name}: the hold trades straight at its market. <button className="link" onClick={toMarket}>Trade from this hold in Markets</button></p>
+      )}
+      {stores && (
+        <div className="row small">
+          <span>Moving goods between the hold and <b>{whose}</b>.</span>
+          <span className="spacer" />
+          <label className="qty">Lot {[1, 10, 50].map((q) => <button key={q} className={lot === q ? 'on' : ''} onClick={() => setLot(q)}>{q}</button>)}</label>
+          <button disabled={!cargoUsed(fleet)} onClick={async () => { for (const g of GOODS) if (fleet.cargo[g]) await run({ kind: 'stow', fleet: fleet.id, good: g, qty: -fleet.cargo[g]! }); }}>Unload everything</button>
+        </div>
+      )}
+      {goods.length > 0 ? (
+        <table className="market cargo-table">
+          <thead><tr><th>Good</th>{stores && <th className="num">{colony ? 'In the colony' : 'In stores'}</th>}<th className="num">Aboard</th>{stores && <th />}</tr></thead>
+          <tbody>
+            {goods.map((g) => {
+              const ashore = Math.floor(stores?.[g] ?? 0), aboard = fleet.cargo[g] ?? 0;
+              return (
+                <tr key={g}>
+                  <td className="good"><GoodIcon good={g} size={26} />{GOOD_INFO[g].name}</td>
+                  {stores && <td className="num">{ashore || '–'}</td>}
+                  <td className="num"><b>{aboard || '–'}</b></td>
+                  {stores && (
+                    <td className="trade">
+                      <button disabled={!ashore || free <= 0} title="From the stores into the hold" onClick={() => void run({ kind: 'stow', fleet: fleet.id, good: g, qty: Math.min(lot, ashore) })}>Load {Math.max(1, Math.min(lot, ashore, free))}</button>
+                      <button disabled={!ashore || free <= 0} onClick={() => void run({ kind: 'stow', fleet: fleet.id, good: g, qty: ashore })}>Load all</button>
+                      <button disabled={!aboard} title="From the hold into the stores" onClick={() => void run({ kind: 'stow', fleet: fleet.id, good: g, qty: -Math.min(lot, aboard) })}>Unload {Math.max(1, Math.min(lot, aboard))}</button>
+                      <button disabled={!aboard} onClick={() => void run({ kind: 'stow', fleet: fleet.id, good: g, qty: -aboard })}>Unload all</button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : <p className="muted">{stores ? `The hold is empty, and so are ${whose}.` : 'The hold is empty.'}</p>}
+      {stores && port && storesTrade(game, port.id) && <p className="muted small">Buy and sell in <button className="link" onClick={toMarket}>Markets</button>: what you buy in {port.name} waits in your stores until a fleet loads it.</p>}
+      {colony && <p className="muted small">Colonists, soldiers and friars go ashore from the first tab.</p>}
     </div>
   );
 }
@@ -162,9 +228,13 @@ function CommandTab({ fleet }: { fleet: Fleet }) {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const run = useStore((s) => s.run);
+  const openWindow = useStore((s) => s.openWindow);
   const leader = leaderOf(game, fleet);
   const port = fleet.at ? portById(world, fleet.at, game) : undefined;
   const home = port?.kind === 'home';
+  const colony = fleet.at ? colonyById(game, fleet.at) : undefined;
+  const colonists = unitsAboard(game, fleet).filter((u) => u.type === 'colonist').length;
+  const who = (p: Person) => <button className="link" title="Open their window" onClick={() => openWindow({ kind: 'person', id: p.id }, true)}><b>{p.name}</b></button>;
   const [unit, setUnit] = useState<UnitType>('colonist');
   const waitingUnits = home ? game.units.filter((u) => u.city === port!.id && u.fleet == null && u.party == null) : [];
   const posted = game.people.find((p) => p.alive && p.posted === fleet.id);
@@ -176,7 +246,7 @@ function CommandTab({ fleet }: { fleet: Fleet }) {
     <div className="command-tab">
       {leader ? (
         <div className="leader">
-          <div><b>{leader.name}</b>, {RANK_INFO[leader.rank].name.toLowerCase()}. {leader.rank === 'explorer' ? 'May sail into unknown waters.' : 'May run a trade route.'}</div>
+          <div>{who(leader)}, {RANK_INFO[leader.rank].name.toLowerCase()}. {leader.rank === 'explorer' ? 'May sail into unknown waters.' : 'May run a trade route.'}</div>
           <div className="skills">
             {SKILLS.map((k) => <span key={k} className="skill" title={SKILL_INFO[k].blurb}><span className="skill-name">{SKILL_INFO[k].short}</span><Pips n={leader.skills[k]} /></span>)}
           </div>
@@ -188,7 +258,7 @@ function CommandTab({ fleet }: { fleet: Fleet }) {
           <p className="lead-note">
             <b>No one in command.</b> Without a leader she sails only charted waters{game.newWorldFound ? '' : ' and cannot cross the Mar Océano'}. An <b>explorer</b> may sail into the unknown and lead a party ashore; a <b>merchant</b> gets better prices and can run a trade route.
           </p>
-          {posted && <p className="lead-posted"><b>{posted.name}</b> takes command {posted.ready > 0 ? `in ${posted.ready} season${posted.ready > 1 ? 's' : ''}` : 'as soon as the fleet lies in their port'}. <button className="link" onClick={() => void run({ kind: 'post', person: posted.id, fleet: null })}>Choose someone else</button></p>}
+          {posted && <p className="lead-posted">{who(posted)} takes command {posted.ready > 0 ? `in ${posted.ready} season${posted.ready > 1 ? 's' : ''}` : 'as soon as the fleet lies in their port'}. <button className="link" onClick={() => void run({ kind: 'post', person: posted.id, fleet: null })}>Choose someone else</button></p>}
           {!home && <p className="muted">Leaders are chosen in one of your own ports: bring the fleet home first.</p>}
           {home && !posted && (
             <>
@@ -200,7 +270,7 @@ function CommandTab({ fleet }: { fleet: Fleet }) {
                 {candidates.map((p) => (
                   <li key={p.id} className="lead-row">
                     <span className="lead-face"><Portrait p={p} turn={game.turn} /></span>
-                    <span className="lead-who"><b>{p.name}</b><span className="muted small">{RANK_INFO[p.rank].name}{p.ready > 0 ? ` · ready in ${p.ready} season${p.ready > 1 ? 's' : ''}` : ''}</span></span>
+                    <span className="lead-who">{who(p)}<span className="muted small">{RANK_INFO[p.rank].name}{p.ready > 0 ? ` · ready in ${p.ready} season${p.ready > 1 ? 's' : ''}` : ''}</span></span>
                     <span className="lead-skill" title={SKILL_INFO.navigation.blurb}>Navigation <Pips n={p.skills.navigation} /></span>
                     <span className="lead-skill" title={SKILL_INFO.commerce.blurb}>Commerce <Pips n={p.skills.commerce} /></span>
                     <span className="lead-act">
@@ -228,6 +298,7 @@ function CommandTab({ fleet }: { fleet: Fleet }) {
 
       <div className="slots">
         <b>Aboard</b> <span className="muted small">{slotsUsed(game, fleet)} of {slotsMax(fleet)} places (caravel 1, carrack 2, galleon 4; the leader takes one)</span>
+        {colony && colonists > 0 && <div className="row"><button className="primary" onClick={() => void run({ kind: 'settle', fleet: fleet.id })}>Settle {colonists} colonist{colonists > 1 ? 's' : ''} in {colony.name}</button></div>}
         {(fleet.captives ?? 0) > 0 && <div className="small">{fleet.captives} captives in the hold. About one in ten dies each season at sea.</div>}
         <div className="row">
           {leader && <span className="chip">✦ {leader.name.split(' ')[0]}</span>}

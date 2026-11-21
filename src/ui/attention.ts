@@ -16,6 +16,8 @@ export interface Target {
   fleet?: number;
   party?: number;
   colony?: string;
+  /** one of your cities: its own window */
+  city?: string;
   researchTab?: 'subjects' | 'laws' | 'expedition';
 }
 

@@ -23,6 +23,18 @@ export interface Preview extends MovePreview { fleet: number; dest: number; map:
 
 export type DrawerId = 'cities' | 'markets' | 'fleets' | 'court' | 'diplomacy' | 'research' | 'chronicle';
 
+export type FleetTab = 'command' | 'cargo' | 'ships' | 'route';
+export type CityTab = 'overview' | 'stores' | 'buildings' | 'economy' | 'recruit';
+/**
+ * One thing's own window: a fleet, a person, a city or a colony. It opens over the screen it was opened
+ * from (or over the map), and closing it goes back there.
+ */
+export type WindowRef =
+  | { kind: 'fleet'; id: number; tab?: FleetTab }
+  | { kind: 'person'; id: number }
+  | { kind: 'city'; id: string; tab?: CityTab }
+  | { kind: 'colony'; id: string };
+
 /** A chronicle entry's identity, stable across saves. */
 export const newsKey = (c: ChronicleEntry) => `${c.turn}|${c.text}`;
 
@@ -63,8 +75,8 @@ interface Store {
   sideTab: 'goals' | 'realm';
   showLedger: boolean;
   showSaves: boolean;
-  /** the fleet whose page the Fleets screen shows; null is the list */
-  fleetOpen: number | null;
+  /** the windows open over the screen or the map, the last on top; Back closes the top one */
+  windows: WindowRef[];
   /** what the map shows over the chart */
   mapMode: 'realms' | 'finds' | 'peoples' | 'loyalty';
   /** the game as it stood before your last order, while that order can still be taken back */
@@ -97,6 +109,10 @@ interface Store {
   confirmPreview: () => Promise<void>;
   setMap: (m: MapId) => void;
   say: (text: string, bad?: boolean) => void;
+  /** Open a thing's window. From inside another window, `over` keeps that one underneath for Back. */
+  openWindow: (w: WindowRef, over?: boolean) => void;
+  /** Back: close the window on top. */
+  closeWindow: () => void;
   set: (p: Partial<Store>) => void;
 }
 
@@ -120,9 +136,9 @@ export async function listSaves(): Promise<SaveInfo[]> {
 }
 
 /** Orders with nothing left to chance: these can be taken back. Anything that rolled dice, sailed or fought cannot. */
-const UNDOABLE = new Set<Command['kind']>(['buy', 'sell', 'provision', 'repair', 'project', 'promote', 'relieve', 'hire', 'embark', 'disembark', 'merge', 'split', 'rename', 'research', 'queueResearch',
+const UNDOABLE = new Set<Command['kind']>(['buy', 'sell', 'storeBuy', 'storeSell', 'stow', 'provision', 'repair', 'project', 'promote', 'relieve', 'hire', 'embark', 'disembark', 'merge', 'split', 'rename', 'research', 'queueResearch',
   'tradeRoute', 'colonyTransfer', 'factoryOrder', 'factoryTransfer', 'openFactory', 'taxRate', 'charter', 'festival', 'walls', 'upgradeColony', 'renameColony', 'enactLaw', 'fundExpedition', 'standing', 'cancelOrder', 'assignLeader', 'gift', 'realmGift', 'tribute', 'marque', 'buyCaptives', 'sellCaptives', 'landCaptives', 'settle']);
-const UNDO_NAME: Partial<Record<Command['kind'], string>> = { buy: 'a purchase', sell: 'a sale', project: 'a project begun', promote: 'a commission', hire: 'a hiring', enactLaw: 'a law enacted', research: 'a change of subject', tradeRoute: 'a trade route', openFactory: 'a factory opened', gift: 'a gift', realmGift: 'a gift' };
+const UNDO_NAME: Partial<Record<Command['kind'], string>> = { buy: 'a purchase', sell: 'a sale', storeBuy: 'a purchase', storeSell: 'a sale', stow: 'a load', project: 'a project begun', promote: 'a commission', hire: 'a hiring', enactLaw: 'a law enacted', research: 'a change of subject', tradeRoute: 'a trade route', openFactory: 'a factory opened', gift: 'a gift', realmGift: 'a gift' };
 /** Orders that cannot be taken back and are easy to give by mistake: asked about first. */
 const CONFIRM: Partial<Record<Command['kind'], string>> = {
   repealLaw: 'Repeal this law? It costs prestige, and enacting it again will cost ducats.',
@@ -138,7 +154,7 @@ let lastAttention: string | null = null;
 /** The sound each kind of order makes when it succeeds. */
 function soundFor(c: Command): Sfx {
   switch (c.kind) {
-    case 'buy': case 'sell': case 'gift': case 'provision': case 'repair': case 'colonyTransfer': return 'coins';
+    case 'buy': case 'sell': case 'storeBuy': case 'storeSell': case 'gift': case 'provision': case 'repair': case 'colonyTransfer': return 'coins';
     case 'project': return c.project.kind === 'building' || c.project.kind === 'ship' ? 'build' : 'train';
     case 'found': case 'upgradeColony': case 'tradingPost': case 'mission': case 'charter': case 'promote': case 'hire': return 'build';
     case 'move': case 'moveParty': case 'land': case 'cross': return 'select';
@@ -193,9 +209,17 @@ export const useStore = create<Store>((set, get) => {
   return {
     phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, stance: 'assault', selectedPort: null, selectedColony: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false, showSettings: false, showWelcome: false, showGuard: false, guardSeen: [],
-    drawer: null, courtTab: 'people', diploTab: 'peoples', researchTab: 'subjects', sideTab: pref('sideTab'), showLedger: false, showSaves: false, fleetOpen: null, mapMode: 'realms', undo: null, dismissed: [], toast: null, busy: false,
+    drawer: null, courtTab: 'people', diploTab: 'peoples', researchTab: 'subjects', sideTab: pref('sideTab'), showLedger: false, showSaves: false, windows: [], mapMode: 'realms', undo: null, dismissed: [], toast: null, busy: false,
 
     set: (p) => set(p),
+
+    openWindow(w, over = false) {
+      sfx('page');
+      set({ windows: over ? [...get().windows, w] : [w] });
+    },
+    closeWindow() {
+      set({ windows: get().windows.slice(0, -1) });
+    },
 
     async checkSave() {
       try {
@@ -350,10 +374,11 @@ export const useStore = create<Store>((set, get) => {
           drawer: diplo ? 'diplomacy' : t.drawer, showLedger: false,
           ...(diplo ? { diploTab: diplo } : t.courtTab ? { courtTab: t.courtTab as Store['courtTab'] } : {}),
           ...(t.researchTab ? { researchTab: t.researchTab } : {}),
-          ...(t.fleetOpen != null ? { fleetOpen: t.fleetOpen } : {}),
-          ...(t.colony ? { selectedColony: t.colony, selectedPort: t.colony } : {}),
         });
       }
+      // a thing to look at opens in its own window, over the map
+      const w: WindowRef | null = t.fleetOpen != null ? { kind: 'fleet', id: t.fleetOpen } : t.colony ? { kind: 'colony', id: t.colony } : t.city ? { kind: 'city', id: t.city } : null;
+      set(w ? { drawer: null, windows: [w], ...(t.colony ? { selectedColony: t.colony } : {}) } : { windows: [] });
     },
 
     selectFleet(id) {

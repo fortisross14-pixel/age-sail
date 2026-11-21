@@ -17,7 +17,7 @@ import * as Vic from './victory';
 import { CRISIS, PRESTIGE, scenarioById, type FavourId, type ScenarioId } from '../data/scenarios';
 import { VOYAGE } from '../data/objectives';
 import { SLAVERY } from '../data/slavery';
-import { NATIVE_TRADE, MARKET } from '../data/trade';
+import { NATIVE_TRADE, MARKET, FACTORY } from '../data/trade';
 import { TREATY_INFO, type Treaty } from '../data/diplomacy';
 import { courtYear, onPromotion } from './court';
 import { DEFAULT_DIFFICULTY, difficultySpec, type Difficulty } from '../data/difficulty';
@@ -160,10 +160,10 @@ export function waterScale(world: World, map: MapId, hex: number): number {
 /** How much fiercer storms are in the open ocean: a skilled navigator reads the sky better. */
 const deepStorms = (s: GameState, f: Fleet) => 3 - 0.3 * skill(leaderOf(s, f), 'navigation');
 /** The haggling margin on each trade: the Crown's bookkeeping and the fleet leader's skills narrow it. */
-export function spreadFor(s: GameState, f?: Fleet, native = false): number {
+export function spreadFor(s: GameState, f?: Fleet, native = false, at = f?.at): number {
   const l = f ? leaderOf(s, f) : undefined;
-  let sp = (has(s, 'bookkeeping') ? MARKET.spreadBooks : MARKET.spread) - skill(l, 'commerce') * 0.01 - (crownSpec(s.crown).edge.spread ?? 0) - Dyn.knowledgeMods(s).spread - Eur.treatySpread(s, f?.at);
-  const city = f?.at ? s.cities[f.at] : undefined;
+  let sp = (has(s, 'bookkeeping') ? MARKET.spreadBooks : MARKET.spread) - skill(l, 'commerce') * 0.01 - (crownSpec(s.crown).edge.spread ?? 0) - Dyn.knowledgeMods(s).spread - Eur.treatySpread(s, at);
+  const city = at ? s.cities[at] : undefined;
   if (city) sp -= city.buildings.market * 0.02;
   if (native) sp -= skill(l, 'diplomacy') * 0.01;
   return Math.max(MARKET.spreadFloor, sp);
@@ -360,7 +360,7 @@ export function newGame(seed: number, until: number = DEFAULT_UNTIL, crown: Crow
     freeStates: [], endTurn: (until - 1492) * 4, ended: false, taxRate: 'normal', loans: [], told: {},
     ledger: { mark: 0, lines: {}, last: null }, rebels: [], victory: null, scenario: scenario ? { id: scenario, done: null } : null, europe: Eur.initEurope(crown), euroWars: [], marque: false, laws: [], expedition: null, flags: {}, pending: [], dynasty: Dyn.initialDynasty(crown, (() => { let k = 0; return () => -(++k); })()), eraPath: null, land: null,
     adoption: { furs: 1, dyes: 1, gold: 1, silver: 1, tools: 1, spices: 1, sugar: 0.5, tobacco: 0.05, cacao: 0.1, timber: 1, stone: 1, food: 1, cloth: 1, wine: 1 },
-    chronicle: [], events: [], factories: [], shocks: [], nextId: 1, newWorldFound: false,
+    chronicle: [], events: [], factories: [], stores: {}, shocks: [], nextId: 1, newWorldFound: false,
     research: { known: [...(spec.edge.startTechs ?? [])], current: null, progress: 0, pending: 0 },
   };
   state.research.current = TECHS.find((t) => !state.research.known.includes(t.id) && t.requires.every((r) => state.research.known.includes(r)))?.id ?? null;
@@ -589,7 +589,13 @@ function adopt(s: GameState, g: GoodId, qty: number) {
 
 // ---------- factories ----------
 
-export function openFactory(world: World, s: GameState, portId: string): CommandResult { return Trade.openFactory(world, s, portById(world, portId, s)); }
+export function openFactory(world: World, s: GameState, portId: string): CommandResult {
+  const r = Trade.openFactory(world, s, portById(world, portId, s));
+  // in one of your own cities the factor takes over the stores: one warehouse per port
+  const kept = s.stores[portId], f = Trade.factoryAt(s, portId);
+  if (r.ok && kept && f) { for (const [g, n] of Object.entries(kept)) f.stock[g as GoodId] = (f.stock[g as GoodId] ?? 0) + (n ?? 0); delete s.stores[portId]; }
+  return r;
+}
 export function factoryOrder(s: GameState, city: string, g: GoodId, mode: 'sell' | 'buy' | 'hold'): CommandResult { return Trade.setOrder(s, city, g, mode); }
 export function factoryTransfer(s: GameState, fleetId: number, g: GoodId, qty: number): CommandResult {
   const f = fleetById(s, fleetId);
@@ -621,6 +627,104 @@ export function sell(world: World, s: GameState, fleetId: number, g: GoodId, qty
   if (!f.cargo[g]) delete f.cargo[g];
   if (f.map === 'old') adopt(s, g, qty);
   return { ok: true, message: `Sold ${qty} ${GOOD_INFO[g].name.toLowerCase()} for ${value} ducats.` };
+}
+
+// ---------- stores ashore ----------
+
+const NO_STORES: Partial<Record<GoodId, number>> = Object.freeze({});
+
+/**
+ * The goods you keep ashore in a port: a colony's warehouse, your factor's, or the quays of one of your
+ * own cities. Null where you keep nothing (a foreign port without a factor, a people's trading ground,
+ * an inland city). With `make`, an empty store is created for one of your cities.
+ */
+export function storesAt(s: GameState, portId: string, make = false): Partial<Record<GoodId, number>> | null {
+  const c = Col.colonyById(s, portId);
+  if (c) return c.stock;
+  const f = Trade.factoryAt(s, portId);
+  if (f) return f.stock;
+  const city = s.cities[portId];
+  if (!city || city.inland) return null;
+  if (make) return (s.stores[portId] ??= {});
+  return s.stores[portId] ?? NO_STORES;
+}
+
+/** Whether what you keep in a port can be bought into and sold from at its market. */
+export const storesTrade = (s: GameState, portId: string) => !!s.markets[portId] && !Col.colonyById(s, portId) && storesAt(s, portId) != null;
+
+/** The market of a port where you keep stores, if it will trade with you. */
+function storesMarket(world: World, s: GameState, portId: string, g: GoodId) {
+  const port = portById(world, portId, s);
+  if (!port || !storesTrade(s, portId)) return { error: `You keep no stores in ${port?.name ?? 'that port'} that its market can reach.` };
+  if (Eur.enemyOf(s, cityById(portId)?.realm)) return { error: `The ports of ${port.name} are closed to you: you are at war with its masters.` };
+  const m = s.markets[portId]?.[g];
+  if (!m) return { error: `${port.name} does not trade in ${GOOD_INFO[g].name.toLowerCase()}.` };
+  const sp = spreadFor(s, undefined, false, portId) + (port.kind === 'foreign' ? FACTORY.foreignDues : 0);
+  return { m, sp, name: port.name };
+}
+
+/** Buy at a port's market into your stores there; a fleet loads it later. */
+export function storeBuy(world: World, s: GameState, portId: string, g: GoodId, qty: number): CommandResult {
+  const r = storesMarket(world, s, portId, g);
+  if ('error' in r) return fail(r.error!);
+  const { m, sp } = r;
+  qty = Math.min(qty, Math.floor(m.stock));
+  while (qty > 0 && buyCost(m, qty, sp) > s.treasury) qty--;
+  if (qty <= 0) return fail('Nothing to buy: no stock, or no money.');
+  const cost = buyCost(m, qty, sp);
+  const st = storesAt(s, portId, true)!;
+  s.treasury -= cost;
+  m.stock -= qty;
+  st[g] = (st[g] ?? 0) + qty;
+  return { ok: true, message: `Bought ${qty} ${GOOD_INFO[g].name.toLowerCase()} for ${cost} ducats. They wait in your stores in ${r.name}.` };
+}
+
+/** Sell from your stores in a port at its market. */
+export function storeSell(world: World, s: GameState, portId: string, g: GoodId, qty: number): CommandResult {
+  const r = storesMarket(world, s, portId, g);
+  if ('error' in r) return fail(r.error!);
+  const { m, sp } = r;
+  const st = storesAt(s, portId, true)!;
+  qty = Math.min(qty, Math.floor(st[g] ?? 0));
+  if (qty <= 0) return fail('Nothing of that in your stores.');
+  const value = sellValue(m, qty, sp);
+  s.treasury += value;
+  s.revenue += value;
+  m.stock += qty;
+  st[g] = (st[g] ?? 0) - qty;
+  if (!(st[g]! >= 1)) delete st[g];
+  adopt(s, g, qty);
+  return { ok: true, message: `Sold ${qty} ${GOOD_INFO[g].name.toLowerCase()} for ${value} ducats.` };
+}
+
+/**
+ * Move goods between a docked fleet's hold and your stores in that port: qty > 0 loads aboard,
+ * qty < 0 unloads. Works the same in your cities, your colonies and where you keep a factor.
+ */
+export function stow(s: GameState, fleetId: number, g: GoodId, qty: number): CommandResult {
+  const f = fleetById(s, fleetId);
+  if (!f) return fail('No such fleet.');
+  if (!f.at) return fail('The fleet must be in port to load or unload.');
+  const c = Col.colonyById(s, f.at);
+  if (c) return Col.transfer(s, f, c, g, qty, cargoCapacity(f), cargoUsed(f));
+  if (Trade.factoryAt(s, f.at)) return Trade.factoryTransfer(s, f, g, -qty, cargoCapacity(f) - cargoUsed(f));
+  const st = storesAt(s, f.at, true);
+  if (!st) return fail('You keep no stores in this port: trade from the hold at its market instead.');
+  const name = GOOD_INFO[g].name.toLowerCase();
+  if (qty > 0) {
+    const n = Math.min(qty, Math.floor(st[g] ?? 0), cargoCapacity(f) - cargoUsed(f));
+    if (n <= 0) return fail('Nothing of that in your stores, or no room in the hold.');
+    st[g] = (st[g] ?? 0) - n;
+    if (!(st[g]! >= 1)) delete st[g];
+    f.cargo[g] = (f.cargo[g] ?? 0) + n;
+    return { ok: true, message: `Loaded ${n} ${name} aboard ${f.name}.` };
+  }
+  const n = Math.min(-qty, f.cargo[g] ?? 0);
+  if (n <= 0) return fail('Nothing of that aboard.');
+  f.cargo[g] = (f.cargo[g] ?? 0) - n;
+  if (!f.cargo[g]) delete f.cargo[g];
+  st[g] = (st[g] ?? 0) + n;
+  return { ok: true, message: `Unloaded ${n} ${name} into your stores.` };
 }
 
 export function provision(world: World, s: GameState, fleetId: number): CommandResult {

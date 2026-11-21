@@ -5,9 +5,11 @@ You lead the Crown of Castile from 1492: grow your home ports in a fixed Old Wor
 send explorers west across the Mar Océano, and discover a New World that is generated
 fresh every game.
 
-## Now playing: v0.22
+## Now playing: v0.23
 
-Fleets are a list, and each fleet has its own page with tabs for command, ships and trade route. You choose a leader on the fleet's page in one click, and someone commissioned for a fleet takes command by themselves when ready. Ships are added to and removed from a fleet on its Ships tab.
+Stores and windows. What you buy in one of your cities waits in its stores (the city's Stores tab) until you load it: select a ship and press Load and unload, or open her Cargo tab. Markets say plainly what you trade from, your stores or the ship you choose. Every fleet, person, city and colony has its own window, opened from Fleets, Court or Cities, or from the map, with Back to the window you came from.
+
+From v0.22: fleets are a list, and each fleet has its own page with tabs for command, ships and trade route. You choose a leader on the fleet's page in one click, and someone commissioned for a fleet takes command by themselves when ready. Ships are added to and removed from a fleet on its Ships tab.
 
 From v0.21: Phase 6, balance: a bot now plays whole games headlessly (`npx vite-node tools/autoplay.ts`) and the numbers were tuned against it. Prestige is earned over a reign, not in one summer of charting; your sales and the rivals' are reckoned on the same scale, so the score and the trade race are fair; the African trade pays about a third of what it did; rival colonies grow at a pace a player can match; the five crowns are evenly matched as rivals; difficulty changes the whole game, not only its start; privateers go home after a fight; and a crossing can meet a storm or a crew that refuses.
 

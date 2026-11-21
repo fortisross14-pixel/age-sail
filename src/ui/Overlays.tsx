@@ -89,7 +89,8 @@ export function EventCard() {
 const GUIDE: { id: string; name: string; items: [string, string][] }[] = [
   { id: 'start', name: 'First steps', items: [
     ['Form an expedition.', 'In Fleets, join the two ships. In Court, make your best navigator an explorer and choose who sails with them (a colonist, soldiers or a missionary). When they are ready, give them command of the fleet. The colonist and soldier waiting in port can go aboard too.'],
-    ['Load cargo.', 'Iron tools are cheap in Europe, and the peoples of the coast may prize them.'],
+    ['Load cargo.', 'Iron tools are cheap in Europe, and the peoples of the coast may prize them. What you buy in your own city waits in its stores (the city’s Stores tab); open the ship and choose Load and unload to take it aboard. In a foreign port or a trading ground you trade straight from a ship’s hold.'],
+    ['Windows.', 'Every fleet, person, city and colony has its own window. Open it from its screen (Fleets, Court, Cities) or from the map: click a selected ship again, or click your city. Back returns to the window underneath; Esc or a click outside closes it.'],
     ['Sail south.', 'Click the sea to plan a voyage: numbered markers show where each season’s sailing ends. Click again or press Space. The trade winds carry you down the coast; coming home is harder.'],
     ['Go ashore.', 'Ships only chart coasts. Beside a shore, Land party puts your units and explorer ashore. On foot they survey the land for gold, silver, timber and fertile soil, and follow rumours of ruins (the red ?). Bring them back aboard from a ship beside them.'],
   ] },

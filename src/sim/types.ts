@@ -581,6 +581,11 @@ export interface GameState {
   events: GameEvent[];
   /** your factories in European ports */
   factories: Factory[];
+  /**
+   * Goods you keep ashore in your own cities, by city id: what you buy there waits here until a fleet
+   * loads it. Colonies keep theirs in `Colony.stock` and factors in `Factory.stock` (see `storesAt`).
+   */
+  stores: Record<string, Partial<Record<GoodId, number>>>;
   /** shocks to demand under way */
   shocks: MarketShock[];
   nextId: number;

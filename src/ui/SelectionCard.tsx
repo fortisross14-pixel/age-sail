@@ -1,6 +1,6 @@
 import { useStore } from '../store';
 import { rivalSpec } from '../data/rivals';
-import { provisionsMax, maxMoves, leaderOf, slotsUsed, slotsMax, isPortal, canCross, portById, cargoUsed, cargoCapacity, provisionCost } from '../sim/game';
+import { provisionsMax, maxMoves, leaderOf, slotsUsed, slotsMax, isPortal, canCross, portById, cargoUsed, cargoCapacity, provisionCost, storesAt } from '../sim/game';
 import { fmt } from './format';
 import { GRIDS } from '../sim/hex';
 import { isWater } from '../data/terrain';
@@ -29,6 +29,7 @@ export function SelectionCard() {
   const run = useStore((s) => s.run);
   const confirm = useStore((s) => s.confirmPreview);
   const set = useStore((s) => s.set);
+  const openWindow = useStore((s) => s.openWindow);
   const landing = useStore((s) => s.landing);
   const partyId = useStore((s) => s.selectedParty);
   const party = game.parties.find((p) => p.id === partyId && p.map === map);
@@ -43,11 +44,11 @@ export function SelectionCard() {
   const lowFood = fleet.supplies <= 2;
   return (
     <div className="selection" role="region" aria-label={`Selected fleet ${fleet.name}`}>
-      <button className="sel-open" title="Open this fleet’s page" aria-label={`Open ${fleet.name}`} onClick={() => set({ drawer: 'fleets', fleetOpen: fleet.id })}><ShipIcon type={fleet.ships[0].type} size={54} /></button>
+      <button className="sel-open" title="Open this fleet’s window" aria-label={`Open ${fleet.name}`} onClick={() => openWindow({ kind: 'fleet', id: fleet.id })}><ShipIcon type={fleet.ships[0].type} size={54} /></button>
       <div className="sel-main">
         <div className="sel-title">
           <b>{fleet.name}</b>
-          <span className="muted small">{leader ? `led by ${leader.name}, ${leader.rank}` : 'no one in command'}{port ? ` · at ${port.name}` : ''}</span>
+          <span className="muted small">{leader ? <>led by <button className="link" onClick={() => openWindow({ kind: 'person', id: leader.id })}>{leader.name}</button>, {leader.rank}</> : 'no one in command'}{port ? ` · at ${port.name}` : ''}</span>
         </div>
         <div className="sel-stats">
           <span title="Movement left this season">⛵ {fleet.moves}/{maxMoves(fleet, game)}</span>
@@ -93,7 +94,9 @@ export function SelectionCard() {
             {fleet.map === 'old' ? 'Cross ⟵' : 'To Europe ⟶'}
           </button>
         )}
-        {port && !preview && <button onClick={() => set(port.kind === 'colony' ? { drawer: 'cities', selectedColony: port.id } : { drawer: 'markets', selectedPort: port.id })}>{port.kind === 'colony' ? 'Colony' : 'Trade'}</button>}
+        {port && !preview && storesAt(game, port.id) && <button title={`Move goods between the hold and your stores in ${port.name}`} onClick={() => openWindow({ kind: 'fleet', id: fleet.id, tab: 'cargo' })}>Load and unload</button>}
+        {port && !preview && port.kind !== 'colony' && <button title={storesAt(game, port.id) ? `Buy and sell from your stores in ${port.name}` : 'Trade from this fleet’s hold'} onClick={() => set({ drawer: 'markets', selectedPort: port.id })}>Market</button>}
+        {port && !preview && (port.kind === 'colony' || port.kind === 'home') && <button onClick={() => openWindow(port.kind === 'colony' ? { kind: 'colony', id: port.id } : { kind: 'city', id: port.id })}>{port.kind === 'colony' ? 'Colony' : 'City'}</button>}
         {port && !preview && provisionCost(world, fleet, game) > 0 && (
           <button onClick={() => void run({ kind: 'provision', fleet: fleet.id })}>Provision · {fmt(provisionCost(world, fleet, game))}</button>
         )}
@@ -125,8 +128,8 @@ export function SelectionCard() {
             </>
           );
         })()}
-        {!preview && !leader && port?.kind === 'home' && <button className="primary" title="Without a leader she sails only charted waters" onClick={() => set({ drawer: 'fleets', fleetOpen: fleet.id })}>Choose a leader</button>}
-        {!preview && <button title="Her own page: command, ships, trade route" onClick={() => set({ drawer: 'fleets', fleetOpen: fleet.id })}>Open fleet</button>}
+        {!preview && !leader && port?.kind === 'home' && <button className="primary" title="Without a leader she sails only charted waters" onClick={() => openWindow({ kind: 'fleet', id: fleet.id, tab: 'command' })}>Choose a leader</button>}
+        {!preview && <button title="Her own window: command and people, cargo, ships, trade route" onClick={() => openWindow({ kind: 'fleet', id: fleet.id })}>Open fleet</button>}
       </div>
       <button className="x" onClick={() => useStore.getState().selectFleet(null)} aria-label="Deselect">×</button>
     </div>
@@ -222,7 +225,7 @@ function PartyCard({ partyId }: { partyId: number }) {
           const needs = Object.entries(foundingNeeds(game, p)).map(([g, n]) => `${n} ${GOOD_INFO[g as GoodId].name.toLowerCase()}`).join(', ');
           return (
             <button className="primary" disabled={!chk.ok} title={chk.ok ? `Uses ${needs} from the fleet beside you` : chk.why}
-              onClick={async () => { if (await run({ kind: 'found', party: p.id })) { const st = useStore.getState(); const c = st.game?.colonies.at(-1); st.set({ drawer: 'cities', selectedColony: c?.id ?? null }); } }}>
+              onClick={async () => { if (await run({ kind: 'found', party: p.id })) { const st = useStore.getState(); const c = st.game?.colonies.at(-1); if (c) st.openWindow({ kind: 'colony', id: c.id }); } }}>
               Found colony
             </button>
           );

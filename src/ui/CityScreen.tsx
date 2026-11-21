@@ -2,14 +2,17 @@ import { Fragment, useEffect, useState } from 'react';
 import { CompareTable } from './More';
 import { COMBAT, MILITARY, isMilitary } from '../data/army';
 import { createPortal } from 'react-dom';
-import { useStore } from '../store';
+import { useStore, type CityTab } from '../store';
 import { SHIPS, type ShipType } from '../data/ships';
 import { UNIT_INFO } from '../data/court';
 import { BUILDINGS, BUILDING_ORDER, UNIT_SPECS, type BuildingId } from '../data/city';
 import { crownSpec } from '../data/rivals';
 import { GOOD_INFO, GOODS } from '../data/goods';
 import { realmSpec } from '../data/realms';
-import { portById, projectCost, realmGate, citySlots, slotsUsedIn, cityTaxes, mainPort, spreadFor } from '../sim/game';
+import { portById, projectCost, realmGate, citySlots, slotsUsedIn, cityTaxes, mainPort, spreadFor, storesAt, cargoUsed, cargoCapacity } from '../sim/game';
+import { LEVELS } from '../sim/colony';
+import { colonyKind } from '../render/colonyKind';
+import { GoodIcon } from './Icon';
 import { personById } from '../sim/court';
 import { unitPrice } from '../sim/market';
 import type { City, ProjectKind, UnitType } from '../sim/types';
@@ -17,7 +20,7 @@ import { spriteUrl } from '../render/assets';
 import { CROWN } from '../render/palette';
 import { fmt } from './format';
 import { Tabs } from './Drawers';
-import { ColonyCard, TaxRate } from './CitiesDrawer';
+import { TaxRate } from './CitiesDrawer';
 import { Art, Medal, CrestArt, buildingSlot, cityViewSlot } from './theme/Art';
 import { Frame } from './theme/Frame';
 import { Icon, Crest, type IconName } from './theme/icons';
@@ -42,38 +45,34 @@ const buildingArt = (b: BuildingId, lv = 1) => {
 const unitArt = (u: UnitType) => <Art slot={`unit/${u}`} fallback={<img src={spriteUrl(UNIT_INFO[u].sprite)} alt="" />} />;
 const shipArt = (t: ShipType) => <Art slot={`ship/${t}`} fallback={<img src={spriteUrl(`ships/${t}`)} alt="" />} />;
 
-type CityTab = 'overview' | 'buildings' | 'economy' | 'recruit';
-
-/** The Cities panel: one of your cities at a time, or the list of all of them and your colonies. */
+/** The Cities screen: every city of your realm and every colony; each opens its own window. */
 export function Cities() {
-  const game = useStore((s) => s.game)!;
-  const selectedPort = useStore((s) => s.selectedPort);
-  const selectedColony = useStore((s) => s.selectedColony);
-  const [list, setList] = useState(() => !!selectedColony && selectedPort === selectedColony);
-  const cityId = selectedPort && game.cities[selectedPort] ? selectedPort : mainPort(game);
-  if (list) return <CityList onPick={(id) => { useStore.getState().set({ selectedPort: id }); setList(false); sfx('page'); }} />;
-  return <CityScreen key={cityId} cityId={cityId} onList={() => { setList(true); sfx('page'); }} />;
+  return <CityList />;
 }
 
 function ordered(cities: Record<string, City>, main: string) {
   return Object.values(cities).sort((a, b) => Number(b.id === main) - Number(a.id === main) || b.size - a.size || Number(a.inland) - Number(b.inland));
 }
 
-function CityScreen({ cityId, onList }: { cityId: string; onList: () => void }) {
+/** A city's own window: what it is, what you keep there, what it builds, earns and raises. */
+export function CityWindow({ cityId, tab: first }: { cityId: string; tab?: CityTab }) {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
   const set = useStore((s) => s.set);
-  const [tab, setTab] = useState<CityTab>('buildings');
+  const [tab, setTab] = useState<CityTab>(first ?? 'overview');
   const city = game.cities[cityId];
   const port = portById(world, cityId)!;
   const all = ordered(game.cities, mainPort(game));
   const k = all.findIndex((c) => c.id === cityId);
-  const go = (d: number) => { sfx('page'); set({ selectedPort: all[(k + d + all.length) % all.length].id }); };
+  // the arrows step through your cities in this same window
+  const go = (d: number) => { const ws = useStore.getState().windows; set({ windows: [...ws.slice(0, -1), { kind: 'city', id: all[(k + d + all.length) % all.length].id, tab }] }); sfx('page'); };
   const colours = CROWN[game.crown];
   const kind = [SIZE_NAME[city.size], city.inland ? 'inland' : 'port', `${citySlots(city)} places`, `+${cityTaxes(city)} / season`].join(' · ');
+  const kept = storesAt(game, cityId);
+  const keptN = kept ? GOODS.reduce((t, g) => t + Math.floor(kept[g] ?? 0), 0) : 0;
   return (
     <>
-      <header className="drawer-head city-head">
+      <header className="drawer-head city-head window-head">
         <div className="vignette"><Art slot={cityViewSlot(cityId, city.inland, city.size)} fallback={<img src={spriteUrl(city.inland ? 'colonies/fort-city' : 'colonies/port-city')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'right center', opacity: .9 }} />} /></div>
         <CrestArt realm={game.crown} size={64} fallback={<Crest primary={colours.css2} secondary={colours.css} size={52} />} />
         <div>
@@ -82,18 +81,73 @@ function CityScreen({ cityId, onList }: { cityId: string; onList: () => void }) 
           <div className="city-nav">
             <button className="adm-medal small" onClick={() => go(-1)} aria-label="Previous city" title="Previous city"><Icon name="prev" size={18} /></button>
             <button className="adm-medal small" onClick={() => go(1)} aria-label="Next city" title="Next city"><Icon name="nextArrow" size={18} /></button>
-            <button className="link" onClick={onList}>All cities and colonies ({all.length + game.colonies.length})</button>
+            <span className="muted small">{k + 1} of {all.length} cities</span>
           </div>
         </div>
       </header>
-      <Tabs value={tab} onChange={setTab} tabs={[['overview', 'Overview'], ['buildings', 'Buildings'], ['economy', 'Economy'], ['recruit', 'Recruitment']]} />
+      <Tabs value={tab} onChange={setTab} tabs={[['overview', 'Overview'], ...(kept ? [['stores', `Stores${keptN ? ` · ${keptN}` : ''}`] as [CityTab, string]] : []), ['buildings', 'Buildings'], ['economy', 'Economy'], ['recruit', 'Recruitment']]} />
       <div className="tab-pane" key={tab}>
         {tab === 'overview' && <Overview city={city} />}
+        {tab === 'stores' && <Stores city={city} />}
         {tab === 'buildings' && <Buildings city={city} />}
         {tab === 'economy' && <Economy city={city} />}
         {tab === 'recruit' && <Recruitment city={city} />}
       </div>
     </>
+  );
+}
+
+/** What you keep in a city, the ships in its harbour, and the people waiting for one. */
+function Stores({ city }: { city: City }) {
+  const game = useStore((s) => s.game)!;
+  const world = useStore((s) => s.world)!;
+  const set = useStore((s) => s.set);
+  const openWindow = useStore((s) => s.openWindow);
+  const port = portById(world, city.id)!;
+  const kept = storesAt(game, city.id) ?? {};
+  const goods = GOODS.filter((g) => (kept[g] ?? 0) >= 1);
+  const book = game.markets[city.id] ?? {};
+  const value = goods.reduce((t, g) => t + Math.floor(kept[g] ?? 0) * (book[g] ? unitPrice(book[g]!) : 0), 0);
+  const docked = game.fleets.filter((f) => f.at === city.id);
+  const waiting = game.units.filter((u) => u.city === city.id && u.fleet == null && u.party == null);
+  const factor = game.factories.some((f) => f.city === city.id);
+  return (
+    <div className="stores-tab">
+      <div className="sec">In your stores <span className="count">{goods.length || ''}</span>{value > 0 && <span className="muted small"> · worth about {fmt(value)} here</span>}</div>
+      {goods.length ? (
+        <table className="market">
+          <thead><tr><th>Good</th><th className="num">Kept</th><th className="num">Price here</th></tr></thead>
+          <tbody>{goods.map((g) => (
+            <tr key={g}><td className="good"><GoodIcon good={g} size={26} />{GOOD_INFO[g].name}</td><td className="num"><b>{Math.floor(kept[g] ?? 0)}</b></td><td className="num">{book[g] ? fmt(unitPrice(book[g]!)) : '–'}</td></tr>
+          ))}</tbody>
+        </table>
+      ) : <p className="muted">Empty. What you buy in {port.name}’s market waits here until a fleet loads it, and what a fleet unloads is kept here.</p>}
+      <div className="row">
+        <button onClick={() => set({ drawer: 'markets', selectedPort: city.id, windows: [] })}>Buy and sell in {port.name}</button>
+        {factor && <span className="muted small">Your factor keeps these stores and trades them on your orders.</span>}
+      </div>
+      <div className="sec">In the harbour <span className="count">{docked.length || ''}</span></div>
+      {docked.length ? (
+        <ul className="fleet-list lines">
+          {docked.map((f) => (
+            <li key={f.id}>
+              <button className="fleet-line short" onClick={() => openWindow({ kind: 'fleet', id: f.id, tab: 'cargo' }, true)}>
+                <span className="ship-art"><Art slot={`ship/${f.ships[0].type}`} fallback={<img src={spriteUrl(`ships/${f.ships[0].type}`)} alt="" />} /></span>
+                <span className="fl-name"><b>{f.name}</b><span className="muted small">{f.ships.length} ship{f.ships.length > 1 ? 's' : ''}</span></span>
+                <span className="fl-cell"><b>{cargoUsed(f)}/{cargoCapacity(f)}</b><span className="muted small">hold</span></span>
+                <span className="fl-where"><b>Load and unload</b><span className="muted small">opens her cargo</span></span>
+                <span className="fl-go" aria-hidden>›</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="muted small">No ship lies here.{city.inland ? ' An inland city has no harbour.' : ''}</p>}
+      {waiting.length > 0 && <>
+        <div className="sec">Waiting for a ship <span className="count">{waiting.length}</span></div>
+        <div className="roles">{waiting.map((u) => <span key={u.id} className="role-chip">{UNIT_INFO[u.type].name}</span>)}</div>
+        <p className="muted small">They go aboard from a fleet’s window, on its first tab.</p>
+      </>}
+    </div>
   );
 }
 
@@ -124,7 +178,7 @@ function Overview({ city }: { city: City }) {
         <div className="fact"><Icon name="taxes" tone="ink" /><b>+{cityTaxes(city)}</b><span>ducats a season</span></div>
         <div className="fact"><Icon name="docks" tone="ink" /><b>{city.inland ? 'Inland' : city.buildings.docks ? `Docks ${ROMAN[city.buildings.docks]}` : 'Quay only'}</b><span>{city.inland ? 'units march to the nearest port' : `${docked.length} fleet${docked.length === 1 ? '' : 's'} in port`}</span></div>
         <div className="fact"><Icon name="construction" tone="ink" /><b>{p ? projectLabel(p) : 'Idle'}</b><span>{p ? `${p.turnsLeft} season${p.turnsLeft === 1 ? '' : 's'} to go` : 'no project under way'}</span></div>
-        <div className="fact"><Icon name="units" tone="ink" /><b>{governor ? governor.name : 'No governor'}</b><span>{governor ? `construction ${governor.skills.construction}` : <button className="link" onClick={() => set({ drawer: 'court', courtTab: 'people' })}>appoint one at court</button>}</span></div>
+        <div className="fact"><Icon name="units" tone="ink" /><b>{governor ? <button className="link" onClick={() => useStore.getState().openWindow({ kind: 'person', id: governor.id }, true)}>{governor.name}</button> : 'No governor'}</b><span>{governor ? `construction ${governor.skills.construction}` : <button className="link" onClick={() => set({ drawer: 'court', courtTab: 'people', windows: [] })}>appoint one at court</button>}</span></div>
       </div>
       {units.length > 0 && <>
         <div className="sec">Waiting for a ship <span className="count">{units.length}</span></div>
@@ -356,32 +410,59 @@ function Recruitment({ city }: { city: City }) {
   );
 }
 
-/** Every city of your realm, then your colonies overseas. */
-function CityList({ onPick }: { onPick: (id: string) => void }) {
+/** Every city of your realm, then your colonies overseas: each opens its own window. */
+function CityList() {
   const game = useStore((s) => s.game)!;
   const world = useStore((s) => s.world)!;
+  const openWindow = useStore((s) => s.openWindow);
   const all = ordered(game.cities, mainPort(game));
+  const open = (id: string) => { sfx('page'); openWindow({ kind: 'city', id }, true); };
   return (
     <>
       <header className="drawer-head">
         <span className="adm-medal" aria-hidden><Medal name="cities" size={60} fallback={<Icon name="cities" size={26} />} /></span>
-        <div><h2>Your cities</h2><div className="sub">{all.length} cities of {realmSpec(game.crown).name} · {game.colonies.length} colon{game.colonies.length === 1 ? 'y' : 'ies'}</div></div>
+        <div><h2>Cities</h2><div className="sub">{all.length} cities of {realmSpec(game.crown).name} · {game.colonies.length} colon{game.colonies.length === 1 ? 'y' : 'ies'}</div></div>
       </header>
-      <details className="compare-wrap"><summary>Compare every city and colony</summary><CompareTable /></details>
-      <div className="tiles">
-        {all.map((c) => (
-          <button key={c.id} className="tile" onClick={() => onPick(c.id)} title={`${SIZE_NAME[c.size]}${c.inland ? ', inland' : ''} · +${cityTaxes(c)} a season`}>
-            <span className="art"><Art slot={cityViewSlot(c.id, c.inland, c.size)} fallback={<img src={spriteUrl(c.inland ? (c.size === 1 ? 'colonies/fort-outpost' : 'colonies/fort-town') : c.size === 1 ? 'colonies/port-outpost' : 'colonies/port-town')} alt="" />} /></span>
-            <span>{portById(world, c.id)!.name}</span>
-            <span className="level">{c.size === 3 ? 'III' : c.size === 2 ? 'II' : 'I'}</span>
-          </button>
-        ))}
+      <div className="sec">Your cities <span className="count">{all.length}</span></div>
+      <div className="tiles city-tiles">
+        {all.map((c) => {
+          const p = c.project;
+          const kept = storesAt(game, c.id);
+          const n = kept ? GOODS.reduce((t, g) => t + Math.floor(kept[g] ?? 0), 0) : 0;
+          const docked = game.fleets.filter((f) => f.at === c.id).length;
+          return (
+            <button key={c.id} className="tile" onClick={() => open(c.id)} title={`${SIZE_NAME[c.size]}${c.inland ? ', inland' : ''} · +${cityTaxes(c)} a season`}>
+              <span className="art"><Art slot={cityViewSlot(c.id, c.inland, c.size)} fallback={<img src={spriteUrl(c.inland ? (c.size === 1 ? 'colonies/fort-outpost' : 'colonies/fort-town') : c.size === 1 ? 'colonies/port-outpost' : 'colonies/port-town')} alt="" />} /></span>
+              <span>{portById(world, c.id)!.name}</span>
+              <span className="level">{c.size === 3 ? 'III' : c.size === 2 ? 'II' : 'I'}</span>
+              <span className="tile-facts">
+                <span className={p ? '' : 'idle'}>{p ? `${projectLabel(p)} · ${p.turnsLeft}` : 'Idle'}</span>
+                {(n > 0 || docked > 0) && <span>{n > 0 ? `${n} in stores` : ''}{n > 0 && docked > 0 ? ' · ' : ''}{docked > 0 ? `${docked} ship${docked > 1 ? 's' : ''}` : ''}</span>}
+              </span>
+            </button>
+          );
+        })}
       </div>
       <div className="sec">Colonies <span className="count">{game.colonies.length || ''}</span></div>
       {game.colonies.length > 0 && <TaxRate />}
-      {game.colonies.length ? game.colonies.map((c) => <ColonyCard key={c.id} colonyId={c.id} />) : (
+      {game.colonies.length ? (
+        <ul className="fleet-list lines">
+          {game.colonies.map((c) => (
+            <li key={c.id}>
+              <button className="fleet-line short" onClick={() => { sfx('page'); openWindow({ kind: 'colony', id: c.id }, true); }}>
+                <span className="ship-art"><img src={spriteUrl(`colonies/${colonyKind(game, c)}-${c.level}`)} alt="" /></span>
+                <span className="fl-name"><b>{c.name}</b><span className="muted small">{LEVELS[c.level].name} · {c.pop}/{LEVELS[c.level].cap} colonists</span></span>
+                <span className={`fl-cell ${c.loyalty < 30 ? 'bad' : ''}`}><b>{Math.round(c.loyalty)}</b><span className="muted small">loyalty</span></span>
+                <span className={`fl-where ${c.last.besieged || c.last.hungry ? 'bad' : ''}`}><b>{c.last.besieged ? 'Under siege' : c.last.hungry ? 'Hungry' : c.last.discontent ? 'Discontent' : 'Quiet'}</b><span className="muted small">{game.fleets.filter((f) => f.at === c.id).length || 'no'} ship{game.fleets.filter((f) => f.at === c.id).length === 1 ? '' : 's'} in port</span></span>
+                <span className="fl-go" aria-hidden>›</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
         <p className="muted">None yet. Land a party with colonists on surveyed coast, with a fleet beside it carrying timber and tools, and choose <b>Found colony</b>.</p>
       )}
+      <details className="compare-wrap"><summary>Compare every city and colony</summary><CompareTable /></details>
     </>
   );
 }

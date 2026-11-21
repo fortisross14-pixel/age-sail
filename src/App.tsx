@@ -11,6 +11,7 @@ import { Dock, Rail } from './ui/Dock';
 import { Minimap } from './ui/Minimap';
 import { GoldDefs } from './ui/theme/icons';
 import { Drawer } from './ui/Drawers';
+import { Windows } from './ui/Windows';
 import { SelectionCard } from './ui/SelectionCard';
 import { HoverInfo } from './ui/HoverInfo';
 import { EventCard, Help, Toast, Settings } from './ui/Overlays';
@@ -51,7 +52,7 @@ function useKeys() {
       if (s.showHelp) { if (k === 'escape' || k === 'enter' || k === 'h') { e.preventDefault(); s.set({ showHelp: false }); } return; }
       if (s.showSaves) { if (k === 'escape') { e.preventDefault(); s.set({ showSaves: false }); } return; }
       if (s.showLedger) { if (k === 'escape' || k === 'enter' || k === 'l') { e.preventDefault(); s.set({ showLedger: false }); } return; }
-      const def = keyDef(k, s.drawer ? 'screen' : 'map');
+      const def = keyDef(k, s.drawer || s.windows.length ? 'screen' : 'map');
       if (!def) return; // with a screen open, Enter and Space belong to the control that has the focus
       if (def.action === 'pan') return; // the map view pans while these are held
       e.preventDefault();
@@ -61,12 +62,13 @@ function useKeys() {
         case 'sail': void s.confirmPreview(); break;
         case 'escape':
           if (s.showSettings) s.set({ showSettings: false });
+          else if (s.windows.length) s.closeWindow();
           else if (s.drawer) s.set({ drawer: null });
           else if (s.landing) s.set({ landing: null });
           else if (s.preview) s.set({ preview: null });
           else { s.selectFleet(null); s.selectParty(null); }
           break;
-        case 'screen': { const d = def.screen!; s.set({ drawer: s.drawer === d ? null : d }); break; }
+        case 'screen': { const d = def.screen!; s.set({ drawer: s.drawer === d && !s.windows.length ? null : d, windows: [] }); break; }
         case 'ledger': s.set({ showLedger: true }); break;
         case 'undo': void s.undoLast(); break;
         case 'mode': { const order = ['realms', 'finds', 'peoples', 'loyalty'] as const; s.set({ mapMode: order[(order.indexOf(s.mapMode) + 1) % order.length] }); break; }
@@ -127,6 +129,7 @@ export function App() {
       <Minimap />
       <Settings />
       <Drawer />
+      <Windows />
       <SelectionCard />
       <HoverInfo />
       <Toast />

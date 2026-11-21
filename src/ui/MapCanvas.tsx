@@ -58,7 +58,7 @@ export function MapCanvas() {
           }
           if (fleetId != null) {
             if (s.selectedFleet !== fleetId) s.selectFleet(fleetId);
-            else s.set({ drawer: 'fleets', fleetOpen: fleetId });
+            else s.openWindow({ kind: 'fleet', id: fleetId });
             return;
           }
           const colony = g.colonies.find((c) => c.map === map && c.hex === hex);
@@ -67,14 +67,18 @@ export function MapCanvas() {
           const again = s.preview?.dest === hex && s.preview.map === map;
           // inland cities: yours open the city panel; foreign ones are names on the chart
           if (port && 'inland' in port && port.inland) {
-            if (port.kind === 'home') s.set({ selectedPort: port.id, preview: null, drawer: 'cities' });
+            if (port.kind === 'home') { s.set({ selectedPort: port.id, preview: null }); s.openWindow({ kind: 'city', id: port.id }); }
             return;
           }
           if (port) {
             if (fleet && fleet.hex !== hex) {
               if (again) void s.confirmPreview();
               else { s.set({ selectedPort: port.id }); void s.planTo(hex); }
-            } else s.set({ selectedPort: port.id, preview: null, drawer: (port.kind === 'home' || port.kind === 'colony') && !fleet ? 'cities' : 'markets', ...(port.kind === 'colony' ? { selectedColony: port.id } : {}) });
+            } else if ((port.kind === 'home' || port.kind === 'colony') && !fleet) {
+              // your own city or colony opens its window; a foreign port or trading ground its market
+              s.set({ selectedPort: port.id, preview: null, ...(port.kind === 'colony' ? { selectedColony: port.id } : {}) });
+              s.openWindow(port.kind === 'colony' ? { kind: 'colony', id: port.id } : { kind: 'city', id: port.id });
+            } else s.set({ selectedPort: port.id, preview: null, drawer: 'markets' });
             return;
           }
           const known = g.fog[map][hex] >= Fog.Charted;
