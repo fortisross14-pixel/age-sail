@@ -122,6 +122,8 @@ export interface Person {
   unitType: UnitType | null;
   /** fleet they lead */
   fleet: number | null;
+  /** the fleet they are to take command of as soon as they are ready and it lies in their port */
+  posted?: number | null;
   /** home city where they are when not at sea (or the city they govern) */
   city: string | null;
   alive: boolean;

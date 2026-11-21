@@ -27,7 +27,9 @@ function targetOf(o: ObjectiveDef, g: GameState): Target {
     const f = (t.fleet === 'led' ? g.fleets.find((x) => x.leader != null) : undefined) ?? g.fleets[0];
     return f ? { fleet: f.id } : { drawer: 'fleets' };
   }
-  return { drawer: t.screen, courtTab: t.courtTab };
+  // a fleet still wants a leader: straight to her page
+  const idle = t.screen === 'fleets' && (o.id === 'explorer' || o.id === 'command') ? g.fleets.find((x) => x.leader == null && x.at != null) : undefined;
+  return { drawer: t.screen, courtTab: t.courtTab, ...(idle ? { fleetOpen: idle.id } : {}) };
 }
 
 /**

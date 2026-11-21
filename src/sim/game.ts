@@ -718,7 +718,7 @@ export function hire(s: GameState, personId: number): CommandResult {
 }
 
 /** Commission a courtier. Explorers come with a free unit of the chosen type. */
-export function promote(s: GameState, personId: number, rank: Rank, opts: { unit?: UnitType; city?: string } = {}): CommandResult {
+export function promote(s: GameState, personId: number, rank: Rank, opts: { unit?: UnitType; city?: string; fleet?: number } = {}): CommandResult {
   const p = courtPerson(s, personId);
   if (!p) return fail('No such person at court.');
   if (p.fleet != null) return fail(`${p.name} is at sea.`);
@@ -738,8 +738,36 @@ export function promote(s: GameState, personId: number, rank: Rank, opts: { unit
   onPromotion(s, p);
   p.ready = info.ready;
   p.unitType = rank === 'explorer' ? opts.unit! : null;
-  const when = info.ready ? ` Ready in ${info.ready} season${info.ready > 1 ? 's' : ''}.` : '';
-  return { ok: true, message: `${p.name} is made ${info.name.toLowerCase()}.${when}` };
+  const posted = rank !== 'governor' && opts.fleet != null ? fleetById(s, opts.fleet) : undefined;
+  p.posted = posted?.id ?? null;
+  const when = info.ready ? ` Ready in ${info.ready} season${info.ready > 1 ? 's' : ''}` : '';
+  return { ok: true, message: `${p.name} is made ${info.name.toLowerCase()}.${when}${posted ? `${when ? ', and then takes' : ' They take'} command of ${posted.name}` : ''}${when || posted ? '.' : ''}` };
+}
+
+/** Promise a fleet to an explorer or merchant who is not ready yet (or take the promise back): they take command by themselves. */
+export function postLeader(world: World, s: GameState, personId: number, fleetId: number | null): CommandResult {
+  const p = courtPerson(s, personId);
+  if (!p) return fail('No such person at court.');
+  if (p.rank !== 'explorer' && p.rank !== 'merchant') return fail('Only explorers and merchants lead fleets.');
+  if (p.fleet != null) return fail(`${p.name} already leads a fleet.`);
+  if (fleetId == null) { p.posted = null; return { ok: true, message: `${p.name} waits for other orders.` }; }
+  const f = fleetById(s, fleetId);
+  if (!f) return fail('No such fleet.');
+  if (f.leader != null) return fail(`${f.name} already has a leader.`);
+  p.posted = f.id;
+  takePosts(world, s);
+  return { ok: true, message: p.fleet === f.id ? `${p.name} takes command of ${f.name}.` : `${p.name} will take command of ${f.name} when ready, if she lies in ${p.city ? portById(world, p.city, s)?.name : 'port'}.` };
+}
+
+/** Those promised a fleet take command of it, once they are ready and it lies in their port. */
+function takePosts(world: World, s: GameState) {
+  for (const p of s.people) {
+    if (p.posted == null) continue;
+    const f = fleetById(s, p.posted);
+    if (!p.alive || p.fleet != null || !f || f.leader != null || (p.rank !== 'explorer' && p.rank !== 'merchant')) { p.posted = null; continue; }
+    if (p.ready > 0 || f.at !== p.city) continue;
+    if (assignLeader(s, p.id, f.id).ok) log(s, 'court', `${p.name} takes command of ${f.name}${p.rank === 'explorer' ? ', as promised' : ''} in ${portById(world, f.at!, s)?.name}.`);
+  }
 }
 
 /** Back to plain courtier (only when not at sea). */
@@ -750,6 +778,7 @@ export function relieve(s: GameState, personId: number): CommandResult {
   for (const c of Object.values(s.cities)) if (c.governor === p.id) c.governor = null;
   p.rank = 'courtier';
   p.ready = 0;
+  p.posted = null;
   p.unitType = null;
   return { ok: true, message: `${p.name} returns to court.` };
 }
@@ -768,6 +797,8 @@ export function assignLeader(s: GameState, personId: number, fleetId: number): C
   f.leader = p.id;
   p.fleet = f.id;
   p.city = null;
+  p.posted = null;
+  for (const x of s.people) if (x.posted === f.id) x.posted = null;
   let msg = `${p.name} takes command of ${f.name}.`;
   for (const u of s.units.filter((x) => x.city === f.at && x.fleet == null && x.party == null)) {
     if (slotsUsed(s, f) >= slotsMax(f)) { msg += ' There is no room aboard for everyone waiting in port.'; break; }
@@ -1526,11 +1557,15 @@ export function seasonTick(world: World, s: GameState): void {
   s.treasury += Math.round(taxes * mods.taxes);
   tally(s, 'taxes');
 
+  const readyNow: Person[] = [];
   // the court: commissions take effect, salaries, a learned court helps the scholars
   for (const p of s.people) {
     if (!p.alive || p.ready <= 0) continue;
     p.ready--;
     if (p.ready > 0) continue;
+    readyNow.push(p);
+  }
+  for (const p of readyNow) {
     if (p.rank === 'explorer' && p.unitType) {
       const at = p.city ?? mainPort(s);
       s.units.push({ id: s.nextId++, type: p.unitType, fleet: null, city: at, party: null });
@@ -1539,6 +1574,7 @@ export function seasonTick(world: World, s: GameState): void {
       log(s, 'court', `${p.name} is ready to serve as ${RANK_INFO[p.rank].name.toLowerCase()}.`);
     }
   }
+  takePosts(world, s);
   const wages = Math.round(s.people.filter((p) => p.alive).reduce((t, p) => t + salary(p), 0));
   for (const p of s.people) if (p.alive && p.trait === 'learned' && p.fleet == null) addResearch(s, 1);
 

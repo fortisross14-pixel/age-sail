@@ -63,6 +63,8 @@ interface Store {
   sideTab: 'goals' | 'realm';
   showLedger: boolean;
   showSaves: boolean;
+  /** the fleet whose page the Fleets screen shows; null is the list */
+  fleetOpen: number | null;
   /** what the map shows over the chart */
   mapMode: 'realms' | 'finds' | 'peoples' | 'loyalty';
   /** the game as it stood before your last order, while that order can still be taken back */
@@ -191,7 +193,7 @@ export const useStore = create<Store>((set, get) => {
   return {
     phase: 'menu', hasSave: false, saveProblem: null, world: null, game: null, map: 'old', selectedFleet: null, selectedParty: null, landing: null, stance: 'assault', selectedPort: null, selectedColony: null, preview: null,
     hover: null, showWind: false, showGrid: false, highlightAll: false, showHelp: false, showSettings: false, showWelcome: false, showGuard: false, guardSeen: [],
-    drawer: null, courtTab: 'people', diploTab: 'peoples', researchTab: 'subjects', sideTab: pref('sideTab'), showLedger: false, showSaves: false, mapMode: 'realms', undo: null, dismissed: [], toast: null, busy: false,
+    drawer: null, courtTab: 'people', diploTab: 'peoples', researchTab: 'subjects', sideTab: pref('sideTab'), showLedger: false, showSaves: false, fleetOpen: null, mapMode: 'realms', undo: null, dismissed: [], toast: null, busy: false,
 
     set: (p) => set(p),
 
@@ -348,6 +350,7 @@ export const useStore = create<Store>((set, get) => {
           drawer: diplo ? 'diplomacy' : t.drawer, showLedger: false,
           ...(diplo ? { diploTab: diplo } : t.courtTab ? { courtTab: t.courtTab as Store['courtTab'] } : {}),
           ...(t.researchTab ? { researchTab: t.researchTab } : {}),
+          ...(t.fleetOpen != null ? { fleetOpen: t.fleetOpen } : {}),
           ...(t.colony ? { selectedColony: t.colony, selectedPort: t.colony } : {}),
         });
       }

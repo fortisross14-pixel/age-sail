@@ -230,7 +230,7 @@ A number that matters is changed against the harness (`tools/autoplay.ts`), befo
 | 2 | A world that pushes back | 15 | 15 |
 | 3 | Stories and dynasty | 14 | 14 |
 | 4 | Depth | 20 | 20 |
-| 5 | Interface depth | 20 | 20 |
+| 5 | Interface depth | 21 | 21 |
 | 6 | Balance | 10 | 8 |
 | 7 | Technical and visual polish (deferred) | 14 | 0 |
 
@@ -365,6 +365,7 @@ Function only: looks are Phase 7.
 | P5-18 | Cards for outcomes that were only a line of news: a rising put down, a treaty signed, the end of a war you joined, an expedition's return (successions, risings that succeed and battles had theirs already) | U5 | done |
 | P5-19 | Keys can be changed on the guide's Controls page, each row at a time, with a refusal when another key in the same place already does that; the choice is kept with the player's other preferences | U6 | done |
 | P5-20 | First-time hints at the top of Diplomacy, Dynasty, Laws and the Expedition, each closed once and for all | G3 | done |
+| P5-21 | Fleets as a list, then a page for each fleet (owner's report: "clunky", "I cannot select the explorer"). The list shows every fleet with its leader, ships, hold, stores, place and task. A fleet's page has what she is doing at the top and three tabs: command and people, ships (remove one, add the others lying here), trade route. A leader is chosen on that page from everyone free in port, in one click; a courtier made explorer or merchant for a fleet takes command of it by themselves when ready (`Person.posted`, command `post`). The selection card has Choose a leader and Open fleet; a second click on a selected fleet opens her page. Court: an explicit Make explorer button, and giving command returns to the fleet on the map | G3 | done |
 
 ### Phase 6: Balance
 

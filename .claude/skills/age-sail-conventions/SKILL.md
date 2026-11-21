@@ -134,6 +134,10 @@ one: `pixijs-rendering` (map), `save-systems` (saves), `procedural-gen` (mapgen)
 - **Undo** (`store.undo`): an order is undoable only if nothing in it is left to chance. A new
   `Command` kind goes in `UNDOABLE` in `src/store.ts` only if that holds; one that cannot be taken
   back and is easy to give by mistake goes in `CONFIRM`.
+- **A list, then a page.** A screen that holds many of a thing (fleets) shows them as a list and opens
+  one on its own page, with tabs for its parts and a way back; what a thing needs is done on its own
+  page (a fleet's leader is chosen on the fleet, not at Court). `store.fleetOpen` says which fleet's
+  page is open; any link to a fleet's page sets it with `drawer: 'fleets'`.
 - **What needs the player** is one list, `attention()` in `src/ui/attention.ts` (pure, no rules):
   End Turn's reminder, the count on its button and any future outliner read it. A new kind of
   reminder goes there, with a stable id so the player is asked once. Jump to things with

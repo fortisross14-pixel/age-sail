@@ -134,3 +134,28 @@ describe('Phase 5: what needs you', () => {
     expect(attention(state, world).find((a) => a.id === 'rebels-1')?.urgent).toBe(true);
   });
 });
+
+describe('a leader promised to a fleet', () => {
+  it('takes command by themselves when ready, and brings their unit aboard', async () => {
+    const { newGame, promote, endTurn, postLeader, mainPort } = await import('./game');
+    const { world, state } = newGame(11);
+    const f = state.fleets.find((x) => x.ships[0].type === 'carrack')!;
+    const p = state.people[0];
+    expect(promote(state, p.id, 'explorer', { unit: 'colonist', fleet: f.id }).ok).toBe(true);
+    expect(p.posted).toBe(f.id);
+    expect(f.leader).toBeNull();
+    state.events = [];
+    endTurn(world, state);
+    expect(f.leader).toBe(p.id);
+    expect(p.posted ?? null).toBeNull();
+    expect(state.chronicle.some((c) => c.text.includes('takes command'))).toBe(true);
+    // a promise can be made later, and to someone already ready it is kept at once
+    const q = state.people[1], other = state.fleets.find((x) => x !== f)!;
+    expect(promote(state, q.id, 'merchant').ok).toBe(true);
+    expect(postLeader(world, state, q.id, other.id).ok).toBe(true);
+    expect(other.leader).toBeNull();
+    state.events = [];
+    endTurn(world, state);
+    expect(other.at === mainPort(state) ? other.leader : q.id).toBe(q.id);
+  });
+});

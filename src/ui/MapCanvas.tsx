@@ -58,6 +58,7 @@ export function MapCanvas() {
           }
           if (fleetId != null) {
             if (s.selectedFleet !== fleetId) s.selectFleet(fleetId);
+            else s.set({ drawer: 'fleets', fleetOpen: fleetId });
             return;
           }
           const colony = g.colonies.find((c) => c.map === map && c.hex === hex);

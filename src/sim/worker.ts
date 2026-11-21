@@ -24,7 +24,8 @@ export type Command =
   | { kind: 'project'; city: string; project: ProjectKind }
   | { kind: 'assignLeader'; person: number; fleet: number }
   | { kind: 'recall'; fleet: number }
-  | { kind: 'promote'; person: number; rank: Rank; unit?: UnitType; city?: string }
+  | { kind: 'promote'; person: number; rank: Rank; unit?: UnitType; city?: string; fleet?: number }
+  | { kind: 'post'; person: number; fleet: number | null }
   | { kind: 'relieve'; person: number }
   | { kind: 'hire'; person: number }
   | { kind: 'embark'; unit: number; fleet: number }
@@ -132,7 +133,8 @@ const api = {
       case 'project': result = G.startProject(state, c.city, c.project); break;
       case 'assignLeader': result = G.assignLeader(state, c.person, c.fleet); break;
       case 'recall': result = G.recall(world, state, c.fleet); break;
-      case 'promote': result = G.promote(state, c.person, c.rank, { unit: c.unit, city: c.city }); break;
+      case 'promote': result = G.promote(state, c.person, c.rank, { unit: c.unit, city: c.city, fleet: c.fleet }); break;
+      case 'post': result = G.postLeader(world, state, c.person, c.fleet); break;
       case 'relieve': result = G.relieve(state, c.person); break;
       case 'hire': result = G.hire(state, c.person); break;
       case 'embark': result = G.embark(world, state, c.unit, c.fleet); break;

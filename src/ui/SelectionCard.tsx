@@ -41,7 +41,7 @@ export function SelectionCard() {
   const lowFood = fleet.supplies <= 2;
   return (
     <div className="selection" role="region" aria-label={`Selected fleet ${fleet.name}`}>
-      <ShipIcon type={fleet.ships[0].type} size={54} />
+      <button className="sel-open" title="Open this fleet’s page" aria-label={`Open ${fleet.name}`} onClick={() => set({ drawer: 'fleets', fleetOpen: fleet.id })}><ShipIcon type={fleet.ships[0].type} size={54} /></button>
       <div className="sel-main">
         <div className="sel-title">
           <b>{fleet.name}</b>
@@ -123,7 +123,8 @@ export function SelectionCard() {
             </>
           );
         })()}
-        {!preview && <button onClick={() => set({ drawer: 'fleets' })}>Details</button>}
+        {!preview && !leader && port?.kind === 'home' && <button className="primary" title="Without a leader she sails only charted waters" onClick={() => set({ drawer: 'fleets', fleetOpen: fleet.id })}>Choose a leader</button>}
+        {!preview && <button title="Her own page: command, ships, trade route" onClick={() => set({ drawer: 'fleets', fleetOpen: fleet.id })}>Open fleet</button>}
       </div>
       <button className="x" onClick={() => useStore.getState().selectFleet(null)} aria-label="Deselect">×</button>
     </div>

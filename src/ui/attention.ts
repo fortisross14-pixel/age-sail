@@ -9,6 +9,8 @@ import type { GameState, World } from '../sim/types';
 
 /** Where an item (or an objective's "Show me") takes the player. */
 export interface Target {
+  /** with the Fleets screen: open this fleet's own page */
+  fleetOpen?: number;
   drawer?: 'cities' | 'markets' | 'fleets' | 'court' | 'research' | 'chronicle';
   courtTab?: 'people' | 'petitioners' | 'peoples' | 'crowns' | 'dynasty' | 'europe';
   fleet?: number;
@@ -32,7 +34,7 @@ export function attention(g: GameState, world: World): Attention[] {
   const leading = new Set(g.parties.map((p) => p.leader));
 
   if (!objectiveDone(g, 'explorer')) {
-    out.push({ id: 'no-explorer', urgent: true, go: { drawer: 'court', courtTab: 'people' }, text: 'No explorer is commissioned: your ships cannot leave charted waters.' });
+    out.push({ id: 'no-explorer', urgent: true, go: { drawer: 'fleets', fleetOpen: g.fleets.find((f) => f.leader == null && f.at != null)?.id }, text: 'No explorer is commissioned: your ships cannot leave charted waters.' });
   }
   if (!g.research.current && TECHS.some((t) => techAvailable(g, t.id))) {
     out.push({ id: 'research', urgent: true, go: { drawer: 'research' }, text: 'Your scholars have nothing to study.' });
@@ -40,7 +42,7 @@ export function attention(g: GameState, world: World): Attention[] {
   for (const p of g.people) {
     if (!p.alive || p.ready !== 0 || p.fleet != null || leading.has(p.id)) continue;
     if (p.rank !== 'explorer' && p.rank !== 'merchant') continue;
-    out.push({ id: `leader-${p.id}`, urgent: true, go: { drawer: 'fleets' }, text: `${p.name}, ${p.rank}, is ready and has no fleet to lead.` });
+    out.push({ id: `leader-${p.id}`, urgent: true, go: { drawer: 'fleets', fleetOpen: g.fleets.find((f) => f.leader == null && f.at === p.city)?.id }, text: `${p.name}, ${p.rank}, is ready and has no fleet to lead.` });
   }
   for (const f of g.fleets) {
     if (f.at || f.order || f.route?.active || f.standing) continue;

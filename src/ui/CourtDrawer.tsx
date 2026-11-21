@@ -154,28 +154,44 @@ function PersonActions({ p }: { p: Person }) {
   const ungoverned = Object.values(game.cities).filter((c) => c.governor == null);
   const [city, setCity] = useState(ungoverned[0]?.id ?? '');
   const units: UnitType[] = ['colonist', 'infantry', 'missionary'];
+  const [unit, setUnit] = useState<UnitType>('colonist');
+  const [post, setPost] = useState(String(fleetsHere[0]?.id ?? ''));
+  // commissioned for a fleet: back to that fleet, where the promise shows
+  const commission = async (rank: 'explorer' | 'merchant') => {
+    const fleet = post && fleetsHere.some((f) => String(f.id) === post) ? Number(post) : undefined;
+    if (await run({ kind: 'promote', person: p.id, rank, ...(rank === 'explorer' ? { unit } : {}), ...(fleet != null ? { fleet } : {}) }) && fleet != null) { selectFleet(fleet); set({ drawer: 'fleets', fleetOpen: fleet }); }
+  };
   return (
     <div className="commissions">
       {p.rank === 'courtier' && atHome && (
         <>
           <div className="sec">Commission</div>
+          {fleetsHere.length > 0 && (
+            <label className="row post-to">
+              <span>Then take command of</span>
+              <select value={post} onChange={(e) => setPost(e.target.value)} aria-label="Fleet to command when ready">
+                {fleetsHere.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                <option value="">no fleet yet</option>
+              </select>
+            </label>
+          )}
           <div className="commission">
             <div className="c-head"><Icon name="navigation" size={22} tone="ink" /><b>Explorer</b><span className="cost-tag">{fmt(RANK_INFO.explorer.cost)} · 2 seasons</span></div>
-            <div className="muted small">Leads a fleet into unknown waters, with one of these at their side:</div>
+            <div className="muted small">Leads a fleet into unknown waters. One unit comes with them, free: choose which.</div>
             <div className="unit-choice">
               {units.map((u) => (
-                <button key={u} className="offer-card mini" disabled={game.treasury < RANK_INFO.explorer.cost} title={UNIT_INFO[u].blurb}
-                  onClick={() => void run({ kind: 'promote', person: p.id, rank: 'explorer', unit: u })}>
+                <button key={u} className={`offer-card mini ${unit === u ? 'selected' : ''}`} aria-pressed={unit === u} title={UNIT_INFO[u].blurb} onClick={() => setUnit(u)}>
                   <Art slot={`unit/${u}`} fallback={<img src={`${import.meta.env.BASE_URL}sprites/${UNIT_INFO[u].sprite}.png`} alt="" />} />
                   <span>{UNIT_INFO[u].name}</span>
                 </button>
               ))}
             </div>
+            <button className="adm-gold-btn" disabled={game.treasury < RANK_INFO.explorer.cost} onClick={() => commission('explorer')}>Make explorer, with {UNIT_INFO[unit].name.toLowerCase()}</button>
           </div>
           <div className="commission">
             <div className="c-head"><Icon name="commerce" size={22} tone="ink" /><b>Merchant</b><span className="cost-tag">{fmt(RANK_INFO.merchant.cost)} · 1 season</span></div>
             <div className="muted small">Leads trade fleets and runs trade routes on their own.</div>
-            <button className="adm-gold-btn" disabled={game.treasury < RANK_INFO.merchant.cost} onClick={() => void run({ kind: 'promote', person: p.id, rank: 'merchant' })}>Make merchant</button>
+            <button className="adm-gold-btn" disabled={game.treasury < RANK_INFO.merchant.cost} onClick={() => commission('merchant')}>Make merchant</button>
           </div>
           <div className="commission">
             <div className="c-head"><Icon name="construction" size={22} tone="ink" /><b>Governor</b><span className="cost-tag">free · at once</span></div>
@@ -191,13 +207,24 @@ function PersonActions({ p }: { p: Person }) {
           </div>
         </>
       )}
+      {(p.rank === 'explorer' || p.rank === 'merchant') && atHome && p.ready > 0 && (
+        <div className="commission">
+          <div className="c-head"><Icon name="fleets" size={22} tone="ink" /><b>Command when ready</b><span className="muted small">in {p.ready} season{p.ready > 1 ? 's' : ''}</span></div>
+          <div className="row">
+            {p.posted != null && game.fleets.some((f) => f.id === p.posted)
+              ? <><span>Promised {game.fleets.find((f) => f.id === p.posted)!.name}.</span><button className="small-btn" onClick={() => void run({ kind: 'post', person: p.id, fleet: null })}>Take it back</button></>
+              : fleetsHere.length ? fleetsHere.map((f) => <button key={f.id} className="adm-gold-btn" onClick={() => void run({ kind: 'post', person: p.id, fleet: f.id })}>{f.name}</button>)
+              : <span className="muted small">No fleet without a leader is in port.</span>}
+          </div>
+        </div>
+      )}
       {(p.rank === 'explorer' || p.rank === 'merchant') && atHome && p.ready === 0 && (
         <div className="commission">
           <div className="c-head"><Icon name="fleets" size={22} tone="ink" /><b>Give command</b><span className="muted small">in {portById(world, p.city!)?.name}</span></div>
           <div className="row">
             {fleetsHere.length ? fleetsHere.map((f) => (
               <button key={f.id} className="adm-gold-btn" onClick={async () => {
-                if (await run({ kind: 'assignLeader', person: p.id, fleet: f.id })) { selectFleet(f.id); set({ drawer: 'fleets' }); }
+                if (await run({ kind: 'assignLeader', person: p.id, fleet: f.id })) { selectFleet(f.id); set({ drawer: null }); setTimeout(() => getView()?.focusHex(f.map, f.hex), 0); }
               }}>{f.name}</button>
             )) : <span className="muted small">No fleet without a leader is in port. Merge or build one.</span>}
           </div>

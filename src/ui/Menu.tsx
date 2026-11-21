@@ -68,7 +68,7 @@ export function Menu() {
           <p className="muted small menu-note">{scenario ? `${SCENARIOS.find((x) => x.id === scenario)!.blurb} Goal: ${SCENARIOS.find((x) => x.id === scenario)!.ask}, by ${SCENARIOS.find((x) => x.id === scenario)!.by}.` : 'No goal but your own: the crown with the highest score when the age ends wins.'}</p>
           <label className="seed">World seed <input value={seed} onChange={(e) => setSeed(e.target.value.replace(/\D/g, ''))} inputMode="numeric" /></label>
         </div>
-        <p className="muted small">Version 0.21 · lead one of the five Atlantic crowns through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
+        <p className="muted small">Version 0.22 · lead one of the five Atlantic crowns through the age of sail: a fixed Europe, a new African coast and a new New World every voyage.</p>
       </div>
     </div>
   );

@@ -45,6 +45,8 @@ export function Drawer() {
   const [entering, setEntering] = useState(true);
   useStore((s) => `${s.courtTab}|${s.researchTab}`); // the hint follows the tab
   // the keyboard goes with the screen: focus moves into it when it opens
+  // the Fleets screen opens on its list unless a fleet was asked for
+  useEffect(() => { if (drawer !== 'fleets' && useStore.getState().fleetOpen != null) set({ fleetOpen: null }); }, [drawer, set]);
   useEffect(() => { if (drawer) setTimeout(() => document.querySelector<HTMLElement>('.drawer .adm-close')?.focus({ preventScroll: true }), 80); }, [drawer]);
   useEffect(() => {
     if (drawer && drawer !== shown) {
